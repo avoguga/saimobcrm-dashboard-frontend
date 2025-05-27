@@ -10,8 +10,6 @@ import BarChart from './BarChart';
 import LineChart from './LineChart';
 import PieChart from './PieChart';
 import FilterBar from './FilterBar';
-import CustomFieldsSection from './CustomFieldsSection';
-import ProgressiveLoading from './ProgressiveLoading';
 
 const Dashboard = () => {
   // Estado para controle de navegação
@@ -44,8 +42,6 @@ const Dashboard = () => {
     customEndDate: ''
   });
   
-  // Estados para controles UI
-  const [showCustomFields, setShowCustomFields] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadedSections, setLoadedSections] = useState([]);
 
@@ -453,13 +449,6 @@ const Dashboard = () => {
       {/* Botões de controle do dashboard */}
       <div className="dashboard-controls">
         <button 
-          className={`control-button ${showCustomFields ? 'active' : ''}`}
-          onClick={() => setShowCustomFields(!showCustomFields)}
-        >
-          {showCustomFields ? 'Ocultar Campos Personalizados' : 'Mostrar Campos Personalizados'}
-        </button>
-        
-        <button 
           className="control-button"
           onClick={() => {
             CacheService.clear();
@@ -482,7 +471,6 @@ const Dashboard = () => {
       ) : (
         <>
           {activeDashboard === 'marketing' ? <MarketingDashboard /> : <SalesDashboard />}
-          {showCustomFields && <CustomFieldsSection />}
         </>
       )}
     </div>
