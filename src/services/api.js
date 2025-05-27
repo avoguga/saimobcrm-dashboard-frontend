@@ -1,6 +1,4 @@
 // src/services/api.js
-import CacheService from './cache';
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://jwwcw84ccswsgkgcw8oc0g0w.167.88.39.225.sslip.io';
 
 /**
@@ -8,26 +6,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://jwwcw84ccswsgkgcw8oc0g0w
  */
 export const KommoAPI = {
   /**
-   * Realiza uma requisição GET para a API com suporte a cache
+   * Realiza uma requisição GET para a API
    * @param {string} endpoint - Endpoint da API
    * @param {Object} params - Parâmetros de consulta
-   * @param {boolean} useCache - Se deve usar cache (padrão: true)
-   * @param {number} cacheTTL - Tempo de vida do cache em ms (padrão: 5 minutos)
    * @returns {Promise} - Promise com os dados da resposta
    */
-  async get(endpoint, params = {}, useCache = true, cacheTTL = CacheService.DEFAULT_TTL) {
+  async get(endpoint, params = {}) {
     try {
-      // Verificar cache primeiro se estiver habilitado
-      if (useCache) {
-        const cacheKey = CacheService.generateKey(endpoint, params);
-        const cachedData = CacheService.get(cacheKey);
-        
-        if (cachedData) {
-          console.log(`Usando dados em cache para ${endpoint}`);
-          return cachedData;
-        }
-      }
-      
       // Construir URL com parâmetros
       const url = new URL(`${API_URL}${endpoint}`);
       Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
@@ -40,16 +25,8 @@ export const KommoAPI = {
         throw new Error(`Erro na requisição: ${response.status} - ${response.statusText}`);
       }
       
-      // Obter dados da resposta
-      const data = await response.json();
-      
-      // Armazenar no cache se estiver habilitado
-      if (useCache) {
-        const cacheKey = CacheService.generateKey(endpoint, params);
-        CacheService.set(cacheKey, data, cacheTTL);
-      }
-      
-      return data;
+      // Retornar os dados como JSON
+      return await response.json();
     } catch (error) {
       console.error(`Erro ao acessar ${endpoint}:`, error);
       // Retornar um objeto vazio ou valor padrão dependendo do endpoint
