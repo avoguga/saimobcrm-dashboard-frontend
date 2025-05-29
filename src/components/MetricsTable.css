@@ -1,0 +1,157 @@
+/* src/components/MetricsTable.css */
+.metrics-section {
+  margin: 20px 0;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.metrics-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #4E5859;
+}
+
+.metrics-table {
+  width: 100%;
+}
+
+.table-header {
+  display: flex;
+  background-color: #f8f9fa;
+  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header-cell {
+  font-weight: 600;
+  color: #4E5859;
+  text-align: left;
+}
+
+.table-body {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.table-row {
+  display: flex;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-row:hover {
+  background-color: rgba(78, 88, 89, 0.05);
+}
+
+.table-cell {
+  padding: 10px 12px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.numeric {
+  text-align: right;
+}
+
+.empty-table-message {
+  padding: 20px;
+  text-align: center;
+  color: #75777B;
+  font-style: italic;
+}
+
+/* Estilos mobile */
+.mobile-table {
+  display: none;
+}
+
+.mobile-row {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: #ffffff;
+}
+
+.mobile-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-cell:last-child {
+  border-bottom: none;
+}
+
+.mobile-header {
+  font-weight: 600;
+  color: #4E5859;
+  font-size: 13px;
+}
+
+.mobile-value {
+  font-size: 14px;
+}
+
+.mobile-value.numeric {
+  font-weight: 500;
+}
+
+/* Responsividade */
+@media (max-width: 992px) {
+  .metrics-title {
+    font-size: 16px;
+  }
+  
+  .table-cell {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-table {
+    display: none;
+  }
+  
+  .mobile-table {
+    display: block;
+  }
+  
+  .metrics-section {
+    padding: 12px;
+  }
+  
+  .metrics-title {
+    margin-bottom: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-section {
+    padding: 10px;
+  }
+  
+  .metrics-title {
+    font-size: 15px;
+  }
+  
+  .mobile-header {
+    font-size: 12px;
+  }
+  
+  .mobile-value {
+    font-size: 13px;
+  }
+}

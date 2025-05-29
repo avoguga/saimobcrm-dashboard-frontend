@@ -1,0 +1,117 @@
+/* src/components/KpiCard.css */
+.kpi-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.kpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.kpi-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #75777B;
+}
+
+.kpi-icon {
+  font-size: 20px;
+  color: #4E5859;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.kpi-subtitle {
+  font-size: 13px;
+  color: #75777B;
+  margin-bottom: 8px;
+}
+
+.kpi-trend {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpi-trend.up {
+  background-color: rgba(76, 224, 179, 0.1);
+  color: #4ce0b3;
+}
+
+.kpi-trend.down {
+  background-color: rgba(255, 58, 94, 0.1);
+  color: #ff3a5e;
+}
+
+.kpi-trend.neutral {
+  background-color: rgba(193, 197, 201, 0.1);
+  color: #75777B;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+  .kpi-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-card {
+    padding: 12px;
+  }
+  
+  .kpi-title {
+    font-size: 12px;
+  }
+  
+  .kpi-value {
+    font-size: 22px;
+    margin: 6px 0;
+  }
+  
+  .kpi-subtitle {
+    font-size: 12px;
+  }
+  
+  .kpi-trend {
+    font-size: 12px;
+    padding: 3px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-card {
+    padding: 10px;
+  }
+  
+  .kpi-value {
+    font-size: 20px;
+  }
+  
+  .kpi-icon {
+    font-size: 16px;
+  }
+}

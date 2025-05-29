@@ -1,5 +1,6 @@
 // src/components/MetricsTable.jsx
 import PropTypes from 'prop-types';
+import './MetricsTable.css';
 
 /**
  * Componente de tabela para exibir métricas e KPIs
