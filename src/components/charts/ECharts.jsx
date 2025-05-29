@@ -72,7 +72,7 @@ EChart.propTypes = {
 };
 
 /**
- * Componente de gráfico de pizza ECharts
+ * Componente de gráfico de pizza ECharts com melhor responsividade
  */
 export const EPieChart = ({ 
   title, 
@@ -86,21 +86,24 @@ export const EPieChart = ({
     return <div style={style || { height: '300px', width: '100%' }}>Nenhum dado disponível</div>;
   }
 
-  const option = {
-    title: title ? {
-      text: title,
-      left: 'center',
-      textStyle: {
-        color: COLORS.primary,
-        fontWeight: 'bold',
-        fontSize: 16
-      }
-    } : undefined,
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
-    },
-    legend: {
+  // Ajuste responsivo para a legenda
+  const getLegendOptions = () => {
+    // Em telas pequenas, sempre colocar a legenda na parte inferior
+    if (window.innerWidth < 768) {
+      return {
+        orient: 'horizontal',
+        left: 'center',
+        top: 'bottom',
+        itemWidth: 10,
+        itemHeight: 10,
+        textStyle: {
+          fontSize: 10,
+          color: COLORS.dark
+        }
+      };
+    }
+    
+    return {
       orient: legendPosition === 'right' ? 'vertical' : 'horizontal',
       left: legendPosition === 'right' ? 'right' : 'center',
       top: legendPosition === 'top' ? 'top' : 'bottom',
@@ -108,13 +111,31 @@ export const EPieChart = ({
       textStyle: {
         color: COLORS.dark
       }
+    };
+  };
+
+  const option = {
+    title: title ? {
+      text: title,
+      left: 'center',
+      textStyle: {
+        color: COLORS.primary,
+        fontWeight: 'bold',
+        fontSize: window.innerWidth < 768 ? 14 : 16
+      }
+    } : undefined,
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b}: {c} ({d}%)',
+      confine: true // Confina o tooltip à área do gráfico
     },
+    legend: getLegendOptions(),
     color: colorPalette,
     series: [
       {
         name: title || 'Distribuição',
         type: 'pie',
-        radius: radius,
+        radius: window.innerWidth < 480 ? ['30%', '70%'] : radius, // Raio menor para telas pequenas
         center: center,
         avoidLabelOverlap: true,
         itemStyle: {
@@ -129,7 +150,7 @@ export const EPieChart = ({
         emphasis: {
           label: {
             show: true,
-            fontSize: '14',
+            fontSize: window.innerWidth < 768 ? 12 : 14,
             fontWeight: 'bold'
           }
         },
@@ -159,7 +180,7 @@ EPieChart.propTypes = {
 };
 
 /**
- * Componente de gráfico de barras ECharts
+ * Componente de gráfico de barras ECharts com melhor responsividade
  */
 export const EBarChart = ({ 
   title, 
@@ -178,6 +199,22 @@ export const EBarChart = ({
   const xData = data.map(item => item[xKey]);
   const yData = data.map(item => item[yKey]);
   
+  // Ajustes responsivos
+  const isSmallScreen = window.innerWidth < 768;
+  const isVerySmallScreen = window.innerWidth < 480;
+  
+  // Truncar nomes longos em telas pequenas
+  const truncateLabel = (label) => {
+    if (isVerySmallScreen && typeof label === 'string' && label.length > 8) {
+      return label.substring(0, 8) + '...';
+    } else if (isSmallScreen && typeof label === 'string' && label.length > 12) {
+      return label.substring(0, 12) + '...';
+    }
+    return label;
+  };
+  
+  const processedXData = isSmallScreen ? xData.map(truncateLabel) : xData;
+  
   const option = {
     title: title ? {
       text: title,
@@ -185,33 +222,37 @@ export const EBarChart = ({
       textStyle: {
         color: COLORS.primary,
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: isSmallScreen ? 14 : 16
       }
     } : undefined,
     tooltip: {
       trigger: 'axis',
       axisPointer: {
         type: 'shadow'
-      }
+      },
+      confine: true // Confina o tooltip à área do gráfico
     },
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '3%',
+      bottom: isSmallScreen ? '15%' : '3%', // Mais espaço para labels em telas pequenas
       containLabel: true
     },
     [horizontal ? 'yAxis' : 'xAxis']: {
       type: 'category',
-      data: xData,
+      data: processedXData,
       axisLabel: {
         color: COLORS.dark,
-        rotate: horizontal ? 0 : 30
+        rotate: horizontal ? 0 : (isVerySmallScreen ? 45 : (isSmallScreen ? 30 : 30)),
+        fontSize: isSmallScreen ? 10 : 12,
+        interval: isSmallScreen ? 'auto' : 0 // Auto spacing em telas pequenas
       }
     },
     [horizontal ? 'xAxis' : 'yAxis']: {
       type: 'value',
       axisLabel: {
-        color: COLORS.dark
+        color: COLORS.dark,
+        fontSize: isSmallScreen ? 10 : 12
       }
     },
     series: [
@@ -228,7 +269,7 @@ export const EBarChart = ({
             color: COLORS.secondary
           }
         },
-        barWidth: horizontal ? 20 : '60%'
+        barWidth: horizontal ? 20 : (isSmallScreen ? '50%' : '60%')
       }
     ]
   };
@@ -247,7 +288,7 @@ EBarChart.propTypes = {
 };
 
 /**
- * Componente de gráfico de linha ECharts
+ * Componente de gráfico de linha ECharts com melhor responsividade
  */
 export const ELineChart = ({ 
   title, 
@@ -267,6 +308,21 @@ export const ELineChart = ({
   const xData = data.map(item => item[xKey]);
   const yData = data.map(item => item[yKey]);
   
+  // Ajustes responsivos
+  const isSmallScreen = window.innerWidth < 768;
+  const isVerySmallScreen = window.innerWidth < 480;
+  
+  // Em telas pequenas, mostrar menos pontos no eixo X
+  const calculateInterval = () => {
+    if (isVerySmallScreen && xData.length > 6) {
+      return Math.ceil(xData.length / 4);
+    }
+    if (isSmallScreen && xData.length > 8) {
+      return Math.ceil(xData.length / 6);
+    }
+    return 0; // Mostrar todos os labels
+  };
+  
   const option = {
     title: title ? {
       text: title,
@@ -274,16 +330,17 @@ export const ELineChart = ({
       textStyle: {
         color: COLORS.primary,
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: isSmallScreen ? 14 : 16
       }
     } : undefined,
     tooltip: {
-      trigger: 'axis'
+      trigger: 'axis',
+      confine: true // Confina o tooltip à área do gráfico
     },
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '3%',
+      bottom: isSmallScreen ? '10%' : '3%',
       containLabel: true
     },
     xAxis: {
@@ -291,13 +348,17 @@ export const ELineChart = ({
       boundaryGap: false,
       data: xData,
       axisLabel: {
-        color: COLORS.dark
+        color: COLORS.dark,
+        fontSize: isSmallScreen ? 10 : 12,
+        interval: calculateInterval(),
+        rotate: isVerySmallScreen ? 30 : 0
       }
     },
     yAxis: {
       type: 'value',
       axisLabel: {
-        color: COLORS.dark
+        color: COLORS.dark,
+        fontSize: isSmallScreen ? 10 : 12
       }
     },
     series: [
@@ -308,12 +369,12 @@ export const ELineChart = ({
         data: yData,
         smooth: smooth,
         symbol: 'circle',
-        symbolSize: 6,
+        symbolSize: isSmallScreen ? 4 : 6,
         itemStyle: {
           color: color
         },
         lineStyle: {
-          width: 3,
+          width: isSmallScreen ? 2 : 3,
           color: color
         },
         areaStyle: area ? {
@@ -347,7 +408,7 @@ ELineChart.propTypes = {
 };
 
 /**
- * Componente de gráfico de gauge ECharts
+ * Componente de gráfico de gauge ECharts com melhor responsividade
  */
 export const EGaugeChart = ({ 
   title, 
@@ -361,6 +422,9 @@ export const EGaugeChart = ({
     return <div style={style || { height: '300px', width: '100%' }}>Nenhum dado disponível</div>;
   }
 
+  // Ajustes responsivos
+  const isSmallScreen = window.innerWidth < 768;
+  
   const option = {
     title: title ? {
       text: title,
@@ -368,11 +432,12 @@ export const EGaugeChart = ({
       textStyle: {
         color: COLORS.primary,
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: isSmallScreen ? 14 : 16
       }
     } : undefined,
     tooltip: {
-      formatter: '{a} <br/>{b} : {c}%'
+      formatter: '{a} <br/>{b} : {c}%',
+      confine: true
     },
     series: [
       {
@@ -380,16 +445,19 @@ export const EGaugeChart = ({
         type: 'gauge',
         min: min,
         max: max,
+        radius: isSmallScreen ? '90%' : '100%', // Menor para telas pequenas
+        center: ['50%', '60%'], // Centraliza melhor em telas pequenas
         detail: { 
           formatter: '{value}%',
           color: COLORS.dark,
-          fontSize: 18,
-          fontWeight: 'bold'
+          fontSize: isSmallScreen ? 16 : 18,
+          fontWeight: 'bold',
+          offsetCenter: [0, '30%']
         },
         data: [{ value, name: title || 'Valor' }],
         axisLine: {
           lineStyle: {
-            width: 30,
+            width: isSmallScreen ? 20 : 30,
             color: [
               [0.3, COLORS.danger],
               [0.7, COLORS.warning],
@@ -419,7 +487,7 @@ EGaugeChart.propTypes = {
 };
 
 /**
- * Componente de gráfico de radar ECharts
+ * Componente de gráfico de radar ECharts com melhor responsividade
  */
 export const ERadarChart = ({ 
   title, 
@@ -432,6 +500,9 @@ export const ERadarChart = ({
     return <div style={style || { height: '300px', width: '100%' }}>Nenhum dado disponível</div>;
   }
 
+  // Ajustes responsivos
+  const isSmallScreen = window.innerWidth < 768;
+  
   const option = {
     title: title ? {
       text: title,
@@ -439,12 +510,15 @@ export const ERadarChart = ({
       textStyle: {
         color: COLORS.primary,
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: isSmallScreen ? 14 : 16
       }
     } : undefined,
-    tooltip: {},
+    tooltip: {
+      confine: true
+    },
     radar: {
       indicator: indicators,
+      radius: isSmallScreen ? '65%' : '75%',
       splitArea: {
         areaStyle: {
           color: ['rgba(255, 255, 255, 0.5)'],
@@ -454,7 +528,7 @@ export const ERadarChart = ({
       },
       axisName: {
         color: COLORS.dark,
-        fontSize: 12
+        fontSize: isSmallScreen ? 10 : 12
       }
     },
     series: [
@@ -463,12 +537,12 @@ export const ERadarChart = ({
         type: 'radar',
         data: data,
         symbol: 'circle',
-        symbolSize: 6,
+        symbolSize: isSmallScreen ? 4 : 6,
         itemStyle: {
           color: color
         },
         lineStyle: {
-          width: 3
+          width: isSmallScreen ? 2 : 3
         },
         areaStyle: {
           color: echarts.color.modifyAlpha(color, 0.3)

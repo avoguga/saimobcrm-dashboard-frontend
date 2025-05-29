@@ -1,5 +1,6 @@
 // src/components/KpiCard.jsx
 import PropTypes from 'prop-types';
+import './KpiCard.css'; // Adicionar o arquivo CSS
 
 /**
  * Componente de cartão KPI para exibir métricas importantes

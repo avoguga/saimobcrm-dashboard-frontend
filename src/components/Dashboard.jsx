@@ -18,28 +18,63 @@ const COLORS = {
 };
 
 // Dashboard principal otimizado
-const Dashboard = () => {
+function Dashboard() {
   const [activeTab, setActiveTab] = useState('marketing');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [marketingData, setMarketingData] = useState(null);
   const [salesData, setSalesData] = useState(null);
   const [period, setPeriod] = useState('90d');
+  
+  // Hook para detecção de tamanho de tela responsiva
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+  
+  // Constantes de responsividade
+  const isMobile = windowSize.width < 768;
+  const isTablet = windowSize.width >= 768 && windowSize.width < 1200;
+  const isSmallMobile = windowSize.width < 480;
+
+  // Hook para atualizar o tamanho da janela
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    // Limpeza
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Carregar dados da API
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      setError(null);
+      
       try {
-        const marketingResponse = await KommoAPI.getMarketingDashboard();
-        const salesResponse = await KommoAPI.getSalesDashboard();
+        // Converter o período para dias
+        const days = parseInt(period.replace('d', ''));
+        
+        // Agora as chamadas não vão falhar completamente se um endpoint falhar
+        const marketingResponse = await KommoAPI.getMarketingDashboard(days);
+        const salesResponse = await KommoAPI.getSalesDashboard(days);
+        
+        // Log para depuração
+        console.log('Marketing dashboard carregado:', marketingResponse);
+        console.log('Sales dashboard carregado:', salesResponse);
         
         setMarketingData(marketingResponse);
         setSalesData(salesResponse);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
-        // Usar dados mockados em caso de erro
-        setMarketingData(KommoAPI.getMockData('/marketing/dashboard'));
-        setSalesData(KommoAPI.getMockData('/sales/dashboard'));
+        setError(`Falha ao comunicar com o servidor. Por favor, tente novamente mais tarde.`);
       } finally {
         setIsLoading(false);
       }
@@ -48,16 +83,89 @@ const Dashboard = () => {
     fetchData();
   }, [period]);
 
+  // Atualizar dados
+  const refreshData = async () => {
+    setIsLoading(true);
+    try {
+      const days = parseInt(period.replace('d', ''));
+      
+      if (activeTab === 'marketing') {
+        const marketingResponse = await KommoAPI.getMarketingDashboard(days);
+        setMarketingData(marketingResponse);
+      } else {
+        const salesResponse = await KommoAPI.getSalesDashboard(days);
+        setSalesData(salesResponse);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar dados:', error);
+      setError(`Não foi possível atualizar os dados: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Helpers responsivos
+  const getChartHeight = (size = 'medium') => {
+    if (size === 'small') {
+      return isSmallMobile ? '150px' : (isMobile ? '180px' : '200px');
+    } else if (size === 'medium') {
+      return isSmallMobile ? '180px' : (isMobile ? '220px' : '250px');
+    } else if (size === 'large') {
+      return isSmallMobile ? '200px' : (isMobile ? '250px' : '300px');
+    }
+    return '250px';
+  };
+  
+  const truncateText = (text, maxLength) => {
+    if (!text || typeof text !== 'string') return text;
+    const limit = isSmallMobile ? 10 : (isMobile ? 15 : 20);
+    const finalLength = maxLength || limit;
+    return text.length > finalLength ? text.substring(0, finalLength) + '...' : text;
+  };
+
   // Renderizar conteúdo de loading
   if (isLoading) {
     return (
       <div className="dashboard-optimized">
         <div className="dashboard-header">
-          <h1>Dashboard SA IMOB</h1>
+          <div className="brand">
+            <h1>SA IMOB</h1>
+            <span className="subtitle">Kommo CRM Dashboard</span>
+          </div>
         </div>
         <div className="loading">
           <div className="spinner"></div>
           <div className="loading-text">Carregando dados do Kommo CRM...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Verificar se houve erro
+  if (error) {
+    return (
+      <div className="dashboard-optimized">
+        <div className="dashboard-header">
+          <div className="brand">
+            <h1>SA IMOB</h1>
+            <span className="subtitle">Kommo CRM Dashboard</span>
+          </div>
+        </div>
+        <div className="error-message">
+          <h3>Erro ao carregar dados</h3>
+          <p>{error}</p>
+          <p className="error-info">Alguns endpoints estão apresentando problemas:</p>
+          <ul className="error-list">
+            <li>GET /leads/by-advertisement - Erro 500 (Interno do Servidor)</li>
+            <li>GET /sales/trends - Erro 404 (Não Encontrado)</li>
+          </ul>
+          <button 
+            className="action-button" 
+            onClick={refreshData}
+            style={{ marginTop: '20px' }}
+          >
+            <span className="icon">↻</span> Tentar Novamente
+          </button>
         </div>
       </div>
     );
@@ -68,22 +176,35 @@ const Dashboard = () => {
     return (
       <div className="dashboard-optimized">
         <div className="dashboard-header">
-          <h1>Dashboard SA IMOB</h1>
+          <div className="brand">
+            <h1>SA IMOB</h1>
+            <span className="subtitle">Kommo CRM Dashboard</span>
+          </div>
         </div>
         <div className="error-message">
-          Erro ao carregar dados. Por favor, tente novamente mais tarde.
+          Erro ao carregar dados. Os dados estão incompletos.
+          <button 
+            className="action-button" 
+            onClick={refreshData}
+            style={{ marginTop: '20px' }}
+          >
+            <span className="icon">↻</span> Tentar Novamente
+          </button>
         </div>
       </div>
     );
   }
 
-  // Mini card para métricas
+  // Mini card para métricas com suporte a responsividade
   const MiniMetricCard = ({ title, value, subtitle, color, icon, trend, trendUp }) => {
+    // Truncar título em telas pequenas
+    const titleDisplay = truncateText(title, isSmallMobile ? 10 : (isMobile ? 15 : undefined));
+    
     return (
       <div className="mini-metric-card">
         <div className="mini-metric-content">
           <div className="mini-metric-header">
-            <div className="mini-metric-title">{title}</div>
+            <div className="mini-metric-title" title={title}>{titleDisplay}</div>
             {icon && <div className="mini-metric-icon">{icon}</div>}
           </div>
           <div className="mini-metric-value" style={{ color }}>{value}</div>
@@ -98,7 +219,7 @@ const Dashboard = () => {
     );
   };
 
-  // Componente de gráfico compacto
+  // Componente de gráfico compacto com responsividade
   const CompactChart = ({ type, data, config, style = { height: '100%', width: '100%' } }) => {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
@@ -111,19 +232,64 @@ const Dashboard = () => {
         
         let option = {};
         
+        // Verificar se estamos em tela pequena
+        const isSmallScreen = windowSize.width < 768;
+        const isVerySmallScreen = windowSize.width < 480;
+        
+        // Função para truncar labels
+        const truncateLabel = (label) => {
+          if (isVerySmallScreen && typeof label === 'string' && label.length > 8) {
+            return label.substring(0, 8) + '...';
+          } else if (isSmallScreen && typeof label === 'string' && label.length > 12) {
+            return label.substring(0, 12) + '...';
+          }
+          return label;
+        };
+        
         if (type === 'line') {
+          // Processamento de dados para telas pequenas
+          const xData = isSmallScreen 
+            ? data.map(item => truncateLabel(item[config.xKey]))
+            : data.map(item => item[config.xKey]);
+            
+          // Cálculo de intervalo para telas pequenas (mostrar menos pontos)
+          const calculateInterval = () => {
+            if (isVerySmallScreen && xData.length > 6) {
+              return Math.ceil(xData.length / 4);
+            }
+            if (isSmallScreen && xData.length > 8) {
+              return Math.ceil(xData.length / 6);
+            }
+            return 0; // Mostrar todos os labels
+          };
+          
           option = {
-            grid: { top: 15, right: 15, bottom: 25, left: 35, containLabel: true },
-            tooltip: { trigger: 'axis' },
+            grid: { 
+              top: 15, 
+              right: 15, 
+              bottom: isSmallScreen ? 40 : 25, 
+              left: isSmallScreen ? 40 : 35, 
+              containLabel: true 
+            },
+            tooltip: { 
+              trigger: 'axis',
+              confine: true // Confina o tooltip à área do gráfico
+            },
             xAxis: {
               type: 'category',
-              data: data.map(item => item[config.xKey]),
-              axisLabel: { fontSize: 10 },
+              data: xData,
+              axisLabel: { 
+                fontSize: isSmallScreen ? 9 : 10, 
+                interval: calculateInterval(),
+                rotate: isVerySmallScreen ? 45 : 0
+              },
               axisLine: { lineStyle: { color: COLORS.light } }
             },
             yAxis: {
               type: 'value',
-              axisLabel: { fontSize: 10 },
+              axisLabel: { 
+                fontSize: isSmallScreen ? 9 : 10 
+              },
               splitLine: { lineStyle: { color: COLORS.light, opacity: 0.5 } }
             },
             series: [{
@@ -131,8 +297,11 @@ const Dashboard = () => {
               type: 'line',
               smooth: true,
               symbol: 'circle',
-              symbolSize: 5,
-              lineStyle: { width: 3, color: config.color || COLORS.primary },
+              symbolSize: isSmallScreen ? 4 : 5,
+              lineStyle: { 
+                width: isSmallScreen ? 2 : 3, 
+                color: config.color || COLORS.primary 
+              },
               itemStyle: { color: config.color || COLORS.primary },
               areaStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -143,23 +312,29 @@ const Dashboard = () => {
             }]
           };
         } else if (type === 'pie') {
+          // Ajustes responsivos para gráficos de pizza
           option = {
             tooltip: {
               trigger: 'item',
-              formatter: '{b}: {c} ({d}%)'
+              formatter: '{b}: {c} ({d}%)',
+              confine: true
             },
             legend: {
-              orient: 'vertical',
-              right: 10,
-              top: 'center',
-              itemWidth: 10,
-              itemHeight: 10,
-              textStyle: { fontSize: 10 }
+              orient: isSmallScreen ? 'horizontal' : 'vertical',
+              right: isSmallScreen ? 'center' : 10,
+              top: isSmallScreen ? 'bottom' : 'center',
+              bottom: isSmallScreen ? 0 : undefined,
+              itemWidth: isSmallScreen ? 8 : 10,
+              itemHeight: isSmallScreen ? 8 : 10,
+              textStyle: { 
+                fontSize: isSmallScreen ? 9 : 10,
+                padding: isSmallScreen ? [0, 2] : [0, 5]
+              }
             },
             series: [{
               type: 'pie',
-              radius: ['40%', '70%'],
-              center: ['30%', '50%'],
+              radius: isSmallScreen ? ['30%', '65%'] : ['40%', '70%'],
+              center: isSmallScreen ? ['40%', '45%'] : ['30%', '50%'],
               avoidLabelOverlap: true,
               itemStyle: {
                 borderRadius: 3,
@@ -179,24 +354,45 @@ const Dashboard = () => {
             }]
           };
         } else if (type === 'bar') {
+          // Processamento de dados para telas pequenas
+          const xData = data.map(item => item[config.xKey]);
+          const processedXData = isSmallScreen 
+            ? xData.map(truncateLabel) 
+            : xData;
+            
           option = {
-            grid: { top: 15, right: 15, bottom: 25, left: 35, containLabel: true },
-            tooltip: { trigger: 'axis' },
+            grid: { 
+              top: 15, 
+              right: 15, 
+              bottom: isSmallScreen ? 40 : 25, 
+              left: isSmallScreen ? 40 : 35, 
+              containLabel: true 
+            },
+            tooltip: { 
+              trigger: 'axis',
+              confine: true
+            },
             xAxis: {
               type: 'category',
-              data: data.map(item => item[config.xKey]),
-              axisLabel: { fontSize: 10, interval: 0, rotate: 30 },
+              data: processedXData,
+              axisLabel: { 
+                fontSize: isSmallScreen ? 9 : 10, 
+                interval: isVerySmallScreen ? 'auto' : 0, 
+                rotate: isVerySmallScreen ? 45 : (isSmallScreen ? 30 : 30) 
+              },
               axisLine: { lineStyle: { color: COLORS.light } }
             },
             yAxis: {
               type: 'value',
-              axisLabel: { fontSize: 10 },
+              axisLabel: { 
+                fontSize: isSmallScreen ? 9 : 10 
+              },
               splitLine: { lineStyle: { color: COLORS.light, opacity: 0.5 } }
             },
             series: [{
               data: data.map(item => item[config.yKey]),
               type: 'bar',
-              barMaxWidth: '60%',
+              barMaxWidth: isSmallScreen ? '40%' : '60%',
               itemStyle: { 
                 color: config.color || COLORS.primary,
                 borderRadius: [3, 3, 0, 0]
@@ -204,6 +400,7 @@ const Dashboard = () => {
             }]
           };
         } else if (type === 'gauge') {
+          // Ajustes responsivos para gráficos de gauge
           option = {
             series: [{
               type: 'gauge',
@@ -211,10 +408,11 @@ const Dashboard = () => {
               endAngle: 0,
               min: 0,
               max: 100,
-              radius: '100%',
+              radius: isSmallScreen ? '90%' : '100%',
+              center: ['50%', '60%'],
               axisLine: {
                 lineStyle: {
-                  width: 20,
+                  width: isSmallScreen ? 15 : 20,
                   color: [
                     [0.3, COLORS.danger],
                     [0.7, COLORS.warning],
@@ -224,14 +422,14 @@ const Dashboard = () => {
               },
               pointer: {
                 itemStyle: { color: 'inherit' },
-                length: '60%',
-                width: 5
+                length: isSmallScreen ? '50%' : '60%',
+                width: isSmallScreen ? 4 : 5
               },
               axisTick: { show: false },
               splitLine: { show: false },
               axisLabel: { show: false },
               detail: {
-                fontSize: 20,
+                fontSize: isSmallScreen ? 16 : 20,
                 offsetCenter: [0, '0%'],
                 formatter: '{value}%',
                 color: COLORS.dark
@@ -259,12 +457,12 @@ const Dashboard = () => {
           chartInstance.current = null;
         };
       }
-    }, [data, type, config]);
+    }, [data, type, config, windowSize]); // Adicionado windowSize às dependências
     
     return <div ref={chartRef} style={style} />;
   };
 
-  // Indicador NPS
+  // Indicador NPS com responsividade
   const NPSIndicator = ({ score }) => {
     let category = '';
     let color = '';
@@ -280,11 +478,24 @@ const Dashboard = () => {
       color = COLORS.danger;
     }
     
+    // Layout responsivo para NPS
     return (
       <div className="nps-indicator">
-        <div className="nps-score" style={{ color }}>{score}%</div>
-        <div className="nps-category" style={{ color }}>{category}</div>
-        <div className="nps-breakdown">
+        <div className="nps-score" style={{ 
+          color, 
+          fontSize: isSmallMobile ? '32px' : (isMobile ? '36px' : '48px')
+        }}>
+          {score}%
+        </div>
+        <div className="nps-category" style={{ 
+          color, 
+          fontSize: isSmallMobile ? '14px' : (isMobile ? '16px' : '18px')
+        }}>
+          {category}
+        </div>
+        <div className="nps-breakdown" style={{ 
+          flexDirection: isMobile ? 'column' : 'row'
+        }}>
           <div className="nps-segment promoters">
             <div className="nps-segment-label">Promotores</div>
             <div className="nps-segment-value">{Math.round(score * 0.75)}%</div>
@@ -304,6 +515,17 @@ const Dashboard = () => {
 
   // Renderizar o Dashboard de Marketing
   const renderMarketingDashboard = () => {
+    // Verificar se os dados necessários estão disponíveis
+    if (!marketingData.facebookMetrics) {
+      return (
+        <div className="dashboard-content">
+          <div className="error-message">
+            Dados de métricas do Facebook não disponíveis.
+          </div>
+        </div>
+      );
+    }
+
     const facebookMetrics = marketingData.facebookMetrics;
 
     return (
@@ -337,25 +559,29 @@ const Dashboard = () => {
         {/* Linha 1: KPIs principais */}
         <div className="dashboard-row row-compact">
           <div className="card card-metrics-group">
-            <div className="card-title">Leads - Últimos 90 dias</div>
+            <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
             <div className="metrics-group">
               <MiniMetricCard
                 title="Total de Leads"
-                value={marketingData.totalLeads}
+                value={marketingData.totalLeads || 0}
                 color={COLORS.primary}
               />
-              <MiniMetricCard
-                title="Leads Facebook"
-                value={marketingData.leadsBySource[0].value}
-                subtitle={`${Math.round(marketingData.leadsBySource[0].value / marketingData.totalLeads * 100)}%`}
-                color={COLORS.secondary}
-              />
-              <MiniMetricCard
-                title="Leads OLX"
-                value={marketingData.leadsBySource[2].value}
-                subtitle={`${Math.round(marketingData.leadsBySource[2].value / marketingData.totalLeads * 100)}%`}
-                color={COLORS.tertiary}
-              />
+              {marketingData.leadsBySource && marketingData.leadsBySource.length > 0 && (
+                <>
+                  <MiniMetricCard
+                    title="Leads Facebook"
+                    value={marketingData.leadsBySource.find(src => src.name.includes('Facebook'))?.value || 0}
+                    subtitle={`${Math.round((marketingData.leadsBySource.find(src => src.name.includes('Facebook'))?.value || 0) / marketingData.totalLeads * 100)}%`}
+                    color={COLORS.secondary}
+                  />
+                  <MiniMetricCard
+                    title="Leads OLX"
+                    value={marketingData.leadsBySource.find(src => src.name.includes('OLX'))?.value || 0}
+                    subtitle={`${Math.round((marketingData.leadsBySource.find(src => src.name.includes('OLX'))?.value || 0) / marketingData.totalLeads * 100)}%`}
+                    color={COLORS.tertiary}
+                  />
+                </>
+              )}
             </div>
           </div>
 
@@ -364,17 +590,17 @@ const Dashboard = () => {
             <div className="metrics-group">
               <MiniMetricCard
                 title="Custo por Lead"
-                value={`R$ ${facebookMetrics.costPerLead.toFixed(2)}`}
+                value={`R$ ${facebookMetrics.costPerLead?.toFixed(2) || 0}`}
                 color={COLORS.primary}
               />
               <MiniMetricCard
                 title="CTR"
-                value={`${facebookMetrics.ctr}%`}
+                value={`${facebookMetrics.ctr || 0}%`}
                 color={COLORS.success}
               />
               <MiniMetricCard
                 title="CPC"
-                value={`R$ ${facebookMetrics.cpc}`}
+                value={`R$ ${facebookMetrics.cpc || 0}`}
                 color={COLORS.tertiary}
               />
             </div>
@@ -385,17 +611,17 @@ const Dashboard = () => {
             <div className="metrics-group">
               <MiniMetricCard
                 title="Investimento"
-                value={`R$ ${Math.round(facebookMetrics.totalSpent).toLocaleString('pt-BR')}`}
+                value={`R$ ${Math.round(facebookMetrics.totalSpent || 0).toLocaleString('pt-BR')}`}
                 color={COLORS.secondary}
               />
               <MiniMetricCard
                 title="Impressões"
-                value={facebookMetrics.impressions.toLocaleString('pt-BR')}
+                value={(facebookMetrics.impressions || 0).toLocaleString('pt-BR')}
                 color={COLORS.primary}
               />
               <MiniMetricCard
                 title="Alcance"
-                value={facebookMetrics.reach.toLocaleString('pt-BR')}
+                value={(facebookMetrics.reach || 0).toLocaleString('pt-BR')}
                 color={COLORS.tertiary}
               />
             </div>
@@ -406,22 +632,30 @@ const Dashboard = () => {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Leads por Fonte</div>
-            <CompactChart 
-              type="pie" 
-              data={marketingData.leadsBySource} 
-              config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
-              style={{ height: '250px' }}
-            />
+            {marketingData.leadsBySource && marketingData.leadsBySource.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={marketingData.leadsBySource} 
+                config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
+                style={{ height: getChartHeight('medium') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-lg">
-            <div className="card-title">Tendência de Leads (Últimos 8 meses)</div>
-            <CompactChart 
-              type="line" 
-              data={marketingData.metricsTrend} 
-              config={{ xKey: 'month', yKey: 'leads', color: COLORS.primary }}
-              style={{ height: '250px' }}
-            />
+            <div className="card-title">Tendência de Leads (Últimos meses)</div>
+            {marketingData.metricsTrend && marketingData.metricsTrend.length > 0 ? (
+              <CompactChart 
+                type="line" 
+                data={marketingData.metricsTrend} 
+                config={{ xKey: 'month', yKey: 'leads', color: COLORS.primary }}
+                style={{ height: getChartHeight('medium') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
 
@@ -429,32 +663,44 @@ const Dashboard = () => {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Tendência de CPL</div>
-            <CompactChart 
-              type="line" 
-              data={marketingData.metricsTrend} 
-              config={{ xKey: 'month', yKey: 'cpl', color: COLORS.secondary }}
-              style={{ height: '200px' }}
-            />
+            {marketingData.metricsTrend && marketingData.metricsTrend.length > 0 ? (
+              <CompactChart 
+                type="line" 
+                data={marketingData.metricsTrend} 
+                config={{ xKey: 'month', yKey: 'cpl', color: COLORS.secondary }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Tendência de Investimento</div>
-            <CompactChart 
-              type="line" 
-              data={marketingData.metricsTrend} 
-              config={{ xKey: 'month', yKey: 'spent', color: COLORS.tertiary }}
-              style={{ height: '200px' }}
-            />
+            {marketingData.metricsTrend && marketingData.metricsTrend.length > 0 ? (
+              <CompactChart 
+                type="line" 
+                data={marketingData.metricsTrend} 
+                config={{ xKey: 'month', yKey: 'spent', color: COLORS.tertiary }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Leads por Anúncio</div>
-            <CompactChart 
-              type="bar" 
-              data={marketingData.leadsByAd} 
-              config={{ xKey: 'name', yKey: 'value', color: COLORS.success }}
-              style={{ height: '200px' }}
-            />
+            {marketingData.leadsByAd && marketingData.leadsByAd.length > 0 ? (
+              <CompactChart 
+                type="bar" 
+                data={marketingData.leadsByAd} 
+                config={{ xKey: 'name', yKey: 'value', color: COLORS.success }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
 
@@ -462,32 +708,44 @@ const Dashboard = () => {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Leads por Tag</div>
-            <CompactChart 
-              type="pie" 
-              data={marketingData.leadsByTag} 
-              config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary] }}
-              style={{ height: '200px' }}
-            />
+            {marketingData.leadsByTag && marketingData.leadsByTag.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={marketingData.leadsByTag} 
+                config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary] }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Tipo de Imóvel</div>
-            <CompactChart 
-              type="pie" 
-              data={marketingData.customFields.propertyType} 
-              config={{ colors: [COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
-              style={{ height: '200px' }}
-            />
+            {marketingData.customFields && marketingData.customFields.propertyType && marketingData.customFields.propertyType.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={marketingData.customFields.propertyType} 
+                config={{ colors: [COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Região de Interesse</div>
-            <CompactChart 
-              type="pie" 
-              data={marketingData.customFields.regionInterest} 
-              config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success] }}
-              style={{ height: '200px' }}
-            />
+            {marketingData.customFields && marketingData.customFields.regionInterest && marketingData.customFields.regionInterest.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={marketingData.customFields.regionInterest} 
+                config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success] }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
 
@@ -498,27 +756,27 @@ const Dashboard = () => {
             <div className="metrics-group">
               <MiniMetricCard
                 title="Curtidas"
-                value={facebookMetrics.engagement.likes.toLocaleString('pt-BR')}
+                value={(facebookMetrics.engagement?.likes || 0).toLocaleString('pt-BR')}
                 color={COLORS.primary}
               />
               <MiniMetricCard
                 title="Comentários"
-                value={facebookMetrics.engagement.comments.toLocaleString('pt-BR')}
+                value={(facebookMetrics.engagement?.comments || 0).toLocaleString('pt-BR')}
                 color={COLORS.secondary}
               />
               <MiniMetricCard
                 title="Compartilhamentos"
-                value={facebookMetrics.engagement.shares.toLocaleString('pt-BR')}
+                value={(facebookMetrics.engagement?.shares || 0).toLocaleString('pt-BR')}
                 color={COLORS.tertiary}
               />
               <MiniMetricCard
                 title="Visualizações de Vídeo"
-                value={facebookMetrics.engagement.videoViews.toLocaleString('pt-BR')}
+                value={(facebookMetrics.engagement?.videoViews || 0).toLocaleString('pt-BR')}
                 color={COLORS.success}
               />
               <MiniMetricCard
                 title="Visitas ao Perfil"
-                value={facebookMetrics.engagement.profileVisits.toLocaleString('pt-BR')}
+                value={(facebookMetrics.engagement?.profileVisits || 0).toLocaleString('pt-BR')}
                 color={COLORS.warning}
               />
             </div>
@@ -565,19 +823,19 @@ const Dashboard = () => {
             <div className="metrics-group">
               <MiniMetricCard
                 title="Total de Leads"
-                value={salesData.totalLeads}
+                value={salesData.totalLeads || 0}
                 color={COLORS.primary}
               />
               <MiniMetricCard
                 title="Leads Ativos"
-                value={salesData.leadsByUser.reduce((sum, user) => sum + user.active, 0)}
-                subtitle={`${Math.round(salesData.leadsByUser.reduce((sum, user) => sum + user.active, 0) / salesData.totalLeads * 100)}%`}
+                value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0}
+                subtitle={`${Math.round((salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0) / (salesData.totalLeads || 1) * 100)}%`}
                 color={COLORS.success}
               />
               <MiniMetricCard
                 title="Leads Perdidos"
-                value={salesData.leadsByUser.reduce((sum, user) => sum + user.lost, 0)}
-                subtitle={`${Math.round(salesData.leadsByUser.reduce((sum, user) => sum + user.lost, 0) / salesData.totalLeads * 100)}%`}
+                value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0}
+                subtitle={`${Math.round((salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0) / (salesData.totalLeads || 1) * 100)}%`}
                 color={COLORS.danger}
               />
             </div>
@@ -588,17 +846,17 @@ const Dashboard = () => {
             <div className="metrics-group">
               <MiniMetricCard
                 title="Lead Cycle"
-                value={`${salesData.leadCycleTime} dias`}
+                value={`${salesData.leadCycleTime?.toFixed(1) || 0} dias`}
                 color={COLORS.secondary}
               />
               <MiniMetricCard
                 title="Win Rate"
-                value={`${salesData.winRate}%`}
+                value={`${salesData.winRate?.toFixed(1) || 0}%`}
                 color={COLORS.tertiary}
               />
               <MiniMetricCard
                 title="Ticket Médio"
-                value={`R$ ${salesData.averageDealSize.toLocaleString('pt-BR')}`}
+                value={`R$ ${(salesData.averageDealSize || 0).toLocaleString('pt-BR')}`}
                 color={COLORS.primary}
               />
             </div>
@@ -609,8 +867,8 @@ const Dashboard = () => {
             <CompactChart 
               type="gauge" 
               data={[]} 
-              config={{ value: salesData.winRate, name: 'Win Rate' }}
-              style={{ height: '120px' }}
+              config={{ value: salesData.winRate || 0, name: 'Win Rate' }}
+              style={{ height: isMobile ? '100px' : '120px' }}
             />
           </div>
         </div>
@@ -624,12 +882,16 @@ const Dashboard = () => {
           
           <div className="card card-lg">
             <div className="card-title">Vendas por Mês</div>
-            <CompactChart 
-              type="line" 
-              data={salesData.salesTrend} 
-              config={{ xKey: 'month', yKey: 'sales', color: COLORS.success }}
-              style={{ height: '250px' }}
-            />
+            {salesData.salesTrend && salesData.salesTrend.length > 0 ? (
+              <CompactChart 
+                type="line" 
+                data={salesData.salesTrend} 
+                config={{ xKey: 'month', yKey: 'sales', color: COLORS.success }}
+                style={{ height: getChartHeight('medium') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
 
@@ -637,22 +899,30 @@ const Dashboard = () => {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Leads por Etapa</div>
-            <CompactChart 
-              type="pie" 
-              data={salesData.leadsByStage} 
-              config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
-              style={{ height: '200px' }}
-            />
+            {salesData.leadsByStage && salesData.leadsByStage.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={salesData.leadsByStage} 
+                config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-lg">
             <div className="card-title">Valor das Vendas (R$)</div>
-            <CompactChart 
-              type="line" 
-              data={salesData.salesTrend} 
-              config={{ xKey: 'month', yKey: 'value', color: COLORS.secondary }}
-              style={{ height: '200px' }}
-            />
+            {salesData.salesTrend && salesData.salesTrend.length > 0 ? (
+              <CompactChart 
+                type="line" 
+                data={salesData.salesTrend} 
+                config={{ xKey: 'month', yKey: 'value', color: COLORS.secondary }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
 
@@ -660,32 +930,44 @@ const Dashboard = () => {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Leads por Corretor</div>
-            <CompactChart 
-              type="bar" 
-              data={salesData.leadsByUser} 
-              config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
-              style={{ height: '200px' }}
-            />
+            {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
+              <CompactChart 
+                type="bar" 
+                data={salesData.leadsByUser} 
+                config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Reuniões por Corretor</div>
-            <CompactChart 
-              type="bar" 
-              data={salesData.leadsByUser} 
-              config={{ xKey: 'name', yKey: 'meetings', color: COLORS.secondary }}
-              style={{ height: '200px' }}
-            />
+            {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
+              <CompactChart 
+                type="bar" 
+                data={salesData.leadsByUser} 
+                config={{ xKey: 'name', yKey: 'meetings', color: COLORS.secondary }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Vendas por Corretor</div>
-            <CompactChart 
-              type="bar" 
-              data={salesData.leadsByUser} 
-              config={{ xKey: 'name', yKey: 'sales', color: COLORS.success }}
-              style={{ height: '200px' }}
-            />
+            {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
+              <CompactChart 
+                type="bar" 
+                data={salesData.leadsByUser} 
+                config={{ xKey: 'name', yKey: 'sales', color: COLORS.success }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
 
@@ -696,22 +978,22 @@ const Dashboard = () => {
             <div className="metrics-group">
               <MiniMetricCard
                 title="Conversão em Reuniões"
-                value={`${salesData.conversionRates.meetings}%`}
+                value={`${salesData.conversionRates?.meetings?.toFixed(1) || 0}%`}
                 color={COLORS.primary}
               />
               <MiniMetricCard
                 title="Conversão em Prospects"
-                value={`${salesData.conversionRates.prospects}%`}
+                value={`${salesData.conversionRates?.prospects?.toFixed(1) || 0}%`}
                 color={COLORS.secondary}
               />
               <MiniMetricCard
                 title="Conversão em Vendas"
-                value={`${salesData.conversionRates.sales}%`}
+                value={`${salesData.conversionRates?.sales?.toFixed(1) || 0}%`}
                 color={COLORS.success}
               />
               <MiniMetricCard
                 title="Recuperados por SalesBot"
-                value={salesData.salesbotRecovery}
+                value={salesData.salesbotRecovery || 0}
                 subtitle="Leads"
                 color={COLORS.tertiary}
               />
@@ -723,22 +1005,30 @@ const Dashboard = () => {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Tipo de Financiamento</div>
-            <CompactChart 
-              type="pie" 
-              data={salesData.customFields.financingType} 
-              config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary] }}
-              style={{ height: '200px' }}
-            />
+            {salesData.customFields && salesData.customFields.financingType && salesData.customFields.financingType.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={salesData.customFields.financingType} 
+                config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary] }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
           
           <div className="card card-md">
             <div className="card-title">Finalidade do Imóvel</div>
-            <CompactChart 
-              type="pie" 
-              data={salesData.customFields.propertyPurpose} 
-              config={{ colors: [COLORS.secondary, COLORS.tertiary] }}
-              style={{ height: '200px' }}
-            />
+            {salesData.customFields && salesData.customFields.propertyPurpose && salesData.customFields.propertyPurpose.length > 0 ? (
+              <CompactChart 
+                type="pie" 
+                data={salesData.customFields.propertyPurpose} 
+                config={{ colors: [COLORS.secondary, COLORS.tertiary] }}
+                style={{ height: getChartHeight('small') }}
+              />
+            ) : (
+              <div className="empty-chart">Não há dados disponíveis</div>
+            )}
           </div>
         </div>
       </div>
@@ -767,10 +1057,20 @@ const Dashboard = () => {
           </button>
         </div>
         <div className="dashboard-actions">
-          <button className="action-button">
+          <button className="action-button" onClick={() => {
+            // Exportar dados como JSON
+            const dataToExport = activeTab === 'marketing' ? marketingData : salesData;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `${activeTab}_dashboard_${period}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+          }}>
             <span className="icon">↓</span> Exportar
           </button>
-          <button className="action-button">
+          <button className="action-button" onClick={refreshData}>
             <span className="icon">↻</span> Atualizar
           </button>
         </div>
@@ -785,6 +1085,6 @@ const Dashboard = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Dashboard;
