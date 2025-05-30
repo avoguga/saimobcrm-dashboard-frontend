@@ -116,11 +116,66 @@ function Dashboard() {
     return '250px';
   };
   
+  // Função melhorada de truncamento de texto
   const truncateText = (text, maxLength) => {
     if (!text || typeof text !== 'string') return text;
-    const limit = isSmallMobile ? 10 : (isMobile ? 15 : 20);
-    const finalLength = maxLength || limit;
-    return text.length > finalLength ? text.substring(0, finalLength) + '...' : text;
+    
+    // Para métricas importantes, usar nomes alternativos mais curtos em vez de truncar
+    const shortNames = {
+      'Conversão em Reuniões': 'Conv. Reuniões',
+      'Conversão em Prospects': 'Conv. Prospects',
+      'Conversão em Vendas': 'Conv. Vendas',
+      'Recuperados por SalesBot': 'Rec. SalesBot',
+      'Visualizações de Vídeo': 'Views Vídeo',
+      'Custo por Lead': 'CPL',
+      'Total de Leads': 'Total Leads',
+      'Leads Facebook': 'Leads FB',
+      'Leads Ativos': 'Ativos',
+      'Leads Perdidos': 'Perdidos',
+      'Investimento': 'Invest.',
+      'Compartilhamentos': 'Shares',
+      'Visitas ao Perfil': 'Visitas',
+      'Lead Cycle': 'Ciclo Lead',
+      'Ticket Médio': 'Ticket Méd.'
+    };
+    
+    // Se estamos em tela pequena e existe um nome alternativo, use-o
+    if (isSmallMobile && shortNames[text]) {
+      return shortNames[text];
+    }
+    
+    // Se estamos em tela móvel (mas não muito pequena) e existe um nome alternativo, use-o
+    if (isMobile && !isSmallMobile && shortNames[text]) {
+      return shortNames[text];
+    }
+    
+    // Truncamento normal se não houver nome alternativo
+    const limit = isSmallMobile ? 12 : (isMobile ? 20 : maxLength || undefined);
+    
+    // Se não precisar truncar, retorna o texto original
+    if (!limit || text.length <= limit) return text;
+    
+    // Truncamento inteligente mantendo palavras completas
+    if (text.length > limit) {
+      // Tenta manter pelo menos a primeira palavra completa
+      const words = text.split(' ');
+      if (words.length > 1) {
+        let result = words[0];
+        let i = 1;
+        
+        while (i < words.length && (result.length + words[i].length + 1) <= limit - 3) {
+          result += ' ' + words[i];
+          i++;
+        }
+        
+        return result + '...';
+      } else {
+        // Se for uma única palavra longa, trunca normalmente
+        return text.substring(0, limit - 3) + '...';
+      }
+    }
+    
+    return text;
   };
 
   // Renderizar conteúdo de loading
@@ -195,15 +250,16 @@ function Dashboard() {
     );
   }
 
-  // Mini card para métricas com suporte a responsividade
+  // Mini card para métricas com suporte a responsividade melhorado
   const MiniMetricCard = ({ title, value, subtitle, color, icon, trend, trendUp }) => {
-    // Truncar título em telas pequenas
-    const titleDisplay = truncateText(title, isSmallMobile ? 10 : (isMobile ? 15 : undefined));
+    // Aplicar a função de truncamento melhorada
+    const titleDisplay = truncateText(title);
     
     return (
       <div className="mini-metric-card">
         <div className="mini-metric-content">
           <div className="mini-metric-header">
+            {/* Adicionar o título completo como tooltip */}
             <div className="mini-metric-title" title={title}>{titleDisplay}</div>
             {icon && <div className="mini-metric-icon">{icon}</div>}
           </div>
