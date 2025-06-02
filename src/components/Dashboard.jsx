@@ -62,16 +62,27 @@ function Dashboard() {
         // Converter o período para dias
         const days = parseInt(period.replace('d', ''));
         
-        // Agora as chamadas não vão falhar completamente se um endpoint falhar
-        const marketingResponse = await KommoAPI.getMarketingDashboard(days);
-        const salesResponse = await KommoAPI.getSalesDashboard(days);
+        // Usar Promise.allSettled para garantir que falhas parciais não afetem todo o dashboard
+        const [marketingResult, salesResult] = await Promise.allSettled([
+          KommoAPI.getMarketingDashboard(days),
+          KommoAPI.getSalesDashboard(days)
+        ]);
         
-        // Log para depuração
-        console.log('Marketing dashboard carregado:', marketingResponse);
-        console.log('Sales dashboard carregado:', salesResponse);
+        if (marketingResult.status === 'fulfilled') {
+          setMarketingData(marketingResult.value);
+          console.log('Marketing dashboard carregado:', marketingResult.value);
+        } else {
+          console.error('Erro no dashboard de marketing:', marketingResult.reason);
+          setError(`Falha ao carregar dados de marketing: ${marketingResult.reason}`);
+        }
         
-        setMarketingData(marketingResponse);
-        setSalesData(salesResponse);
+        if (salesResult.status === 'fulfilled') {
+          setSalesData(salesResult.value);
+          console.log('Sales dashboard carregado:', salesResult.value);
+        } else {
+          console.error('Erro no dashboard de vendas:', salesResult.reason);
+          setError(`Falha ao carregar dados de vendas: ${salesResult.reason}`);
+        }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         setError(`Falha ao comunicar com o servidor. Por favor, tente novamente mais tarde.`);
@@ -116,11 +127,66 @@ function Dashboard() {
     return '250px';
   };
   
+  // Função melhorada de truncamento de texto
   const truncateText = (text, maxLength) => {
     if (!text || typeof text !== 'string') return text;
-    const limit = isSmallMobile ? 10 : (isMobile ? 15 : 20);
-    const finalLength = maxLength || limit;
-    return text.length > finalLength ? text.substring(0, finalLength) + '...' : text;
+    
+    // Para métricas importantes, usar nomes alternativos mais curtos em vez de truncar
+    const shortNames = {
+      'Conversão em Reuniões': 'Conv. Reuniões',
+      'Conversão em Prospects': 'Conv. Prospects',
+      'Conversão em Vendas': 'Conv. Vendas',
+      'Recuperados por SalesBot': 'Rec. SalesBot',
+      'Visualizações de Vídeo': 'Views Vídeo',
+      'Custo por Lead': 'CPL',
+      'Total de Leads': 'Total Leads',
+      'Leads Facebook': 'Leads FB',
+      'Leads Ativos': 'Ativos',
+      'Leads Perdidos': 'Perdidos',
+      'Investimento': 'Invest.',
+      'Compartilhamentos': 'Shares',
+      'Visitas ao Perfil': 'Visitas',
+      'Lead Cycle': 'Ciclo Lead',
+      'Ticket Médio': 'Ticket Méd.'
+    };
+    
+    // Se estamos em tela pequena e existe um nome alternativo, use-o
+    if (isSmallMobile && shortNames[text]) {
+      return shortNames[text];
+    }
+    
+    // Se estamos em tela móvel (mas não muito pequena) e existe um nome alternativo, use-o
+    if (isMobile && !isSmallMobile && shortNames[text]) {
+      return shortNames[text];
+    }
+    
+    // Truncamento normal se não houver nome alternativo
+    const limit = isSmallMobile ? 12 : (isMobile ? 20 : maxLength || undefined);
+    
+    // Se não precisar truncar, retorna o texto original
+    if (!limit || text.length <= limit) return text;
+    
+    // Truncamento inteligente mantendo palavras completas
+    if (text.length > limit) {
+      // Tenta manter pelo menos a primeira palavra completa
+      const words = text.split(' ');
+      if (words.length > 1) {
+        let result = words[0];
+        let i = 1;
+        
+        while (i < words.length && (result.length + words[i].length + 1) <= limit - 3) {
+          result += ' ' + words[i];
+          i++;
+        }
+        
+        return result + '...';
+      } else {
+        // Se for uma única palavra longa, trunca normalmente
+        return text.substring(0, limit - 3) + '...';
+      }
+    }
+    
+    return text;
   };
 
   // Renderizar conteúdo de loading
@@ -154,11 +220,6 @@ function Dashboard() {
         <div className="error-message">
           <h3>Erro ao carregar dados</h3>
           <p>{error}</p>
-          <p className="error-info">Alguns endpoints estão apresentando problemas:</p>
-          <ul className="error-list">
-            <li>GET /leads/by-advertisement - Erro 500 (Interno do Servidor)</li>
-            <li>GET /sales/trends - Erro 404 (Não Encontrado)</li>
-          </ul>
           <button 
             className="action-button" 
             onClick={refreshData}
@@ -195,15 +256,16 @@ function Dashboard() {
     );
   }
 
-  // Mini card para métricas com suporte a responsividade
+  // Mini card para métricas com suporte a responsividade melhorado
   const MiniMetricCard = ({ title, value, subtitle, color, icon, trend, trendUp }) => {
-    // Truncar título em telas pequenas
-    const titleDisplay = truncateText(title, isSmallMobile ? 10 : (isMobile ? 15 : undefined));
+    // Aplicar a função de truncamento melhorada
+    const titleDisplay = truncateText(title);
     
     return (
       <div className="mini-metric-card">
         <div className="mini-metric-content">
           <div className="mini-metric-header">
+            {/* Adicionar o título completo como tooltip */}
             <div className="mini-metric-title" title={title}>{titleDisplay}</div>
             {icon && <div className="mini-metric-icon">{icon}</div>}
           </div>
@@ -628,6 +690,49 @@ function Dashboard() {
           </div>
         </div>
 
+        {/* Campanhas do Facebook */}
+        {marketingData.facebookCampaigns && marketingData.facebookCampaigns.length > 0 && (
+          <div className="dashboard-row">
+            <div className="card card-md">
+              <div className="card-title">Campanhas do Facebook</div>
+              <div className="campaigns-list">
+                {marketingData.facebookCampaigns.slice(0, 5).map((campaign, index) => (
+                  <div key={index} className="campaign-item">
+                    <span className="campaign-name">{campaign.name}</span>
+                    <span className={`campaign-status ${campaign.status?.toLowerCase() || 'unknown'}`}>
+                      {campaign.status || 'Desconhecido'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Visão Geral do Analytics */}
+            {marketingData.analyticsOverview && (
+              <div className="card card-metrics-group">
+                <div className="card-title">Visão Geral Analytics</div>
+                <div className="metrics-group">
+                  <MiniMetricCard
+                    title="Leads Novos"
+                    value={marketingData.analyticsOverview.leads?.new || 0}
+                    color={COLORS.primary}
+                  />
+                  <MiniMetricCard
+                    title="Leads Ativos"
+                    value={marketingData.analyticsOverview.leads?.active || 0}
+                    color={COLORS.success}
+                  />
+                  <MiniMetricCard
+                    title="Taxa de Conversão"
+                    value={`${marketingData.analyticsOverview.performance?.win_rate_percentage?.toFixed(1) || 0}%`}
+                    color={COLORS.secondary}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Linha 2: Gráficos principais */}
         <div className="dashboard-row">
           <div className="card card-md">
@@ -828,14 +933,20 @@ function Dashboard() {
               />
               <MiniMetricCard
                 title="Leads Ativos"
-                value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0}
-                subtitle={`${Math.round((salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0) / (salesData.totalLeads || 1) * 100)}%`}
+                value={salesData.analyticsOverview?.leads?.active || 
+                      (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
+                subtitle={`${Math.round(((salesData.analyticsOverview?.leads?.active || 
+                         (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)) / 
+                         (salesData.totalLeads || 1) * 100))}%`}
                 color={COLORS.success}
               />
               <MiniMetricCard
                 title="Leads Perdidos"
-                value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0}
-                subtitle={`${Math.round((salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0) / (salesData.totalLeads || 1) * 100)}%`}
+                value={salesData.analyticsOverview?.leads?.lost || 
+                      (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0)}
+                subtitle={`${Math.round(((salesData.analyticsOverview?.leads?.lost || 
+                         (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0)) / 
+                         (salesData.totalLeads || 1) * 100))}%`}
                 color={COLORS.danger}
               />
             </div>
@@ -851,12 +962,12 @@ function Dashboard() {
               />
               <MiniMetricCard
                 title="Win Rate"
-                value={`${salesData.winRate?.toFixed(1) || 0}%`}
+                value={`${salesData.winRate?.toFixed(1) || salesData.analyticsOverview?.performance?.win_rate_percentage?.toFixed(1) || 0}%`}
                 color={COLORS.tertiary}
               />
               <MiniMetricCard
                 title="Ticket Médio"
-                value={`R$ ${(salesData.averageDealSize || 0).toLocaleString('pt-BR')}`}
+                value={`R$ ${(salesData.averageDealSize || salesData.analyticsOverview?.performance?.average_deal_size || 0).toLocaleString('pt-BR')}`}
                 color={COLORS.primary}
               />
             </div>
@@ -867,11 +978,48 @@ function Dashboard() {
             <CompactChart 
               type="gauge" 
               data={[]} 
-              config={{ value: salesData.winRate || 0, name: 'Win Rate' }}
+              config={{ value: salesData.winRate || salesData.analyticsOverview?.performance?.win_rate_percentage || 0, name: 'Win Rate' }}
               style={{ height: isMobile ? '100px' : '120px' }}
             />
           </div>
         </div>
+
+        {/* Exibir dados de crescimento se disponíveis */}
+        {salesData.salesGrowth && (
+          <div className="dashboard-row row-compact">
+            <div className="card card-metrics-group wide">
+              <div className="card-title">Crescimento de Vendas</div>
+              <div className="metrics-group">
+                <MiniMetricCard
+                  title="Crescimento em Receita"
+                  value={`${salesData.salesGrowth.growth?.revenue_percentage?.toFixed(1) || 0}%`}
+                  color={salesData.salesGrowth.growth?.revenue_percentage > 0 ? COLORS.success : COLORS.danger}
+                  trend={Math.abs(salesData.salesGrowth.growth?.revenue_percentage || 0).toFixed(1)}
+                  trendUp={salesData.salesGrowth.growth?.revenue_percentage > 0}
+                />
+                <MiniMetricCard
+                  title="Crescimento em Vendas"
+                  value={`${salesData.salesGrowth.growth?.deals_percentage?.toFixed(1) || 0}%`}
+                  color={salesData.salesGrowth.growth?.deals_percentage > 0 ? COLORS.success : COLORS.danger}
+                  trend={Math.abs(salesData.salesGrowth.growth?.deals_percentage || 0).toFixed(1)}
+                  trendUp={salesData.salesGrowth.growth?.deals_percentage > 0}
+                />
+                <MiniMetricCard
+                  title="Período Atual"
+                  value={`R$ ${(salesData.salesGrowth.current_period?.revenue || 0).toLocaleString('pt-BR')}`}
+                  subtitle={`${salesData.salesGrowth.current_period?.deals || 0} vendas`}
+                  color={COLORS.primary}
+                />
+                <MiniMetricCard
+                  title="Período Anterior"
+                  value={`R$ ${(salesData.salesGrowth.previous_period?.revenue || 0).toLocaleString('pt-BR')}`}
+                  subtitle={`${salesData.salesGrowth.previous_period?.deals || 0} vendas`}
+                  color={COLORS.tertiary}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Linha 2: NPS e gráficos principais */}
         <div className="dashboard-row">
@@ -890,7 +1038,19 @@ function Dashboard() {
                 style={{ height: getChartHeight('medium') }}
               />
             ) : (
-              <div className="empty-chart">Não há dados disponíveis</div>
+              salesData.salesRevenue && salesData.salesRevenue.revenue_by_period && salesData.salesRevenue.revenue_by_period.length > 0 ? (
+                <CompactChart 
+                  type="line" 
+                  data={salesData.salesRevenue.revenue_by_period.map(item => ({
+                    month: item.period.substring(0, 7),
+                    sales: item.deals_count
+                  }))} 
+                  config={{ xKey: 'month', yKey: 'sales', color: COLORS.success }}
+                  style={{ height: getChartHeight('medium') }}
+                />
+              ) : (
+                <div className="empty-chart">Não há dados disponíveis</div>
+              )
             )}
           </div>
         </div>
@@ -899,76 +1059,149 @@ function Dashboard() {
         <div className="dashboard-row">
           <div className="card card-md">
             <div className="card-title">Leads por Etapa</div>
-            {salesData.leadsByStage && salesData.leadsByStage.length > 0 ? (
-              <CompactChart 
-                type="pie" 
-                data={salesData.leadsByStage} 
-                config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
-                style={{ height: getChartHeight('small') }}
-              />
+            {salesData.analyticsFunnel && salesData.analyticsFunnel.funnel && salesData.analyticsFunnel.funnel.length > 0 ? (
+              <>
+                <CompactChart 
+                  type="pie" 
+                  data={salesData.analyticsFunnel.funnel.map(stage => ({
+                    name: stage.stage,
+                    value: stage.leads_count
+                  }))} 
+                  config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
+                  style={{ height: getChartHeight('small') }}
+                />
+                <div className="funnel-info">
+                  Taxa de conversão geral: {salesData.analyticsFunnel.overall_conversion_rate?.toFixed(1) || 0}%
+                </div>
+              </>
             ) : (
-              <div className="empty-chart">Não há dados disponíveis</div>
+              salesData.leadsByStage && salesData.leadsByStage.length > 0 ? (
+                <CompactChart 
+                  type="pie" 
+                  data={salesData.leadsByStage} 
+                  config={{ colors: [COLORS.primary, COLORS.secondary, COLORS.tertiary, COLORS.success, COLORS.warning] }}
+                  style={{ height: getChartHeight('small') }}
+                />
+              ) : (
+                <div className="empty-chart">Não há dados disponíveis</div>
+              )
             )}
           </div>
           
           <div className="card card-lg">
             <div className="card-title">Valor das Vendas (R$)</div>
-            {salesData.salesTrend && salesData.salesTrend.length > 0 ? (
+            {salesData.salesRevenue && salesData.salesRevenue.revenue_by_period && salesData.salesRevenue.revenue_by_period.length > 0 ? (
               <CompactChart 
                 type="line" 
-                data={salesData.salesTrend} 
+                data={salesData.salesRevenue.revenue_by_period.map(item => ({
+                  month: item.period.substring(0, 7),
+                  value: item.revenue
+                }))} 
                 config={{ xKey: 'month', yKey: 'value', color: COLORS.secondary }}
                 style={{ height: getChartHeight('small') }}
               />
             ) : (
-              <div className="empty-chart">Não há dados disponíveis</div>
+              salesData.salesTrend && salesData.salesTrend.length > 0 ? (
+                <CompactChart 
+                  type="line" 
+                  data={salesData.salesTrend} 
+                  config={{ xKey: 'month', yKey: 'value', color: COLORS.secondary }}
+                  style={{ height: getChartHeight('small') }}
+                />
+              ) : (
+                <div className="empty-chart">Não há dados disponíveis</div>
+              )
             )}
           </div>
         </div>
 
         {/* Linha 4: Desempenho por corretor */}
         <div className="dashboard-row">
-          <div className="card card-md">
-            <div className="card-title">Leads por Corretor</div>
-            {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
-              <CompactChart 
-                type="bar" 
-                data={salesData.leadsByUser} 
-                config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
-                style={{ height: getChartHeight('small') }}
-              />
+          {salesData.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
+            <>
+              <div className="card card-md">
+                <div className="card-title">Leads por Corretor</div>
+                <CompactChart 
+                  type="bar" 
+                  data={salesData.analyticsTeam.user_performance.map(user => ({
+                    name: user.user_name,
+                    value: user.new_leads || 0
+                  }))} 
+                  config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
+                  style={{ height: getChartHeight('small') }}
+                />
+              </div>
+              
+              <div className="card card-md">
+                <div className="card-title">Atividades por Corretor</div>
+                <CompactChart 
+                  type="bar" 
+                  data={salesData.analyticsTeam.user_performance.map(user => ({
+                    name: user.user_name,
+                    value: user.activities || 0
+                  }))} 
+                  config={{ xKey: 'name', yKey: 'value', color: COLORS.secondary }}
+                  style={{ height: getChartHeight('small') }}
+                />
+              </div>
+              
+              <div className="card card-md">
+                <div className="card-title">Vendas por Corretor</div>
+                <CompactChart 
+                  type="bar" 
+                  data={salesData.analyticsTeam.user_performance.map(user => ({
+                    name: user.user_name,
+                    value: user.won_deals || 0
+                  }))} 
+                  config={{ xKey: 'name', yKey: 'value', color: COLORS.success }}
+                  style={{ height: getChartHeight('small') }}
+                />
+                {salesData.analyticsTeam.team_stats?.top_performer && (
+                  <div className="team-info">
+                    Top performer: {salesData.analyticsTeam.team_stats.top_performer}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
+              <>
+                <div className="card card-md">
+                  <div className="card-title">Leads por Corretor</div>
+                  <CompactChart 
+                    type="bar" 
+                    data={salesData.leadsByUser} 
+                    config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
+                    style={{ height: getChartHeight('small') }}
+                  />
+                </div>
+                
+                <div className="card card-md">
+                  <div className="card-title">Reuniões por Corretor</div>
+                  <CompactChart 
+                    type="bar" 
+                    data={salesData.leadsByUser} 
+                    config={{ xKey: 'name', yKey: 'meetings', color: COLORS.secondary }}
+                    style={{ height: getChartHeight('small') }}
+                  />
+                </div>
+                
+                <div className="card card-md">
+                  <div className="card-title">Vendas por Corretor</div>
+                  <CompactChart 
+                    type="bar" 
+                    data={salesData.leadsByUser} 
+                    config={{ xKey: 'name', yKey: 'sales', color: COLORS.success }}
+                    style={{ height: getChartHeight('small') }}
+                  />
+                </div>
+              </>
             ) : (
-              <div className="empty-chart">Não há dados disponíveis</div>
-            )}
-          </div>
-          
-          <div className="card card-md">
-            <div className="card-title">Reuniões por Corretor</div>
-            {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
-              <CompactChart 
-                type="bar" 
-                data={salesData.leadsByUser} 
-                config={{ xKey: 'name', yKey: 'meetings', color: COLORS.secondary }}
-                style={{ height: getChartHeight('small') }}
-              />
-            ) : (
-              <div className="empty-chart">Não há dados disponíveis</div>
-            )}
-          </div>
-          
-          <div className="card card-md">
-            <div className="card-title">Vendas por Corretor</div>
-            {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
-              <CompactChart 
-                type="bar" 
-                data={salesData.leadsByUser} 
-                config={{ xKey: 'name', yKey: 'sales', color: COLORS.success }}
-                style={{ height: getChartHeight('small') }}
-              />
-            ) : (
-              <div className="empty-chart">Não há dados disponíveis</div>
-            )}
-          </div>
+              <div className="card card-lg">
+                <div className="error-message">Não há dados de desempenho por corretor disponíveis</div>
+              </div>
+            )
+          )}
         </div>
 
         {/* Linha 5: Taxas de conversão */}
@@ -988,7 +1221,8 @@ function Dashboard() {
               />
               <MiniMetricCard
                 title="Conversão em Vendas"
-                value={`${salesData.conversionRates?.sales?.toFixed(1) || 0}%`}
+                value={`${salesData.conversionRates?.sales?.toFixed(1) || 
+                        salesData.analyticsFunnel?.overall_conversion_rate?.toFixed(1) || 0}%`}
                 color={COLORS.success}
               />
               <MiniMetricCard
@@ -1030,6 +1264,26 @@ function Dashboard() {
               <div className="empty-chart">Não há dados disponíveis</div>
             )}
           </div>
+
+          {salesData.meetingsStats && (
+            <div className="card card-md">
+              <div className="card-title">Estatísticas de Reuniões</div>
+              <div className="metrics-group" style={{ flexDirection: 'column' }}>
+                <MiniMetricCard
+                  title="Total de Reuniões"
+                  value={salesData.meetingsStats.summary?.total_meetings || 0}
+                  color={COLORS.primary}
+                />
+                <MiniMetricCard
+                  title="Reuniões Realizadas"
+                  value={salesData.meetingsStats.summary?.completed_meetings || 0}
+                  subtitle={`${Math.round((salesData.meetingsStats.summary?.completed_meetings || 0) / 
+                            (salesData.meetingsStats.summary?.total_meetings || 1) * 100)}%`}
+                  color={COLORS.success}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

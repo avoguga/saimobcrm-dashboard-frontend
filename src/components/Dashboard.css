@@ -283,6 +283,64 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  position: relative;
+}
+
+/* Tooltip para texto truncado em hover */
+.mini-metric-title:hover::before {
+  content: attr(title);
+  position: absolute;
+  top: -28px;
+  left: 0;
+  background: var(--dark-color);
+  color: var(--white-color);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  z-index: 10;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.95;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Mostrar seta na tooltip */
+.mini-metric-title:hover::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  border-width: 4px;
+  border-style: solid;
+  border-color: var(--dark-color) transparent transparent transparent;
+  pointer-events: none;
+}
+
+/* Para dispositivos touch, mostrar tooltip ao tocar */
+@media (hover: none) and (pointer: coarse) {
+  .mini-metric-title:active::before {
+    content: attr(title);
+    position: absolute;
+    top: -28px;
+    left: 0;
+    background: var(--dark-color);
+    color: var(--white-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  
+  .mini-metric-title:active::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 10px;
+    border-width: 4px;
+    border-style: solid;
+    border-color: var(--dark-color) transparent transparent transparent;
+  }
 }
 
 .mini-metric-icon {
