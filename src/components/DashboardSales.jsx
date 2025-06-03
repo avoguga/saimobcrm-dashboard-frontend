@@ -17,6 +17,112 @@ const COLORS = {
   lightBg: '#f8f9fa'
 };
 
+// Componente de métrica com seta e fundo colorido (como na imagem)
+const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'number' }) => {
+  // Função para formatar valores
+  const formatValue = (value) => {
+    if (!value && value !== 0) return '0';
+    
+    switch (format) {
+      case 'percentage':
+        return `${value.toFixed(1)}%`;
+      case 'currency':
+        return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      case 'time':
+        return `${value} dias`;
+      default:
+        return value.toLocaleString('pt-BR');
+    }
+  };
+
+  // Calcular diferença e tendência
+  const calculateTrend = () => {
+    if (!previousValue || previousValue === 0) {
+      return { percentage: 0, trend: 'neutral', difference: 0 };
+    }
+
+    const difference = currentValue - previousValue;
+    const percentage = (difference / previousValue) * 100;
+    
+    let trend = 'neutral';
+    if (percentage > 1) trend = 'up';
+    else if (percentage < -1) trend = 'down';
+
+    return { percentage, trend, difference };
+  };
+
+  const { percentage, trend, difference } = calculateTrend();
+
+  // Estilo baseado na tendência (como na imagem)
+  const getTrendStyle = () => {
+    switch (trend) {
+      case 'up':
+        return {
+          backgroundColor: 'rgba(76, 224, 179, 0.15)', // Verde claro
+          color: '#4ce0b3',
+          icon: '↑',
+          sign: '+'
+        };
+      case 'down':
+        return {
+          backgroundColor: 'rgba(255, 58, 94, 0.15)', // Vermelho claro
+          color: '#ff3a5e',
+          icon: '↓',
+          sign: ''
+        };
+      default:
+        return {
+          backgroundColor: 'rgba(117, 119, 123, 0.1)', // Cinza claro
+          color: '#75777B',
+          icon: '→',
+          sign: ''
+        };
+    }
+  };
+
+  const trendStyle = getTrendStyle();
+
+  return (
+    <div className="comparison-metric-new">
+      <div className="metric-header-new">
+        <h3 className="metric-title-new">{title}</h3>
+      </div>
+      
+      <div className="metric-main-value">
+        {formatValue(currentValue)}
+      </div>
+      
+      <div className="metric-previous">
+        <span className="previous-label-new">PERÍODO ANTERIOR:</span>
+        <div className="previous-value-new">{formatValue(previousValue)}</div>
+      </div>
+      
+      <div 
+        className="trend-indicator-new"
+        style={{ 
+          backgroundColor: trendStyle.backgroundColor,
+          color: trendStyle.color 
+        }}
+      >
+        <span className="trend-icon-new">{trendStyle.icon}</span>
+        <span className="trend-text-new">
+          {trendStyle.sign}{Math.abs(percentage).toFixed(1)}%
+        </span>
+        {format === 'currency' && difference !== 0 && (
+          <span className="trend-extra">
+            ({trendStyle.sign}R$ {Math.abs(difference).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+          </span>
+        )}
+        {format === 'time' && difference !== 0 && (
+          <span className="trend-extra">
+            ({trendStyle.sign}{Math.abs(difference).toFixed(1)} dias)
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, data }) {
   const [salesData, setSalesData] = useState(data);
   const [comparisonData, setComparisonData] = useState(null);
@@ -66,75 +172,6 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
       {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
     </div>
   );
-
-  // Componente de Comparação de Períodos - Design Simples
-  const ComparisonMetric = ({ label, current, previous, comparison, format = 'number' }) => {
-    const formatValue = (value) => {
-      if (format === 'percentage') return `${value?.toFixed(1) || 0}%`;
-      if (format === 'currency') return `R$ ${(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-      return value || 0;
-    };
-
-    const getTrendIcon = (trend) => {
-      switch(trend) {
-        case 'up': return (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 14L12 9L17 14H7Z"/>
-          </svg>
-        );
-        case 'down': return (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 10L12 15L17 10H7Z"/>
-          </svg>
-        );
-        default: return (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="2"/>
-          </svg>
-        );
-      }
-    };
-
-    const getTrendColor = (trend) => {
-      switch(trend) {
-        case 'up': return COLORS.success;
-        case 'down': return COLORS.danger;
-        default: return COLORS.tertiary;
-      }
-    };
-
-    const trend = comparison?.trend || 'neutral';
-    const percentage = comparison?.percentage || 0;
-
-    return (
-      <div 
-        className="comparison-metric-simple" 
-        style={{ borderLeftColor: getTrendColor(trend) }}
-      >
-        <div className="comparison-header">
-          <span className="comparison-label">{label}</span>
-          <div className="trend-indicator" style={{ color: getTrendColor(trend) }}>
-            {getTrendIcon(trend)}
-          </div>
-        </div>
-        
-        <div className="comparison-values">
-          <div className="period-row">
-            <span className="period-label">Atual:</span>
-            <span className="period-value">{formatValue(current)}</span>
-          </div>
-          <div className="period-row">
-            <span className="period-label">Anterior:</span>
-            <span className="period-value">{formatValue(previous)}</span>
-          </div>
-        </div>
-        
-        <div className="comparison-change" style={{ color: getTrendColor(trend) }}>
-          {percentage > 0 ? '+' : ''}{percentage?.toFixed(1) || 0}%
-        </div>
-      </div>
-    );
-  };
 
   // Compact Chart Component
   const CompactChart = ({ data, type, config, style }) => {
@@ -229,38 +266,6 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
     return <div ref={chartRef} style={style} />;
   };
 
-  // Indicador NPS com responsividade
-  const NPSIndicator = ({ score }) => {
-    let category = '';
-    let color = '';
-    
-    if (score >= 70) {
-      category = 'Excelente';
-      color = COLORS.success;
-    } else if (score >= 50) {
-      category = 'Bom';
-      color = COLORS.warning;
-    } else {
-      category = 'Crítico';
-      color = COLORS.danger;
-    }
-    
-    return (
-      <div className="nps-indicator">
-        <div className="nps-score" style={{ color }}>
-          {score}
-        </div>
-        <div className="nps-category" style={{ color }}>
-          {category}
-        </div>
-        <div className="nps-description">
-          Net Promoter Score
-        </div>
-      </div>
-    );
-  };
-
-
   if (!salesData) {
     return (
       <div className="dashboard-content">
@@ -273,6 +278,172 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
 
   return (
     <div className="dashboard-content">
+      {/* CSS dos novos componentes de comparação */}
+      <style>{`
+        .comparison-metric-new {
+          background: #ffffff;
+          border-radius: 8px;
+          padding: 20px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          border: 1px solid #e0e0e0;
+          transition: all 0.3s ease;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .comparison-metric-new:hover {
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+          transform: translateY(-2px);
+        }
+
+        .metric-header-new {
+          margin-bottom: 8px;
+        }
+
+        .metric-title-new {
+          font-size: 16px;
+          font-weight: 600;
+          color: #4E5859;
+          margin: 0;
+          line-height: 1.3;
+        }
+
+        .metric-main-value {
+          font-size: 32px;
+          font-weight: 700;
+          color: #212121;
+          line-height: 1.1;
+          margin-bottom: 12px;
+        }
+
+        .metric-previous {
+          margin-bottom: 12px;
+        }
+
+        .previous-label-new {
+          font-size: 12px;
+          color: #75777B;
+          font-weight: 500;
+          letter-spacing: 0.5px;
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .previous-value-new {
+          font-size: 14px;
+          color: #555;
+          font-weight: 600;
+        }
+
+        .trend-indicator-new {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 14px;
+          margin-top: auto;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .trend-icon-new {
+          font-size: 16px;
+          font-weight: bold;
+          min-width: 16px;
+          text-align: center;
+        }
+
+        .trend-text-new {
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .trend-extra {
+          font-size: 12px;
+          opacity: 0.9;
+          margin-left: 4px;
+        }
+
+        .comparison-grid-new {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .comparison-summary-new {
+          text-align: center;
+          padding-top: 16px;
+          border-top: 1px solid #e0e0e0;
+        }
+
+        .summary-badge-new {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          background: #f8f9fa;
+          padding: 12px 20px;
+          border-radius: 8px;
+          border: 1px solid #e0e0e0;
+        }
+
+        .summary-icon-new {
+          font-size: 18px;
+        }
+
+        .summary-text-new {
+          font-size: 16px;
+          font-weight: 600;
+          color: #4E5859;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+          .comparison-grid-new {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          
+          .comparison-metric-new {
+            padding: 16px;
+          }
+          
+          .metric-title-new {
+            font-size: 14px;
+          }
+          
+          .metric-main-value {
+            font-size: 24px;
+          }
+          
+          .trend-indicator-new {
+            font-size: 13px;
+            padding: 6px 10px;
+          }
+          
+          .trend-icon-new {
+            font-size: 14px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .comparison-metric-new {
+            padding: 12px;
+          }
+          
+          .metric-main-value {
+            font-size: 20px;
+          }
+          
+          .metric-title-new {
+            font-size: 13px;
+          }
+        }
+      `}</style>
+
       <div className="dashboard-row row-header">
         <div className="section-title">
           <h2>Dashboard de Vendas</h2>
@@ -368,7 +539,62 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
         </div>
       </div>
 
-      {/* Linha 2: Métricas de Performance */}
+      {/* Linha 2: Comparação de Períodos COM SETAS E FUNDOS COLORIDOS */}
+      <div className="dashboard-row">
+        <div className="card card-lg">
+          <div className="card-title" style={{ textAlign: 'center', marginBottom: '24px' }}>
+            Comparação de Períodos - {comparisonData?.currentPeriod?.name || 'Mês Atual'} vs {comparisonData?.previousPeriod?.name || 'Mês Anterior'}
+          </div>
+          
+          <div className="comparison-grid-new">
+            <ComparisonMetricCard
+              title="Total de Leads"
+              currentValue={comparisonData?.currentPeriod?.totalLeads || 85}
+              previousValue={comparisonData?.previousPeriod?.totalLeads || 120}
+              format="number"
+            />
+            
+            <ComparisonMetricCard
+              title="Win Rate"
+              currentValue={comparisonData?.currentPeriod?.winRate || 18.5}
+              previousValue={comparisonData?.previousPeriod?.winRate || 15.2}
+              format="percentage"
+            />
+            
+            <ComparisonMetricCard
+              title="Ticket Médio"
+              currentValue={comparisonData?.currentPeriod?.averageDealSize || 245000}
+              previousValue={comparisonData?.previousPeriod?.averageDealSize || 220000}
+              format="currency"
+            />
+            
+            <ComparisonMetricCard
+              title="Receita Total"
+              currentValue={comparisonData?.currentPeriod?.totalRevenue || 3920000}
+              previousValue={comparisonData?.previousPeriod?.totalRevenue || 3340000}
+              format="currency"
+            />
+
+            <ComparisonMetricCard
+              title="Tempo Médio do Ciclo"
+              currentValue={comparisonData?.currentPeriod?.leadCycleTime || 8.2}
+              previousValue={comparisonData?.previousPeriod?.leadCycleTime || 11.3}
+              format="time"
+            />
+          </div>
+          
+          {/* <div className="comparison-summary-new">
+            <div className="summary-badge-new">
+              <span className="summary-icon-new">📊</span>
+              <span className="summary-text-new">
+                {comparisonData?.summary?.positiveMetrics || 3} métricas melhoraram, {comparisonData?.summary?.negativeMetrics || 1} pioraram
+              </span>
+            </div>
+          </div> */}
+        </div>
+      </div>
+
+      {/* Linha 3: Métricas de Performance */}
       <div className="dashboard-row">
         <div className="card card-md">
           <div className="card-title">Métricas de Performance</div>
@@ -402,51 +628,7 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
         )}
       </div>
 
-      {/* Linha 2.5: Comparação de Períodos */}
-      <div className="dashboard-row">
-        <div className="card card-lg">
-          <div className="card-title">
-            Comparação de Períodos - {comparisonData?.currentPeriod?.name || 'Mês Atual'} vs {comparisonData?.previousPeriod?.name || 'Mês Anterior'}
-          </div>
-            <div className="comparison-grid">
-              <ComparisonMetric
-                label="Total de Leads"
-                current={comparisonData?.currentPeriod?.totalLeads || 85}
-                previous={comparisonData?.previousPeriod?.totalLeads || 120}
-                comparison={comparisonData?.comparison?.totalLeads || { percentage: -29.2, trend: 'down' }}
-                format="number"
-              />
-              <ComparisonMetric
-                label="Win Rate"
-                current={comparisonData?.currentPeriod?.winRate || 18.5}
-                previous={comparisonData?.previousPeriod?.winRate || 15.2}
-                comparison={comparisonData?.comparison?.winRate || { percentage: 21.7, trend: 'up' }}
-                format="percentage"
-              />
-              <ComparisonMetric
-                label="Ticket Médio"
-                current={comparisonData?.currentPeriod?.averageDealSize || 245000}
-                previous={comparisonData?.previousPeriod?.averageDealSize || 220000}
-                comparison={comparisonData?.comparison?.averageDealSize || { percentage: 11.4, trend: 'up' }}
-                format="currency"
-              />
-              <ComparisonMetric
-                label="Receita Total"
-                current={comparisonData?.currentPeriod?.totalRevenue || 3920000}
-                previous={comparisonData?.previousPeriod?.totalRevenue || 3340000}
-                comparison={comparisonData?.comparison?.totalRevenue || { percentage: 17.4, trend: 'up' }}
-                format="currency"
-              />
-            </div>
-            <div className="comparison-summary">
-              <span className="summary-text">
-                📊 {comparisonData?.summary?.positiveMetrics || 3} métricas melhoraram, {comparisonData?.summary?.negativeMetrics || 1} pioraram
-              </span>
-            </div>
-        </div>
-      </div>
-
-      {/* Linha 3: Ticket médio e outros KPIs */}
+      {/* Linha 4: Ticket médio e outros KPIs */}
       <div className="dashboard-row row-compact">
         <div className="card card-metrics-group wide">
           <div className="card-title">Métricas de Vendas</div>
@@ -471,7 +653,7 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
         </div>
       </div>
 
-      {/* Linha 4: Desempenho por corretor */}
+      {/* Linha 5: Desempenho por corretor */}
       <div className="dashboard-row">
         {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
@@ -558,7 +740,7 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
         )}
       </div>
 
-      {/* Linha 5: Taxas de conversão */}
+      {/* Linha 6: Taxas de conversão */}
       <div className="dashboard-row row-compact">
         <div className="card card-metrics-group wide">
           <div className="card-title">Taxas de Conversão</div>
