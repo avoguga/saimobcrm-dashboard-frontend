@@ -65,13 +65,13 @@ body {
 
 .brand h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--primary-color);
 }
 
 .brand .subtitle {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--tertiary-color);
 }
 
@@ -86,7 +86,7 @@ body {
   background: none;
   border: none;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   color: var(--text-light);
@@ -114,7 +114,7 @@ body {
   background-color: var(--white-color);
   border: 1px solid var(--light-color);
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   color: var(--primary-color);
@@ -129,6 +129,20 @@ body {
   background-color: var(--primary-color);
   border-color: var(--primary-color);
   color: var(--white-color);
+}
+
+.action-button:disabled {
+  background-color: var(--light-color);
+  color: var(--text-light);
+  border-color: var(--light-color);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.action-button:disabled:hover {
+  background-color: var(--light-color);
+  color: var(--text-light);
+  border-color: var(--light-color);
 }
 
 .action-button .icon {
@@ -168,9 +182,44 @@ body {
 
 .section-title h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--primary-color);
+}
+
+.dashboard-controls {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.corretor-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.corretor-select {
+  padding: 8px 12px;
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--white-color);
+  color: var(--text-dark);
+  cursor: pointer;
+  min-width: 200px;
+  transition: border-color 0.2s ease;
+}
+
+.corretor-select:hover {
+  border-color: var(--primary-color);
+}
+
+.corretor-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(78, 88, 89, 0.1);
 }
 
 .period-selector {
@@ -239,10 +288,10 @@ body {
 }
 
 .card-title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--text-light);
-  margin-bottom: var(--spacing-sm);
+  color: var(--text-medium);
+  margin-bottom: var(--spacing-md);
   text-align: center;
 }
 
@@ -256,12 +305,13 @@ body {
 
 .mini-metric-card {
   background-color: var(--bg-color);
-  border-radius: 6px;
-  padding: var(--spacing-sm);
+  border-radius: 8px;
+  padding: var(--spacing-md);
   flex: 1 0 calc(50% - var(--spacing-sm)); /* 2 por linha em mobile */
   min-width: 0; /* Para permitir flexbox shrink */
   display: flex;
   flex-direction: column;
+  min-height: 80px;
 }
 
 .mini-metric-content {
@@ -277,13 +327,14 @@ body {
 }
 
 .mini-metric-title {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-light);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   position: relative;
+  margin-bottom: 4px;
 }
 
 /* Tooltip para texto truncado em hover */
@@ -350,20 +401,23 @@ body {
 }
 
 .mini-metric-value {
-  font-size: 20px; /* Menor em mobile */
+  font-size: 28px; /* Ainda maior para tech lead */
   font-weight: 700;
-  margin-top: 2px;
+  margin-top: 4px;
+  margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .mini-metric-subtitle {
-  font-size: 11px;
+  font-size: 15px;
   color: var(--text-light);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
 
 .mini-metric-trend {
@@ -392,12 +446,12 @@ body {
 }
 
 .nps-score {
-  font-size: 36px; /* Menor em mobile */
+  font-size: 42px; /* Aumentado */
   font-weight: 700;
 }
 
 .nps-category {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   margin-top: -10px;
 }
@@ -512,6 +566,117 @@ body {
   color: var(--text-light);
   font-style: italic;
   font-size: 14px;
+}
+
+/* Comparison Components */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Design Simples da Comparação */
+.comparison-metric-simple {
+  background-color: var(--white-color);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  border-left: 3px solid var(--primary-color);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.comparison-metric-simple:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.comparison-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-medium);
+}
+
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.comparison-values {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.period-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.period-label {
+  font-size: 14px;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.period-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.comparison-change {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.comparison-summary {
+  background-color: var(--bg-color);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  text-align: center;
+  margin-top: var(--spacing-sm);
+}
+
+.summary-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-medium);
+}
+
+/* Responsive adjustments for comparison */
+@media (max-width: 768px) {
+  .comparison-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+  
+  .comparison-metric {
+    padding: var(--spacing-sm);
+  }
+  
+  .comparison-label {
+    font-size: 14px;
+  }
+  
+  .period-value {
+    font-size: 14px;
+  }
 }
 
 /* Footer */
@@ -636,6 +801,17 @@ body {
   
   .dashboard-actions {
     justify-content: center;
+  }
+  
+  .dashboard-controls {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: stretch;
+  }
+  
+  .corretor-select {
+    width: 100%;
+    min-width: unset;
   }
   
   .section-title {
