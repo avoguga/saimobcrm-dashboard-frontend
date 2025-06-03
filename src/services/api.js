@@ -1,5 +1,5 @@
 // src/services/api.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://jwwcw84ccswsgkgcw8oc0g0w.167.88.39.225.sslip.io';
 
 /**
  * Serviço para comunicação com a API do Kommo Dashboard
