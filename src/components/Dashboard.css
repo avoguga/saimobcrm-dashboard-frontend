@@ -44,6 +44,168 @@ body {
   background-color: var(--bg-color);
 }
 
+/* Enhanced conversion cards styles */
+.conversion-card-enhanced {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.conversion-card-enhanced::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.5s ease;
+}
+
+.conversion-card-enhanced:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(78, 88, 89, 0.2);
+  border-color: var(--primary-color);
+}
+
+.conversion-card-enhanced:hover::before {
+  left: 100%;
+}
+
+
+.conversion-card-enhanced:hover .click-arrow {
+  transform: translateX(4px);
+}
+
+
+.conversion-card-enhanced:focus {
+  outline: 3px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.conversion-card-enhanced:active {
+  transform: translateY(-4px) scale(1.01);
+}
+
+
+/* Conversion card components */
+.conversion-card-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.conversion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.conversion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.click-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.click-text {
+  font-size: 11px;
+  color: var(--primary-color);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.click-arrow {
+  font-size: 12px;
+  color: var(--primary-color);
+  transition: transform 0.3s ease;
+}
+
+.conversion-value-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  text-align: center;
+}
+
+.conversion-main-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-dark);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.conversion-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conversion-subtitle {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.3;
+}
+
+.conversion-trend {
+  align-self: flex-start;
+}
+
+.trend-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.trend-badge.positive {
+  background: rgba(76, 224, 179, 0.15);
+  color: var(--success-color);
+  border: 1px solid rgba(76, 224, 179, 0.3);
+}
+
+.trend-badge.negative {
+  background: rgba(255, 58, 94, 0.15);
+  color: var(--danger-color);
+  border: 1px solid rgba(255, 58, 94, 0.3);
+}
+
+.trend-arrow {
+  font-size: 12px;
+}
+
+.trend-value {
+  font-weight: 700;
+}
+
 /* Header styles */
 .dashboard-header {
   display: flex;
@@ -839,5 +1001,46 @@ body {
   
   .mini-metric-card {
     flex: 1 0 100%; /* 1 por linha em telas muito pequenas */
+  }
+  
+  .conversion-card-enhanced:hover {
+    transform: translateY(-4px) scale(1.01); /* Menor movimento em mobile */
+    box-shadow: 0 8px 20px rgba(78, 88, 89, 0.15);
+  }
+  
+  
+  .conversion-details {
+    text-align: center;
+  }
+}
+
+/* Melhorias para os cards de conversão */
+.metrics-group {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: stretch;
+}
+
+.metrics-group .conversion-card-enhanced {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+}
+
+/* Responsividade melhorada para cards de conversão */
+@media (max-width: 768px) {
+  .metrics-group {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .metrics-group .conversion-card-enhanced {
+    min-width: unset;
+    width: 100%;
+    min-height: 120px;
   }
 }
