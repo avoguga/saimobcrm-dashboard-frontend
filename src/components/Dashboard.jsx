@@ -185,7 +185,7 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period, customPeriod.startDate, customPeriod.endDate]); // Removido selectedSource para evitar reload no filtro
+  }, [period]); // REMOVIDO: customPeriod.startDate, customPeriod.endDate - filtragem apenas no Aplicar
 
   // Hook para atualização automática
   useEffect(() => {
@@ -291,7 +291,7 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period, selectedCorretor, customPeriod.startDate, customPeriod.endDate, selectedSource]); // Só reage a mudanças específicas
+  }, [period, selectedCorretor, selectedSource]); // REMOVIDO: customPeriod.startDate, customPeriod.endDate - filtragem apenas no Aplicar
 
   // Atualizar dados (só executa se período for válido)
   const refreshData = async (forceRefresh = false) => {
@@ -376,23 +376,66 @@ function Dashboard() {
   };
 
   // Função para aplicar período customizado
-  const applyCustomPeriod = () => {
+  const applyCustomPeriod = async () => {
     if (customPeriod.startDate && customPeriod.endDate) {
       // Validar se data final é maior que inicial
       const startDate = new Date(customPeriod.startDate);
       const endDate = new Date(customPeriod.endDate);
       
       if (endDate <= startDate) {
-        setError('Data final deve ser posterior à data inicial');
+        alert('Data final deve ser posterior à data inicial');
         return;
       }
       
-      // Só fecha o modal, o useEffect já vai detectar que ambas as datas estão preenchidas
+      // Fechar o modal
       setShowCustomPeriod(false);
       console.log('📅 Período customizado aplicado:', customPeriod);
       console.log('📅 Calculando dias:', Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
+      
+      // Carregar dados manualmente
+      await loadCustomPeriodData();
     } else {
-      setError('Por favor, selecione ambas as datas');
+      alert('Por favor, selecione ambas as datas');
+    }
+  };
+
+  // Função para carregar dados do período customizado manualmente
+  const loadCustomPeriodData = async () => {
+    console.log('🚀 Carregando dados do período customizado...');
+    
+    setIsLoadingMarketing(true);
+    setIsLoadingSales(true);
+    setIsLoadingFilters(true);
+    setError(null);
+    
+    try {
+      const days = calculateDays();
+      
+      // Preparar datas customizadas
+      const customDates = {
+        start_date: customPeriod.startDate,
+        end_date: customPeriod.endDate
+      };
+      
+      console.log('📅 customDates para carregamento manual:', customDates);
+      
+      // Carregar dados em paralelo
+      const [marketingResult, salesResult] = await Promise.all([
+        GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
+        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
+      ]);
+      
+      setMarketingData(marketingResult);
+      setSalesData(salesResult);
+      
+      console.log('✅ Dados do período customizado carregados com sucesso');
+    } catch (error) {
+      console.error('💥 Erro ao carregar dados do período customizado:', error);
+      setError(`Falha ao carregar dados: ${error.message}`);
+    } finally {
+      setIsLoadingMarketing(false);
+      setIsLoadingSales(false);
+      setIsLoadingFilters(false);
     }
   };
 
