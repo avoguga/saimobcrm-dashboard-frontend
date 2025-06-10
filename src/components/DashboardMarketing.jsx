@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import * as echarts from 'echarts';
 import LoadingSpinner from './LoadingSpinner';
+import GranularAPI from '../services/granularAPI';
 import './Dashboard.css';
 
 // Paleta de cores da SA IMOB
@@ -17,9 +18,25 @@ const COLORS = {
   lightBg: '#f8f9fa'
 };
 
-function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) {
+function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
   const [marketingData, setMarketingData] = useState(data);
   const [filteredData, setFilteredData] = useState(data);
+  
+  // Estados para filtros de campanhas Facebook
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaigns, setSelectedCampaigns] = useState([]);
+  const [campaignFilters, setCampaignFilters] = useState({
+    campaignIds: [],
+    status: [],
+    objective: [],
+    searchTerm: ''
+  });
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [showCampaignFilter, setShowCampaignFilter] = useState(false);
+  const [campaignInsights, setCampaignInsights] = useState(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Constantes de responsividade
   const isMobile = windowSize.width < 768;
@@ -36,6 +53,46 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       applyCustomPeriod: typeof applyCustomPeriod
     });
   }, [customPeriod, showCustomPeriod, period]);
+
+  // Usar dados que vêm do componente pai (Dashboard.jsx)
+  useEffect(() => {
+    if (data && data.facebookCampaigns) {
+      setCampaigns(data.facebookCampaigns);
+      
+      // Selecionar TODAS as campanhas por padrão
+      const allCampaignIds = data.facebookCampaigns.map(campaign => campaign.id);
+      setSelectedCampaigns(allCampaignIds);
+      
+      setCampaignFilters({
+        campaignIds: allCampaignIds,
+        status: [],
+        objective: [],
+        searchTerm: ''
+      });
+      
+      // Mostrar filtro de campanhas sempre que houver campanhas
+      setShowCampaignFilter(true);
+    }
+    
+    if (data && data.campaignInsights) {
+      setCampaignInsights(data.campaignInsights);
+      console.log('✅ Usando insights que vieram do Dashboard.jsx:', data.campaignInsights);
+    }
+  }, [data]);
+
+  // Effect para fechar dropdown quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Atualizar dados quando recebidos do cache
   useEffect(() => {
@@ -85,6 +142,85 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     } else {
       return isMobile ? '300px' : '350px';
     }
+  };
+
+  // Função para aplicar filtros de campanha
+  const handleCampaignFilterChange = async (newFilters) => {
+    setCampaignFilters(newFilters);
+    
+    // Se houver campanhas selecionadas, carregar insights específicos
+    if (newFilters.campaignIds.length > 0) {
+      setLoadingInsights(true);
+      try {
+        // Preparar range de datas baseado no período selecionado
+        let dateRange;
+        if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+        } else {
+          // Calcular datas baseado no período
+          const endDate = new Date();
+          const startDate = new Date();
+          
+          switch (period) {
+            case '7d':
+              startDate.setDate(endDate.getDate() - 7);
+              break;
+            case '30d':
+              startDate.setDate(endDate.getDate() - 30);
+              break;
+            case '60d':
+              startDate.setDate(endDate.getDate() - 60);
+              break;
+            case '90d':
+              startDate.setDate(endDate.getDate() - 90);
+              break;
+            default:
+              startDate.setDate(endDate.getDate() - 30);
+          }
+          
+          dateRange = {
+            start: startDate.toISOString().split('T')[0],
+            end: endDate.toISOString().split('T')[0]
+          };
+        }
+        
+        const insights = await GranularAPI.getFacebookCampaignInsights(newFilters.campaignIds, dateRange);
+        setCampaignInsights(insights);
+        console.log('✅ Insights de campanhas carregados:', insights);
+        
+        // Também atualizar os dados gerais se necessário
+        if (onDataRefresh) {
+          await onDataRefresh(newFilters);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar insights de campanhas:', error);
+        setCampaignInsights(null);
+      } finally {
+        setLoadingInsights(false);
+      }
+    } else {
+      setCampaignInsights(null);
+      // Se não há campanhas selecionadas, recarregar dados gerais
+      if (onDataRefresh) {
+        await onDataRefresh({});
+      }
+    }
+  };
+
+  // Handler para seleção de campanhas
+  const handleCampaignSelect = (campaignId) => {
+    const newSelectedCampaigns = selectedCampaigns.includes(campaignId)
+      ? selectedCampaigns.filter(id => id !== campaignId)
+      : [...selectedCampaigns, campaignId];
+    
+    setSelectedCampaigns(newSelectedCampaigns);
+    
+    const newFilters = {
+      ...campaignFilters,
+      campaignIds: newSelectedCampaigns
+    };
+    
+    handleCampaignFilterChange(newFilters);
   };
 
   // Mini Metric Card Component
@@ -348,19 +484,48 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     );
   }
 
-  const facebookMetrics = filteredData?.facebookMetrics || {
+  // Usar insights das campanhas selecionadas se disponível, senão usar dados gerais
+  const facebookMetrics = campaignInsights && selectedCampaigns.length > 0 ? {
+    costPerLead: campaignInsights.costPerLead || 0,
+    ctr: campaignInsights.averageCTR || 0,
+    cpc: campaignInsights.averageCPC || 0,
+    cpm: campaignInsights.averageCPM || 0,
+    impressions: campaignInsights.totalImpressions || 0,
+    reach: campaignInsights.totalReach || 0,
+    clicks: campaignInsights.totalClicks || 0,
+    spend: campaignInsights.totalSpend || 0,
+    inlineLinkClicks: campaignInsights.totalInlineLinkClicks || 0,
+    inlineLinkClickCtr: campaignInsights.inlineLinkClickCTR || 0,
+    costPerInlineLinkClick: campaignInsights.costPerInlineLinkClick || 0,
+    engagement: {
+      likes: campaignInsights.totalPostReactions || 0,
+      comments: campaignInsights.totalComments || 0,
+      shares: 0, // Não disponível na estrutura atual
+      videoViews: 0, // Não disponível na estrutura atual
+      profileVisits: 0,
+      pageEngagement: campaignInsights.totalPageEngagement || 0,
+      postEngagement: campaignInsights.totalPostEngagement || 0
+    }
+  } : filteredData?.facebookMetrics || {
     costPerLead: 0,
     ctr: 0,
     cpc: 0,
+    cpm: 0,
     impressions: 0,
     reach: 0,
     clicks: 0,
+    spend: 0,
+    inlineLinkClicks: 0,
+    inlineLinkClickCtr: 0,
+    costPerInlineLinkClick: 0,
     engagement: {
       likes: 0,
       comments: 0,
       shares: 0,
       videoViews: 0,
-      profileVisits: 0
+      profileVisits: 0,
+      pageEngagement: 0,
+      postEngagement: 0
     }
   };
 
@@ -385,6 +550,104 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   ))}
                 </select>
               </div>
+
+              {/* Filtro de Campanhas Facebook */}
+              {showCampaignFilter && (
+                <div className="campaign-selector">
+                  <label className="filter-label">Campanhas:</label>
+                  {loadingCampaigns ? (
+                    <div className="campaign-loading">Carregando campanhas...</div>
+                  ) : (
+                    <div className="campaign-filter-container" ref={dropdownRef}>
+                      <button 
+                        className="campaign-filter-button"
+                        onClick={() => setShowDropdown(!showDropdown)}
+                      >
+                        {selectedCampaigns.length === 0 
+                          ? 'Selecionar campanhas' 
+                          : selectedCampaigns.length === campaigns.length 
+                            ? `Todas as campanhas (${selectedCampaigns.length})`
+                            : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
+                        <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
+                      </button>
+                      
+                      <div className={`campaign-dropdown ${showDropdown ? 'show' : ''}`}>
+                        <div className="campaign-search">
+                          <input
+                            type="text"
+                            placeholder="Buscar campanhas..."
+                            value={campaignFilters.searchTerm}
+                            onChange={(e) => setCampaignFilters({
+                              ...campaignFilters,
+                              searchTerm: e.target.value
+                            })}
+                            className="campaign-search-input"
+                          />
+                        </div>
+                        
+                        <div className="campaign-actions">
+                          <button 
+                            className="select-all-btn"
+                            onClick={() => {
+                              if (selectedCampaigns.length === campaigns.length) {
+                                // Se todas estão selecionadas, desmarcar todas
+                                setSelectedCampaigns([]);
+                                handleCampaignFilterChange({
+                                  ...campaignFilters,
+                                  campaignIds: []
+                                });
+                              } else {
+                                // Se nem todas estão selecionadas, selecionar todas
+                                const allCampaignIds = campaigns.map(c => c.id);
+                                setSelectedCampaigns(allCampaignIds);
+                                handleCampaignFilterChange({
+                                  ...campaignFilters,
+                                  campaignIds: allCampaignIds
+                                });
+                              }
+                            }}
+                          >
+                            {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                          </button>
+                          <button 
+                            className="clear-all-btn"
+                            onClick={() => {
+                              setSelectedCampaigns([]);
+                              handleCampaignFilterChange({
+                                ...campaignFilters,
+                                campaignIds: []
+                              });
+                            }}
+                          >
+                            Limpar
+                          </button>
+                        </div>
+                        
+                        <div className="campaign-list">
+                          {campaigns
+                            .filter(campaign => 
+                              !campaignFilters.searchTerm || 
+                              campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
+                            )
+                            .map(campaign => (
+                              <label key={campaign.id} className="campaign-item">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCampaigns.includes(campaign.id)}
+                                  onChange={() => handleCampaignSelect(campaign.id)}
+                                />
+                                <span className="campaign-name">{campaign.name}</span>
+                                <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
+                                  {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
+                                </span>
+                              </label>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="period-controls" style={{ position: 'relative' }}>
               <div className="period-selector">
@@ -459,8 +722,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           </div>
         </div>
 
+
         <div className="card card-metrics-group">
-          <div className="card-title">Métricas do Facebook Ads</div>
+          <div className="card-title">
+            {campaignInsights && selectedCampaigns.length > 0 
+              ? `Facebook Ads - ${selectedCampaigns.length} Campanha(s) Selecionada(s)`
+              : 'Métricas do Facebook Ads'}
+            {loadingInsights && <span className="loading-indicator"> - Atualizando...</span>}
+          </div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
               title="Custo por Lead"
@@ -483,8 +752,77 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               previous={filteredData.previousFacebookMetrics?.cpc || 0}
               color={COLORS.tertiary}
             />
+            <MiniMetricCard
+              title="CPM"
+              value={`R$ ${(facebookMetrics.cpm || 0).toFixed(2)}`}
+              color={COLORS.dark}
+            />
+            <MiniMetricCard
+              title="Impressões"
+              value={(facebookMetrics.impressions || 0).toLocaleString()}
+              color={COLORS.primary}
+            />
+            <MiniMetricCard
+              title="Alcance"
+              value={(facebookMetrics.reach || 0).toLocaleString()}
+              color={COLORS.secondary}
+            />
+            <MiniMetricCard
+              title="Cliques"
+              value={(facebookMetrics.clicks || 0).toLocaleString()}
+              color={COLORS.tertiary}
+            />
+            <MiniMetricCard
+              title="Gasto"
+              value={`R$ ${(facebookMetrics.spend || 0).toFixed(2)}`}
+              color={COLORS.warning}
+            />
+            {(facebookMetrics.inlineLinkClicks || 0) > 0 && (
+              <>
+                <MiniMetricCard
+                  title="Link Clicks"
+                  value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
+                  color={COLORS.success}
+                />
+                <MiniMetricCard
+                  title="Link Click CTR"
+                  value={`${(facebookMetrics.inlineLinkClickCtr || 0).toFixed(2)}%`}
+                  color={COLORS.success}
+                />
+                <MiniMetricCard
+                  title="Custo por Link Click"
+                  value={`R$ ${(facebookMetrics.costPerInlineLinkClick || 0).toFixed(2)}`}
+                  color={COLORS.success}
+                />
+              </>
+            )}
+            {campaignInsights && selectedCampaigns.length > 0 && (
+              <>
+                <MiniMetricCard
+                  title="Engajamento Página"
+                  value={(facebookMetrics.engagement.pageEngagement || 0).toLocaleString()}
+                  color={COLORS.primary}
+                />
+                <MiniMetricCard
+                  title="Engajamento Post"
+                  value={(facebookMetrics.engagement.postEngagement || 0).toLocaleString()}
+                  color={COLORS.secondary}
+                />
+                <MiniMetricCard
+                  title="Reações"
+                  value={(facebookMetrics.engagement.likes || 0).toLocaleString()}
+                  color={COLORS.success}
+                />
+                <MiniMetricCard
+                  title="Comentários"
+                  value={(facebookMetrics.engagement.comments || 0).toLocaleString()}
+                  color={COLORS.warning}
+                />
+              </>
+            )}
           </div>
         </div>
+
       </div>
 
       {/* Linha 2: Gráficos */}
@@ -534,43 +872,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         <div className="card card-sm">
           <div className="card-title">Métricas Detalhadas do Facebook</div>
           
-          {/* Seção de Alcance e Performance */}
-          <div className="compact-metrics-section">
-            <h4 className="section-subtitle">Alcance & Performance</h4>
-            <div className="compact-metrics-row">
-              <div className="compact-metric">
-                <span className="metric-label">Impressões</span>
-                <span className="metric-value">{(facebookMetrics.impressions || 0).toLocaleString('pt-BR')}</span>
-                {facebookMetrics.impressions > 0 && filteredData.previousFacebookMetrics?.impressions > 0 && (
-                  <span className={`metric-trend ${facebookMetrics.impressions > filteredData.previousFacebookMetrics.impressions ? 'up' : 'down'}`}>
-                    {((facebookMetrics.impressions - filteredData.previousFacebookMetrics.impressions) / filteredData.previousFacebookMetrics.impressions * 100).toFixed(0)}%
-                  </span>
-                )}
-              </div>
-              <div className="compact-metric">
-                <span className="metric-label">Alcance</span>
-                <span className="metric-value">{(facebookMetrics.reach || 0).toLocaleString('pt-BR')}</span>
-                {facebookMetrics.reach > 0 && filteredData.previousFacebookMetrics?.reach > 0 && (
-                  <span className={`metric-trend ${facebookMetrics.reach > filteredData.previousFacebookMetrics.reach ? 'up' : 'down'}`}>
-                    {((facebookMetrics.reach - filteredData.previousFacebookMetrics.reach) / filteredData.previousFacebookMetrics.reach * 100).toFixed(0)}%
-                  </span>
-                )}
-              </div>
-              <div className="compact-metric">
-                <span className="metric-label">Cliques</span>
-                <span className="metric-value">{(facebookMetrics.clicks || 0).toLocaleString('pt-BR')}</span>
-                {facebookMetrics.clicks > 0 && filteredData.previousFacebookMetrics?.clicks > 0 && (
-                  <span className={`metric-trend ${facebookMetrics.clicks > filteredData.previousFacebookMetrics.clicks ? 'up' : 'down'}`}>
-                    {((facebookMetrics.clicks - filteredData.previousFacebookMetrics.clicks) / filteredData.previousFacebookMetrics.clicks * 100).toFixed(0)}%
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          
           {/* Seção de Engajamento */}
           <div className="compact-metrics-section">
-            <h4 className="section-subtitle">Engajamento</h4>
+            <h4 className="section-subtitle">Engajamento do Facebook</h4>
             <div className="compact-metrics-row">
               <div className="compact-metric">
                 <span className="metric-label">Curtidas</span>

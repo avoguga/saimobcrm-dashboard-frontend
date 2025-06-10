@@ -166,11 +166,34 @@ function Dashboard() {
             end_date: customPeriod.endDate
           } : null;
           
-          // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO! (sem filtro de fonte - filtragem no frontend)
-          const marketingResult = await GranularAPI.loadMarketingDashboard(days, null, customDates);
+          // CARREGAMENTO PARALELO: Dashboard geral + Insights de campanhas Facebook
+          const [marketingResult, facebookCampaigns] = await Promise.all([
+            GranularAPI.loadMarketingDashboard(days, null, customDates),
+            GranularAPI.getFacebookCampaigns()
+          ]);
           
-          setMarketingData(marketingResult);
-          console.log('✅ Marketing dashboard carregado (GRANULAR):', marketingResult);
+          // Carregar insights de todas as campanhas
+          let campaignInsights = null;
+          if (facebookCampaigns && facebookCampaigns.length > 0) {
+            const allCampaignIds = facebookCampaigns.map(campaign => campaign.id);
+            const dateRange = customDates ? {
+              start: customDates.start_date,
+              end: customDates.end_date
+            } : null;
+            
+            campaignInsights = await GranularAPI.getFacebookCampaignInsights(allCampaignIds, dateRange);
+            console.log('✅ Insights de campanhas carregados automaticamente:', campaignInsights);
+          }
+          
+          // Integrar insights das campanhas nos dados do marketing
+          const enrichedMarketingData = {
+            ...marketingResult,
+            campaignInsights,
+            facebookCampaigns
+          };
+          
+          setMarketingData(enrichedMarketingData);
+          console.log('✅ Marketing dashboard carregado (GRANULAR + Campanhas):', enrichedMarketingData);
         } catch (error) {
           console.error('Erro ao carregar dados de marketing:', error);
           setError(`Falha ao carregar dados de marketing: ${error.message}`);
@@ -375,6 +398,38 @@ function Dashboard() {
     }
   };
 
+  // Função para refresh de marketing com filtros de campanha
+  const refreshMarketingWithCampaignFilters = async (campaignFilters = {}) => {
+    try {
+      setIsLoadingMarketing(true);
+      setIsLoadingFilters(true);
+      
+      const days = calculateDays();
+      const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
+        start_date: customPeriod.startDate,
+        end_date: customPeriod.endDate
+      } : null;
+      
+      console.log('🚀 Atualizando marketing com filtros de campanha:', campaignFilters);
+      
+      const marketingResponse = await GranularAPI.loadMarketingDashboard(
+        days, 
+        selectedSource, 
+        customDates, 
+        campaignFilters
+      );
+      setMarketingData(marketingResponse);
+      console.log('✅ Marketing data atualizado com filtros de campanha');
+      
+    } catch (error) {
+      console.error('Erro ao atualizar marketing com campanhas:', error);
+      setError(`Erro ao aplicar filtros de campanha: ${error.message}`);
+    } finally {
+      setIsLoadingMarketing(false);
+      setIsLoadingFilters(false);
+    }
+  };
+
   // Função para aplicar período customizado
   const applyCustomPeriod = async () => {
     if (customPeriod.startDate && customPeriod.endDate) {
@@ -527,6 +582,7 @@ function Dashboard() {
           setShowCustomPeriod={setShowCustomPeriod}
           handlePeriodChange={handlePeriodChange}
           applyCustomPeriod={applyCustomPeriod}
+          onDataRefresh={refreshMarketingWithCampaignFilters}
         />
       ) : (
         <DashboardSales 
