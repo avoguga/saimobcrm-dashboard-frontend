@@ -1584,200 +1584,11 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
                 </button>
                 <button 
                   className={period === 'custom' ? 'active' : ''} 
-                  onClick={() => {
-                    console.log('🎯 Clicando no botão Personalizado');
-                    handlePeriodChange('custom');
-                  }}
-                  style={{
-                    backgroundColor: showCustomPeriod ? '#4f46e5' : '',
-                    color: showCustomPeriod ? '#fff' : ''
-                  }}
+                  onClick={() => handlePeriodChange('custom')}
                 >
-                  📅 Personalizado {showCustomPeriod ? '(ATIVO)' : ''}
+                  Personalizado
                 </button>
               </div>
-              
-              {/* Seletor de período customizado */}
-              {showCustomPeriod && (
-                <div style={{
-                  position: 'fixed',
-                  top: '0',
-                  left: '0',
-                  right: '0',
-                  bottom: '0',
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 9999
-                }}
-                onClick={() => {
-                  console.log('🚫 Sales: Fechando modal por clique fora');
-                  setShowCustomPeriod(false);
-                }}>
-                  <div style={{
-                    background: '#fff',
-                    borderRadius: '12px',
-                    padding: '30px',
-                    maxWidth: '500px',
-                    width: '90%',
-                    maxHeight: '90vh',
-                    overflowY: 'auto',
-                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="date-inputs">
-                      <div style={{ marginBottom: '20px' }}>
-                        <h4 style={{ margin: '0 0 12px 0', color: '#374151', fontSize: '16px', fontWeight: '600' }}>
-                          🗓️ Selecionar Período Personalizado
-                        </h4>
-                        <p style={{ margin: '0', color: '#6b7280', fontSize: '14px' }}>
-                          Escolha as datas de início e fim para análise
-                        </p>
-                      </div>
-                      
-                      {/* Shortcuts rápidos */}
-                      <div className="quick-periods">
-                        <button 
-                          className="quick-period-btn"
-                          onClick={() => {
-                            const end = new Date();
-                            const start = new Date();
-                            start.setDate(start.getDate() - 180);
-                            setCustomPeriod({
-                              startDate: start.toISOString().split('T')[0],
-                              endDate: end.toISOString().split('T')[0]
-                            });
-                          }}
-                        >
-                          Últimos 6 meses
-                        </button>
-                        <button 
-                          className="quick-period-btn"
-                          onClick={() => {
-                            const end = new Date();
-                            const start = new Date();
-                            start.setFullYear(start.getFullYear() - 1);
-                            setCustomPeriod({
-                              startDate: start.toISOString().split('T')[0],
-                              endDate: end.toISOString().split('T')[0]
-                            });
-                          }}
-                        >
-                          Último ano
-                        </button>
-                        <button 
-                          className="quick-period-btn"
-                          onClick={() => {
-                            const now = new Date();
-                            const start = new Date(now.getFullYear(), 0, 1);
-                            setCustomPeriod({
-                              startDate: start.toISOString().split('T')[0],
-                              endDate: now.toISOString().split('T')[0]
-                            });
-                          }}
-                        >
-                          Este ano
-                        </button>
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>📅 Data Inicial</label>
-                          <input
-                            type="date"
-                            value={customPeriod.startDate || ''}
-                            onChange={(e) => {
-                              console.log('📅 Sales: Alterando data inicial:', e.target.value);
-                              setCustomPeriod({...customPeriod, startDate: e.target.value});
-                            }}
-                            max={new Date().toISOString().split('T')[0]}
-                            style={{
-                              padding: '8px 12px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              width: '100%'
-                            }}
-                          />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>📅 Data Final</label>
-                          <input
-                            type="date"
-                            value={customPeriod.endDate || ''}
-                            onChange={(e) => {
-                              console.log('📅 Sales: Alterando data final:', e.target.value);
-                              setCustomPeriod({...customPeriod, endDate: e.target.value});
-                            }}
-                            max={new Date().toISOString().split('T')[0]}
-                            min={customPeriod.startDate || ''}
-                            style={{
-                              padding: '8px 12px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              width: '100%'
-                            }}
-                          />
-                        </div>
-                      </div>
-                      
-                      {customPeriod.startDate && customPeriod.endDate && (
-                        <div style={{ 
-                          background: '#f0f9ff', 
-                          border: '1px solid #bae6fd', 
-                          borderRadius: '8px', 
-                          padding: '12px', 
-                          fontSize: '14px', 
-                          color: '#0369a1' 
-                        }}>
-                          📊 Período selecionado: {Math.ceil((new Date(customPeriod.endDate) - new Date(customPeriod.startDate)) / (1000 * 60 * 60 * 24))} dias
-                        </div>
-                      )}
-                      
-                      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                        <button 
-                          onClick={() => {
-                            console.log('🚫 Sales: Cancelando período customizado');
-                            setShowCustomPeriod(false);
-                          }}
-                          style={{
-                            padding: '10px 20px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            background: '#fff',
-                            color: '#374151',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                          }}
-                        >
-                          Cancelar
-                        </button>
-                        <button 
-                          onClick={() => {
-                            console.log('✅ Sales: Aplicando período customizado:', customPeriod);
-                            applyCustomPeriod();
-                          }}
-                          disabled={!customPeriod.startDate || !customPeriod.endDate}
-                          style={{
-                            padding: '10px 20px',
-                            border: 'none',
-                            borderRadius: '6px',
-                            background: customPeriod.startDate && customPeriod.endDate ? '#4f46e5' : '#9ca3af',
-                            color: '#fff',
-                            cursor: customPeriod.startDate && customPeriod.endDate ? 'pointer' : 'not-allowed',
-                            fontSize: '14px'
-                          }}
-                        >
-                          ✓ Aplicar Período
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1879,11 +1690,11 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
       </div>
 
 
-      {/* Linha 5: Desempenho por corretor */}
-      <div className="dashboard-row">
+      {/* Linha 5: Gráficos de Corretores - Layout Vertical */}
+      <div className="dashboard-row" style={{ flexDirection: 'column' }}>
         {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
-            <div className="card card-md">
+            <div className="card card-full">
               <div className="card-title">Leads por Corretor</div>
               <CompactChart 
                 type="bar" 
@@ -1893,7 +1704,7 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
                   />
             </div>
             
-            <div className="card card-md">
+            <div className="card card-full">
               <div className="card-title">Rank Corretores - Reunião</div>
               <CompactChart 
                 type="bar" 
@@ -1903,7 +1714,7 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
                   />
             </div>
             
-            <div className="card card-md">
+            <div className="card card-full">
               <div className="card-title">Rank Corretores - Venda</div>
               <CompactChart 
                 type="bar" 
@@ -1915,7 +1726,7 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
           </>
         ) : salesData?.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
           <>
-            <div className="card card-md">
+            <div className="card card-full">
               <div className="card-title">Leads por Corretor</div>
               <CompactChart 
                 type="bar" 
@@ -1925,8 +1736,8 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
                   />
             </div>
             
-            <div className="card card-md">
-              <div className="card-title">Atividades por Corretor</div>
+            <div className="card card-full">
+              <div className="card-title">Rank Corretores - Reunião</div>
               <CompactChart 
                 type="bar" 
                 data={chartData.activitiesData} 
@@ -1935,7 +1746,7 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
                   />
             </div>
             
-            <div className="card card-md">
+            <div className="card card-full">
               <div className="card-title">Rank Corretores - Venda</div>
               <CompactChart 
                 type="bar" 
@@ -1951,7 +1762,7 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
             </div>
           </>
         ) : (
-          <div className="card card-lg">
+          <div className="card card-full">
             <div className="error-message">Não há dados de desempenho por corretor disponíveis</div>
           </div>
         )}
@@ -2104,6 +1915,37 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
         data={modalStateRef.current.data}
         error={modalStateRef.current.error}
       />
+
+      {/* Modal de período customizado */}
+      {showCustomPeriod && (
+        <div className="custom-period-backdrop" onClick={() => setShowCustomPeriod(false)}>
+          <div className="custom-period-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Selecionar Período Personalizado</h3>
+            <div className="date-inputs">
+              <label>
+                Data Inicial:
+                <input
+                  type="date"
+                  value={customPeriod.startDate}
+                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+              </label>
+              <label>
+                Data Final:
+                <input
+                  type="date"
+                  value={customPeriod.endDate}
+                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowCustomPeriod(false)}>Cancelar</button>
+              <button onClick={applyCustomPeriod}>Aplicar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

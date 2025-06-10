@@ -166,8 +166,8 @@ function Dashboard() {
             end_date: customPeriod.endDate
           } : null;
           
-          // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO!
-          const marketingResult = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
+          // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO! (sem filtro de fonte - filtragem no frontend)
+          const marketingResult = await GranularAPI.loadMarketingDashboard(days, null, customDates);
           
           setMarketingData(marketingResult);
           console.log('✅ Marketing dashboard carregado (GRANULAR):', marketingResult);
@@ -185,7 +185,7 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period, customPeriod.startDate, customPeriod.endDate, selectedSource]); // Só reage a mudanças específicas
+  }, [period, customPeriod.startDate, customPeriod.endDate]); // Removido selectedSource para evitar reload no filtro
 
   // Hook para atualização automática
   useEffect(() => {

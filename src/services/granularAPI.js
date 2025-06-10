@@ -2,7 +2,7 @@
  * 🚀 API GRANULAR SIMPLIFICADA E HONESTA
  * 
  * VENDAS: Usa endpoints V2 reais do backend
- * MARKETING: Usa mocks (backend ainda não implementou)
+ * MARKETING: Usa endpoint completo /marketing-complete
  * 
  * APENAS métodos REALMENTE usados pelo Dashboard.jsx
  */
@@ -13,7 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohe
 
 // Flags HONESTAS por módulo
 const USE_MOCK_SALES = false; // ✅ VENDAS: Endpoints V2 implementados!
-const USE_MOCK_MARKETING = true; // ⏳ MARKETING: Ainda em desenvolvimento
+const USE_MOCK_MARKETING = false; // ✅ MARKETING: Endpoints implementados!
 
 export class GranularAPI {
   /**
@@ -132,7 +132,7 @@ export class GranularAPI {
           _metadata: { mockData: true, granular: true }
         };
       } else {
-        // Usar endpoints V2 reais (quando backend implementar)
+        // Usar endpoints reais de marketing
         const params = new URLSearchParams();
         
         // Suporte a período customizado
@@ -147,17 +147,15 @@ export class GranularAPI {
         
         if (fonte) params.append('fonte', fonte);
 
-        const [kpis, leadsBySource] = await Promise.all([
-          fetch(`${API_URL}/api/v2/marketing/kpis?${params}`).then(r => r.json()),
-          fetch(`${API_URL}/api/v2/charts/leads-by-source?${params}`).then(r => r.json())
-        ]);
+        // Usar endpoint completo de marketing
+        const marketingData = await fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json());
 
         console.timeEnd('Marketing Dashboard Load');
+        console.log('✅ Marketing data completo recebido:', marketingData);
 
         return {
-          ...kpis,
-          leadsBySource: leadsBySource.leadsBySource || [],
-          _metadata: { realAPI: true, granular: true, v2Endpoints: true }
+          ...marketingData,
+          _metadata: { realAPI: true, granular: true, singleEndpoint: true, ...marketingData._metadata }
         };
       }
     } catch (error) {
@@ -165,6 +163,7 @@ export class GranularAPI {
       throw error;
     }
   }
+
 
   /**
    * Limpar cache
