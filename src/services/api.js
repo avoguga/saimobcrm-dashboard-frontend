@@ -3,23 +3,56 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 /**
  * Serviço para comunicação com a API do Kommo Dashboard
+ * SIMPLIFICADO - apenas métodos REALMENTE usados
  */
 export const KommoAPI = {
+  // Cache interno para reduzir chamadas à API
+  _cache: new Map(),
+
   /**
-   * Realiza uma requisição GET para a API com tolerância a falhas
-   * @param {string} endpoint - Endpoint da API
-   * @param {Object} params - Parâmetros de consulta
-   * @returns {Promise} - Promise com os dados da resposta
+   * Obtém dados do cache se ainda válidos
+   */
+  getFromCache(key, ttl = 5 * 60 * 1000) {
+    const cached = this._cache.get(key);
+    if (cached && (Date.now() - cached.timestamp) < ttl) {
+      return cached.data;
+    }
+    return null;
+  },
+
+  /**
+   * Armazena dados no cache
+   */
+  setCache(key, data) {
+    if (this._cache.size >= 50) {
+      const firstKey = this._cache.keys().next().value;
+      this._cache.delete(firstKey);
+    }
+    
+    this._cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  },
+
+  /**
+   * Limpa todo o cache
+   */
+  clearCache() {
+    this._cache.clear();
+    console.log('🗑️ Cache da API limpo');
+  },
+
+  /**
+   * Realiza uma requisição GET para a API
    */
   async get(endpoint, params = {}) {
     try {
-      // Construir URL com parâmetros
       const url = new URL(`${API_URL}${endpoint}`);
       Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
 
-      console.log(`Fazendo requisição para: ${url.toString()}`);
+      console.log(`🌐 Fazendo requisição para: ${url.toString()}`);
 
-      // Realizar a requisição
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -28,91 +61,26 @@ export const KommoAPI = {
         }
       });
 
-      // Verificar se a resposta foi bem-sucedida
       if (!response.ok) {
+        console.warn(`⚠️ Resposta não OK: ${response.status} - ${response.statusText}`);
         throw new Error(`Erro na requisição: ${response.status} - ${response.statusText}`);
       }
 
-      // Retornar os dados como JSON
       const data = await response.json();
-      console.log(`Dados recebidos de ${endpoint}:`, data);
+      console.log(`✅ Dados recebidos de ${endpoint}:`, data);
       return data;
     } catch (error) {
-      console.error(`Erro ao acessar ${endpoint}:`, error);
-      // Retornar um objeto vazio em vez de propagar o erro
-      // Isso permite que o dashboard carregue mesmo que alguns endpoints falhem
+      console.error(`💥 Erro ao acessar ${endpoint}:`, error);
       return this.getDefaultResponse(endpoint);
     }
   },
 
   /**
    * Retorna uma resposta padrão para endpoints com falha
-   * @param {string} endpoint - Endpoint da API
-   * @returns {Object} - Resposta padrão
    */
   getDefaultResponse(endpoint) {
-    // Mapear respostas padrão para endpoints utilizados
     const defaults = {
       '/corretor-dashboard/list': { corretores: [] },
-      '/dashboard/marketing-complete': { 
-        totalLeads: 0,
-        leadsBySource: [],
-        leadsByTag: [],
-        leadsByAd: [],
-        previousPeriodLeads: 0,
-        previousFacebookLeads: 0,
-        previousOlxLeads: 0,
-        facebookMetrics: {
-          impressions: 0,
-          reach: 0,
-          clicks: 0,
-          ctr: 0,
-          cpc: 0,
-          totalSpent: 0,
-          costPerLead: 0,
-          engagement: {
-            likes: 0,
-            comments: 0,
-            shares: 0,
-            videoViews: 0,
-            profileVisits: 0
-          }
-        },
-        previousFacebookMetrics: {
-          impressions: 0,
-          reach: 0,
-          clicks: 0,
-          ctr: 0,
-          cpc: 0,
-          totalSpent: 0,
-          costPerLead: 0,
-          engagement: {
-            likes: 0,
-            comments: 0,
-            shares: 0,
-            videoViews: 0,
-            profileVisits: 0
-          }
-        },
-        metricsTrend: []
-      },
-      '/dashboard/sales-complete': {
-        totalLeads: 0,
-        leadsByUser: [],
-        leadsByStage: [],
-        leadsBySource: [],
-        conversionRates: { meetings: 0, prospects: 0, sales: 0 },
-        leadCycleTime: 0,
-        winRate: 0,
-        averageDealSize: 0,
-        salesbotRecovery: 0,
-        salesTrend: [],
-        customFields: { fonte: [], available_fontes: [] },
-        analyticsOverview: { leads: { total: 0, active: 0, lost: 0, won: 0 } },
-        analyticsFunnel: {},
-        analyticsTeam: {},
-        meetingsStats: {}
-      },
       '/dashboard/sales-comparison': {
         currentPeriod: { name: 'Mês Atual', totalLeads: 0, winRate: 0, averageDealSize: 0, totalRevenue: 0, leadCycleTime: 0 },
         previousPeriod: { name: 'Mês Anterior', totalLeads: 0, winRate: 0, averageDealSize: 0, totalRevenue: 0, leadCycleTime: 0 }
@@ -128,68 +96,102 @@ export const KommoAPI = {
           valor_total_vendas: 0.0
         }
       },
+      '/custom-fields/837886': {
+        custom_field: {
+          id: 837886,
+          name: "Fonte",
+          type: "select",
+          enums: [
+            { id: 770632, value: "Tráfego Meta", sort: 500 },
+            { id: 770634, value: "Escritório Patacho", sort: 1 },
+            { id: 770636, value: "Canal Pro", sort: 2 },
+            { id: 770638, value: "Site", sort: 3 },
+            { id: 770640, value: "Redes Sociais", sort: 4 },
+            { id: 770642, value: "Parceria com Construtoras", sort: 5 },
+            { id: 788498, value: "Google", sort: 15 }
+          ]
+        }
+      },
       'default': {}
     };
 
     return defaults[endpoint] || defaults['default'];
   },
 
-  // MÉTODOS UTILIZADOS NO DASHBOARD
+  // ============================================================================
+  // MÉTODOS REALMENTE USADOS (apenas estes 5)
+  // ============================================================================
 
   /**
    * Obtém lista de corretores disponíveis
-   * @returns {Promise} - Lista de corretores com suas métricas básicas
+   * USADO EM: Dashboard.jsx:62
    */
   async getCorretoresList() {
     return this.get('/corretor-dashboard/list');
   },
 
   /**
-   * Dashboard de marketing completo em uma única requisição
-   * @param {number} days - Período em dias para análise
-   * @param {Object} extraParams - Parâmetros adicionais (startDate, endDate)
-   * @returns {Promise<Object>} - Dados completos do dashboard de marketing
+   * Obtém custom field do Kommo por ID
    */
-  async getMarketingDashboardComplete(days = 90, extraParams = {}) {
-    const params = { days, ...extraParams };
-    return this.get(`/dashboard/marketing-complete`, params);
+  async getCustomField(fieldId) {
+    return this.get(`/custom-fields/${fieldId}`);
   },
 
   /**
-   * Dashboard de vendas completo em uma única requisição
-   * @param {number} days - Período em dias para análise
-   * @param {string} corretor - Nome do corretor (opcional)
-   * @param {Object} extraParams - Parâmetros adicionais (startDate, endDate)
-   * @returns {Promise<Object>} - Dados completos do dashboard de vendas
+   * Obtém opções de fonte (custom field 837886)
+   * USADO EM: Dashboard.jsx:64
    */
-  async getSalesDashboardComplete(days = 90, corretor = null, extraParams = {}) {
-    const params = { days, ...extraParams };
-    if (corretor) params.corretor = corretor;
-    return this.get(`/dashboard/sales-complete`, params);
+  async getSourceOptions() {
+    try {
+      const FONTE_FIELD_ID = 837886;
+      const response = await this.getCustomField(FONTE_FIELD_ID);
+      
+      if (response?.custom_field?.enums) {
+        const sources = response.custom_field.enums
+          .sort((a, b) => a.sort - b.sort)
+          .map(enum_item => ({
+            value: enum_item.value,
+            label: enum_item.value,
+            id: enum_item.id
+          }));
+        
+        return [
+          { value: '', label: 'Todas as Fontes', id: null },
+          ...sources
+        ];
+      }
+    } catch (error) {
+      console.error('💥 Erro ao buscar opções de fonte:', error);
+    }
+    
+    // Fallback
+    return [
+      { value: '', label: 'Todas as Fontes', id: null },
+      { value: 'Google', label: 'Google', id: 'fallback-1' },
+      { value: 'Tráfego Meta', label: 'Tráfego Meta', id: 'fallback-2' },
+      { value: 'Site', label: 'Site', id: 'fallback-3' }
+    ];
   },
 
   /**
    * Comparação de vendas entre períodos
-   * Compara métricas do mês atual vs mês anterior
-   * @param {string} corretor - Nome do corretor (opcional)
-   * @returns {Promise<Object>} - Dados de comparação entre períodos
+   * USADO EM: DashboardSales.jsx:341
    */
-  async getSalesComparison(corretor = null) {
+  async getSalesComparison(corretor = null, fonte = null) {
     const params = {};
-    if (corretor) params.corretor = corretor;
+    if (corretor) params.corretor = encodeURIComponent(corretor);
+    if (fonte) params.fonte = encodeURIComponent(fonte);
     return this.get(`/dashboard/sales-comparison`, params);
   },
 
   /**
    * Obtém tabelas detalhadas do dashboard
-   * @param {number} days - Período em dias (padrão: 30)
-   * @param {string} corretor - Nome do corretor (opcional)
-   * @param {Object} extraParams - Parâmetros adicionais (startDate, endDate)
-   * @returns {Promise<Object>} - Dados detalhados das tabelas (reuniões, propostas, vendas)
+   * USADO EM: DashboardSales.jsx (linha não especificada)
    */
-  async getDetailedTables(days = 30, corretor = null, extraParams = {}) {
-    const params = { days, ...extraParams };
+  async getDetailedTables(corretor = null, fonte = null, extraParams = {}) {
+    const params = { ...extraParams };
     if (corretor) params.corretor = encodeURIComponent(corretor);
+    if (fonte) params.fonte = encodeURIComponent(fonte);
     return this.get(`/dashboard/detailed-tables`, params);
   }
 };

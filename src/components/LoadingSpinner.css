@@ -208,3 +208,35 @@
     height: 6px;
   }
 }
+
+/* Barra de progresso para dynamic loading */
+.loading-progress {
+  width: 100%;
+  height: 4px;
+  background-color: var(--light-color, #C1C5C9);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color, #4E5859), var(--secondary-color, #96856F));
+  border-radius: 2px;
+  animation: progress 2s ease-in-out infinite;
+}
+
+@keyframes progress {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 75%;
+    margin-left: 25%;
+  }
+  100% {
+    width: 100%;
+    margin-left: 0%;
+  }
+}

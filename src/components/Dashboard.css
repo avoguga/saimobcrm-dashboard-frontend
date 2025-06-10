@@ -237,6 +237,81 @@ body {
   color: var(--tertiary-color);
 }
 
+.filter-loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, var(--success-color), var(--secondary-color));
+  border-radius: 20px;
+  color: var(--white-color);
+  font-size: 12px;
+  font-weight: 600;
+  animation: filterPulse 1.5s ease-in-out infinite;
+  box-shadow: 0 2px 8px rgba(76, 224, 179, 0.3);
+}
+
+.filter-loading-indicator .loading-icon {
+  font-size: 14px;
+  animation: filterSpin 2s linear infinite;
+}
+
+.filter-loading-indicator .loading-text {
+  white-space: nowrap;
+}
+
+@keyframes filterPulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes filterSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Efeito visual para atualizações dinâmicas de charts */
+.dashboard-content.updating {
+  position: relative;
+}
+
+.dashboard-content.updating::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(76, 224, 179, 0.1) 0%,
+    rgba(76, 224, 179, 0.05) 50%,
+    rgba(76, 224, 179, 0.1) 100%
+  );
+  animation: dataUpdate 2s ease-in-out;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes dataUpdate {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 .dashboard-tabs {
   display: flex;
   gap: var(--spacing-xs);
@@ -269,6 +344,65 @@ body {
   display: flex;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.auto-refresh-controls {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.toggle-button {
+  padding: 8px 16px;
+  background-color: var(--white-color);
+  border: 1px solid var(--light-color);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-medium);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.toggle-button:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--white-color);
+}
+
+.toggle-button.active {
+  background-color: var(--success-color);
+  border-color: var(--success-color);
+  color: var(--white-color);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(76, 224, 179, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(76, 224, 179, 0.1); }
+  100% { box-shadow: 0 0 0 0 rgba(76, 224, 179, 0); }
+}
+
+.interval-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--white-color);
+  color: var(--text-dark);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  outline: none;
+}
+
+.interval-select:hover,
+.interval-select:focus {
+  border-color: var(--success-color);
 }
 
 .action-button {
@@ -382,6 +516,58 @@ body {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(78, 88, 89, 0.1);
+}
+
+/* Filtros agrupados */
+.filters-group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-medium);
+  margin-bottom: 4px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.source-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.source-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--white-color);
+  color: var(--text-dark);
+  font-size: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-width: 160px;
+  outline: none;
+}
+
+.source-select:hover {
+  border-color: var(--secondary-color);
+}
+
+.source-select:focus {
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 2px rgba(150, 133, 111, 0.1);
+}
+
+.corretor-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .period-selector {
@@ -852,6 +1038,17 @@ body {
 
 .data-timestamp {
   font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.auto-refresh-indicator {
+  color: var(--success-color);
+  font-weight: 600;
+  font-size: 11px;
 }
 
 /* Breakpoint para tablets */
@@ -957,6 +1154,16 @@ body {
     margin-bottom: var(--spacing-sm);
   }
   
+  .filter-loading-indicator {
+    font-size: 11px;
+    padding: 4px 8px;
+    margin-top: 6px;
+  }
+  
+  .filter-loading-indicator .loading-icon {
+    font-size: 12px;
+  }
+  
   .dashboard-tabs {
     justify-content: center;
   }
@@ -974,6 +1181,24 @@ body {
   .corretor-select {
     width: 100%;
     min-width: unset;
+  }
+  
+  .source-select {
+    width: 100%;
+    min-width: unset;
+  }
+  
+  .filters-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    width: 100%;
+  }
+  
+  .dashboard-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
   }
   
   .section-title {

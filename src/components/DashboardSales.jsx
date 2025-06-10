@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as echarts from 'echarts';
 import { KommoAPI } from '../services/api';
+import LoadingSpinner from './LoadingSpinner';
 import './Dashboard.css';
 
 // Paleta de cores da SA IMOB
@@ -123,24 +125,220 @@ const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'nu
   );
 };
 
-function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, data, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) {
+// Memoized Modal Component to prevent parent re-renders
+const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error }) => {
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}
+      onClick={onClose}
+    >
+      <div 
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '24px',
+          maxWidth: '90vw',
+          maxHeight: '80vh',
+          width: '800px',
+          overflowY: 'auto',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header do modal */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '20px',
+          borderBottom: `2px solid ${COLORS.primary}`,
+          paddingBottom: '12px'
+        }}>
+          <h3 style={{ margin: 0, color: COLORS.primary }}>{title}</h3>
+          <button 
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: COLORS.tertiary,
+              padding: '0',
+              width: '30px',
+              height: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Conteúdo do modal */}
+        <div>
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+              <div>Carregando dados...</div>
+            </div>
+          ) : error ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: COLORS.danger }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
+              <div><strong>Erro ao carregar dados</strong></div>
+              <div style={{ fontSize: '14px', marginTop: '8px' }}>{error}</div>
+            </div>
+          ) : data.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: COLORS.tertiary }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>
+                {type === 'reunioes' ? '📊' : 
+                 type === 'propostas' ? '📋' : '💰'}
+              </div>
+              <div><strong>Nenhum registro encontrado</strong></div>
+              <div style={{ fontSize: '14px', marginTop: '8px' }}>
+                Não há {type} no período selecionado.
+              </div>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ 
+                width: '100%', 
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: COLORS.lightBg }}>
+                    {type === 'reunioes' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                      </>
+                    )}
+                    {type === 'propostas' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Proposta</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                      </>
+                    )}
+                    {type === 'vendas' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Venda</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Valor da Venda</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((item, index) => (
+                    <tr key={index} style={{ 
+                      backgroundColor: index % 2 === 0 ? 'white' : COLORS.lightBg,
+                      borderBottom: `1px solid ${COLORS.light}`
+                    }}>
+                      {type === 'reunioes' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                        </>
+                      )}
+                      {type === 'propostas' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data da Proposta']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                        </>
+                      )}
+                      {type === 'vendas' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data da Venda']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
+                            {item['Valor da Venda']}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {/* Footer com total */}
+              <div style={{ 
+                marginTop: '16px', 
+                padding: '12px',
+                backgroundColor: COLORS.lightBg,
+                borderRadius: '4px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                color: COLORS.primary
+              }}>
+                Total: {data.length} {type}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+});
+
+const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
   const [salesData, setSalesData] = useState(data);
   const [comparisonData, setComparisonData] = useState(null);
   
-  // Estado do modal
-  const [modalState, setModalState] = useState({
+  // Estado do modal usando ref para não causar re-renders
+  const modalStateRef = useRef({
     isOpen: false,
-    type: '', // 'reunioes', 'propostas', 'vendas'
+    type: '',
     title: '',
     isLoading: false,
     data: [],
     error: null
   });
   
+  const [modalForceUpdate, setModalForceUpdate] = useState(0);
+  
 
-  // Constantes de responsividade
-  const isMobile = windowSize.width < 768;
-  const isSmallMobile = windowSize.width < 480;
+  // Constantes de responsividade - memoizadas para evitar re-renders
+  const isMobile = useMemo(() => windowSize.width < 768, [windowSize.width]);
+  const isSmallMobile = useMemo(() => windowSize.width < 480, [windowSize.width]);
+
+  // Debug: Verificar se os props estão chegando corretamente
+  useEffect(() => {
+    console.log('🔍 DashboardSales props:', { 
+      customPeriod, 
+      showCustomPeriod, 
+      period,
+      setCustomPeriod: typeof setCustomPeriod,
+      setShowCustomPeriod: typeof setShowCustomPeriod,
+      applyCustomPeriod: typeof applyCustomPeriod
+    });
+  }, [customPeriod, showCustomPeriod, period]);
 
   // Atualizar dados quando recebidos do cache
   useEffect(() => {
@@ -149,22 +347,35 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
     }
   }, [data]);
 
-  // Buscar dados de comparação
+  // Criar dados de comparação usando os campos V2 que já vêm nos KPIs
   useEffect(() => {
-    const fetchComparisonData = async () => {
-      try {
-        const comparison = await KommoAPI.getSalesComparison(selectedCorretor);
-        setComparisonData(comparison);
-        console.log('Dados de comparação carregados:', comparison);
-      } catch (error) {
-        console.error('Erro ao carregar dados de comparação:', error);
-      }
-    };
-    
-    fetchComparisonData();
-  }, [selectedCorretor]);
+    if (salesData) {
+      const comparison = {
+        currentPeriod: {
+          totalLeads: salesData.totalLeads || 0,
+          activeLeads: salesData.activeLeads || 0,
+          winRate: salesData.winRate || 0,
+          averageDealSize: salesData.averageDealSize || 0,
+          totalRevenue: salesData.totalRevenue || 0,
+          conversionRates: salesData.conversionRates || { meetings: 0, prospects: 0, sales: 0 }
+        },
+        previousPeriod: {
+          totalLeads: salesData.previousTotalLeads || 0,
+          activeLeads: salesData.previousActiveLeads || 0,
+          winRate: salesData.previousWinRate || 0,
+          averageDealSize: salesData.previousAverageDealSize || 0,
+          totalRevenue: 0, // Não disponível nos V2 ainda
+          wonLeads: salesData.previousWonLeads || 0,
+          conversionRates: { meetings: 0, prospects: 0, sales: 0 } // Não disponível nos V2 ainda
+        }
+      };
+      
+      setComparisonData(comparison);
+      console.log('✅ Dados de comparação criados a partir dos V2 KPIs:', comparison);
+    }
+  }, [salesData]);
 
-  // Função para abrir modal e buscar dados
+  // Função para abrir modal sem causar re-render
   const openModal = async (type) => {
     const titles = {
       'reunioes': 'Reuniões Realizadas',
@@ -172,74 +383,69 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
       'vendas': 'Vendas Realizadas'
     };
 
-    setModalState({
+    modalStateRef.current = {
       isOpen: true,
       type,
       title: titles[type],
       isLoading: true,
       data: [],
       error: null
-    });
+    };
+    
+    setModalForceUpdate(prev => prev + 1);  // Forçar re-render apenas do modal
 
     try {
-      // Calcular dias baseado no período
-      const calculateDays = () => {
-        if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
-          const start = new Date(customPeriod.startDate);
-          const end = new Date(customPeriod.endDate);
-          return Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-        }
-        return parseInt(period.replace('d', ''));
-      };
-
-      const days = calculateDays();
       const extraParams = {};
       
-      // Se for período customizado, enviar datas específicas
       if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
         extraParams.start_date = customPeriod.startDate;
         extraParams.end_date = customPeriod.endDate;
       }
 
-      const tablesData = await KommoAPI.getDetailedTables(days, selectedCorretor, extraParams);
+      const tablesData = await KommoAPI.getDetailedTables(selectedCorretor, selectedSource, extraParams);
       
-      // Mapear o tipo para o campo correto
       const dataMap = {
         'reunioes': tablesData.reunioesDetalhes || [],
         'propostas': tablesData.propostasDetalhes || [],
         'vendas': tablesData.vendasDetalhes || []
       };
 
-      setModalState(prev => ({
-        ...prev,
+      modalStateRef.current = {
+        ...modalStateRef.current,
         isLoading: false,
         data: dataMap[type]
-      }));
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
     } catch (error) {
       console.error('Erro ao carregar dados do modal:', error);
-      setModalState(prev => ({
-        ...prev,
+      modalStateRef.current = {
+        ...modalStateRef.current,
         isLoading: false,
         error: error.message
-      }));
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
     }
   };
 
-  // Função para fechar modal
+  // Função para fechar modal sem causar re-render
   const closeModal = () => {
-    setModalState({
+    modalStateRef.current = {
       isOpen: false,
       type: '',
       title: '',
       isLoading: false,
       data: [],
       error: null
-    });
+    };
+    
+    setModalForceUpdate(prev => prev + 1);
   };
 
 
-  // Helpers responsivos
-  const getChartHeight = (size = 'medium') => {
+  // Helpers responsivos - memoizados
+  const getChartHeight = useMemo(() => (size = 'medium') => {
     if (size === 'small') {
       return isMobile ? '200px' : '240px';
     } else if (size === 'medium') {
@@ -247,7 +453,106 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
     } else {
       return isMobile ? '300px' : '350px';
     }
-  };
+  }, [isMobile]);
+
+  // Configurações dos gráficos memoizadas para evitar hooks condicionais
+  const chartConfigs = useMemo(() => ({
+    leadsConfig: { xKey: 'name', yKey: 'value', color: COLORS.primary },
+    meetingsConfig: { xKey: 'name', yKey: 'meetings', color: COLORS.secondary },
+    salesConfig: { xKey: 'name', yKey: 'sales', color: COLORS.success },
+    activitiesConfig: { xKey: 'name', yKey: 'value', color: COLORS.secondary }
+  }), []);
+
+  const chartStyle = useMemo(() => ({ height: getChartHeight('small') }), [getChartHeight]);
+
+  // Dados dos gráficos memoizados (ORDENADOS DECRESCENTE)
+  const chartData = useMemo(() => {
+    if (salesData?.analyticsTeam?.user_performance?.length > 0) {
+      // Mapear dados e ordenar cada categoria separadamente
+      const leadsData = salesData.analyticsTeam.user_performance
+        .map(user => ({
+          name: user.user_name,
+          value: user.new_leads || 0
+        }))
+        .sort((a, b) => b.value - a.value); // Ordenar decrescente
+
+      const activitiesData = salesData.analyticsTeam.user_performance
+        .map(user => ({
+          name: user.user_name,
+          value: user.activities || 0
+        }))
+        .sort((a, b) => b.value - a.value); // Ordenar decrescente
+
+      const wonDealsData = salesData.analyticsTeam.user_performance
+        .map(user => ({
+          name: user.user_name,
+          value: user.won_deals || 0
+        }))
+        .sort((a, b) => b.value - a.value); // Ordenar decrescente
+
+      return {
+        leadsData,
+        activitiesData,
+        wonDealsData
+      };
+    }
+    return { leadsData: [], activitiesData: [], wonDealsData: [] };
+  }, [salesData?.analyticsTeam?.user_performance]);
+
+  // Dados para gráfico de status dos leads (COMPATÍVEL COM V2)
+  const leadsStatusData = useMemo(() => [
+    {
+      name: 'Leads em Negociação',
+      value: salesData?.activeLeads ||  // V2: KPIs endpoint
+             (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)
+    },
+    {
+      name: 'Leads em Remarketing',
+      value: salesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0
+    },
+    {
+      name: 'Leads Reativados',
+      value: 0  // Temporariamente 0 até implementar salesbotRecovery nos V2
+    }
+  ].filter(item => item.value > 0), [salesData]);
+
+  // Config para gráfico de status dos leads
+  const leadsStatusConfig = useMemo(() => ({ 
+    name: 'Status dos Leads',
+    colors: [COLORS.primary, COLORS.secondary, COLORS.success]
+  }), []);
+
+  // Style para gráfico de status dos leads
+  const leadsStatusStyle = useMemo(() => ({ height: getChartHeight('medium') }), [getChartHeight]);
+
+  // Dados ordenados para gráficos de corretores (DECRESCENTE - maior para menor)
+  // SEMPRE MOSTRA TODOS OS CORRETORES, mesmo com valor 0
+  const sortedChartsData = useMemo(() => {
+    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
+      return {
+        sortedLeadsData: [],
+        sortedMeetingsData: [],
+        sortedSalesData: []
+      };
+    }
+
+    return {
+      // Ordenar por total de leads (value) - decrescente
+      // Garantir que todos os corretores apareçam
+      sortedLeadsData: [...salesData.leadsByUser]
+        .sort((a, b) => (b.value || 0) - (a.value || 0)),
+        
+      // Ordenar por reuniões - decrescente  
+      // Garantir que todos os corretores apareçam
+      sortedMeetingsData: [...salesData.leadsByUser]
+        .sort((a, b) => (b.meetings || 0) - (a.meetings || 0)),
+        
+      // Ordenar por vendas - decrescente
+      // Garantir que todos os corretores apareçam
+      sortedSalesData: [...salesData.leadsByUser]
+        .sort((a, b) => (b.sales || 0) - (a.sales || 0))
+    };
+  }, [salesData?.leadsByUser]);
 
   // Mini Metric Card Component
   const MiniMetricCard = ({ title, value, subtitle, color = COLORS.primary }) => (
@@ -377,28 +682,28 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
     );
   };
 
-  // Compact Chart Component
-  const CompactChart = ({ data, type, config, style }) => {
+  // Memoized Compact Chart Component com Loading Animation e Update Dinâmico
+  const CompactChart = memo(({ data, type, config, style, loading = false }) => {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
+    const [isLoading, setIsLoading] = useState(loading);
 
+    // Inicializar chart com configuração vazia (eixos vazios)
     useEffect(() => {
-      if (chartRef.current && data && data.length > 0) {
-        if (chartInstance.current) {
-          chartInstance.current.dispose();
-        }
+      if (!chartRef.current) return;
 
-        const chart = echarts.init(chartRef.current);
-        chartInstance.current = chart;
-
-        let option = {};
-
+      if (!chartInstance.current) {
+        chartInstance.current = echarts.init(chartRef.current);
+        
+        // Mostrar chart vazio inicialmente com estrutura definida
+        let emptyOption = {};
+        
         if (type === 'bar') {
-          option = {
+          emptyOption = {
             grid: { top: 20, right: 20, bottom: 40, left: 60 },
             xAxis: {
               type: 'category',
-              data: data.map(item => item[config.xKey]),
+              data: [], // Eixo vazio inicialmente
               axisLabel: { 
                 fontSize: isMobile ? 10 : 12,
                 rotate: isMobile ? 45 : 0
@@ -409,7 +714,8 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
               axisLabel: { fontSize: isMobile ? 10 : 12 }
             },
             series: [{
-              data: data.map(item => item[config.yKey]),
+              name: config.name || 'Data',
+              data: [], // Dados vazios inicialmente
               type: 'bar',
               itemStyle: { color: config.color },
               barWidth: isMobile ? '60%' : '70%'
@@ -423,66 +729,273 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
             }
           };
         } else if (type === 'pie') {
-          // Preparar dados com cores personalizadas
-          const pieData = data.map((item, index) => ({
-            ...item,
-            itemStyle: {
-              color: config.colors && config.colors[index] ? config.colors[index] : 
-                     ['#4E5859', '#96856F', '#4ce0b3', '#ffaa5b', '#ff3a5e'][index % 5]
-            }
-          }));
-
-          option = {
-            tooltip: {
-              trigger: 'item',
-              formatter: '{a} <br/>{b}: {c} ({d}%)'
-            },
-            legend: {
-              orient: isMobile ? 'horizontal' : 'vertical',
-              left: isMobile ? 'center' : 'left',
-              bottom: isMobile ? 0 : 'auto',
-              textStyle: { fontSize: isMobile ? 10 : 12 }
-            },
+          emptyOption = {
             series: [{
-              name: config.name || 'Dados',
+              name: config.name || 'Data',
               type: 'pie',
-              radius: isMobile ? ['20%', '50%'] : ['25%', '60%'],
-              center: isMobile ? ['50%', '40%'] : ['50%', '50%'],
-              data: pieData,
-              emphasis: {
-                itemStyle: {
-                  shadowBlur: 10,
-                  shadowOffsetX: 0,
-                  shadowColor: 'rgba(0, 0, 0, 0.5)'
-                }
-              },
+              radius: isMobile ? '60%' : '70%',
+              center: ['50%', '50%'],
+              data: [], // Dados vazios inicialmente
               label: {
                 fontSize: isMobile ? 10 : 12,
-                formatter: '{b}\n{c} ({d}%)'
+                formatter: '{b}: {c} ({d}%)'
               },
-              labelLine: {
-                show: true
+              tooltip: {
+                formatter: '{b}: {c} ({d}%)'
               }
             }]
           };
         }
+        
+        chartInstance.current.setOption(emptyOption);
+      }
+    }, [type, config, isMobile]);
 
-        chart.setOption(option);
+    // Controlar loading animation
+    useEffect(() => {
+      if (!chartInstance.current) return;
+      
+      if (isLoading || !data || data.length === 0) {
+        chartInstance.current.showLoading({
+          text: 'Carregando...',
+          color: config.color,
+          textColor: '#666',
+          maskColor: 'rgba(255, 255, 255, 0.8)',
+          zlevel: 0
+        });
+        return;
+      } else {
+        chartInstance.current.hideLoading();
+      }
+    }, [isLoading, data, config.color]);
+
+    // Atualizar dados dinamicamente quando mudam (ASYNC UPDATE)
+    useEffect(() => {
+      if (!chartInstance.current || !data || data.length === 0 || isLoading) return;
+
+      // ECharts will automatically animate transitions between data updates
+      let updateOption = {};
+
+      if (type === 'bar') {
+        updateOption = {
+          xAxis: {
+            data: data.map(item => item[config.xKey])
+          },
+          series: [{
+            name: config.name || 'Data', // Use name for navigation
+            data: data.map(item => item[config.yKey])
+          }]
+        };
+      } else if (type === 'pie') {
+        // Preparar dados com cores personalizadas para pie
+        const pieData = data.map((item, index) => ({
+          name: item.name,
+          value: item.value,
+          itemStyle: { 
+            color: config.colors ? config.colors[index % config.colors.length] : config.color 
+          }
+        }));
         
-        const handleResize = () => chart.resize();
-        window.addEventListener('resize', handleResize);
-        
-        return () => {
-          window.removeEventListener('resize', handleResize);
-          chartInstance.current && chartInstance.current.dispose();
-          chartInstance.current = null;
+        updateOption = {
+          series: [{
+            name: config.name || 'Data',
+            data: pieData
+          }]
         };
       }
+
+      // Use setOption to update data dynamically (ECharts finds differences automatically)
+      chartInstance.current.setOption(updateOption, false); // false = merge mode
+      
+    }, [data, type, config, isLoading]);
+
+    // Sync loading state with parent
+    useEffect(() => {
+      setIsLoading(loading);
+    }, [loading]);
+
+    // Cleanup
+    useEffect(() => {
+      return () => {
+        if (chartInstance.current) {
+          chartInstance.current.dispose();
+          chartInstance.current = null;
+        }
+      };
+    }, []);
+
+    return <div ref={chartRef} style={style} />;
+  });
+
+  // Legacy chart rendering (manter compatibilidade)
+  const LegacyCompactChart = memo(({ data, type, config, style }) => {
+    const chartRef = useRef(null);
+    const chartInstance = useRef(null);
+
+    useEffect(() => {
+      if (!chartRef.current || !data || data.length === 0) {
+        return;
+      }
+
+      if (!chartInstance.current) {
+        chartInstance.current = echarts.init(chartRef.current);
+      }
+
+      let option = {};
+
+      if (type === 'bar') {
+        option = {
+          grid: { top: 20, right: 20, bottom: 40, left: 60 },
+          xAxis: {
+            type: 'category',
+            data: data.map(item => item[config.xKey]),
+            axisLabel: { 
+              fontSize: isMobile ? 10 : 12,
+              rotate: isMobile ? 45 : 0
+            }
+          },
+          yAxis: {
+            type: 'value',
+            axisLabel: { fontSize: isMobile ? 10 : 12 }
+          },
+          series: [{
+            data: data.map(item => item[config.yKey]),
+            type: 'bar',
+            itemStyle: { color: config.color },
+            barWidth: isMobile ? '60%' : '70%'
+          }],
+          tooltip: {
+            trigger: 'axis',
+            formatter: function(params) {
+              const item = params[0];
+              return `${item.name}: ${item.value}`;
+            }
+          }
+        };
+      } else if (type === 'pie') {
+        // Preparar dados com cores personalizadas
+        const pieData = data.map((item, index) => ({
+          ...item,
+          itemStyle: {
+            color: config.colors && config.colors[index] ? config.colors[index] : 
+                   ['#4E5859', '#96856F', '#4ce0b3', '#ffaa5b', '#ff3a5e'][index % 5]
+          }
+        }));
+
+        option = {
+          tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c} ({d}%)'
+          },
+          legend: {
+            orient: isMobile ? 'horizontal' : 'vertical',
+            left: isMobile ? 'center' : 'left',
+            bottom: isMobile ? 0 : 'auto',
+            textStyle: { fontSize: isMobile ? 10 : 12 }
+          },
+          series: [{
+            name: config.name || 'Dados',
+            type: 'pie',
+            radius: isMobile ? ['20%', '50%'] : ['25%', '60%'],
+            center: isMobile ? ['50%', '40%'] : ['50%', '50%'],
+            data: pieData,
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            },
+            label: {
+              fontSize: isMobile ? 10 : 12,
+              formatter: '{b}\n{c} ({d}%)'
+            },
+            labelLine: {
+              show: true
+            }
+          }]
+        };
+      }
+
+      // Use merge mode to avoid flickering
+      chartInstance.current.setOption(option, { notMerge: false });
+      
+      const handleResize = () => {
+        if (chartInstance.current && !chartInstance.current.isDisposed()) {
+          chartInstance.current.resize();
+        }
+      };
+      
+      window.addEventListener('resize', handleResize);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        // Only dispose on unmount, not on every render
+        if (chartInstance.current && !chartInstance.current.isDisposed()) {
+          chartInstance.current.dispose();
+          chartInstance.current = null;
+        }
+      };
+    }, []);  // Dependências removidas para evitar re-renders
+    
+    // Atualizar chart apenas quando dados realmente mudarem
+    useEffect(() => {
+      if (!chartInstance.current || !data || data.length === 0) {
+        return;  // Não atualizar charts quando modal estiver aberto
+      }
+      
+      // Só atualiza se os dados realmente mudaram
+      const newDataString = JSON.stringify(data);
+      if (chartInstance.current._lastDataString === newDataString) {
+        return;
+      }
+      chartInstance.current._lastDataString = newDataString;
+      
+      // Atualizar apenas os dados, não recriar o chart
+      let updateOption = {};
+      
+      if (type === 'bar') {
+        updateOption = {
+          xAxis: {
+            data: data.map(item => item[config.xKey])
+          },
+          series: [{
+            data: data.map(item => item[config.yKey])
+          }]
+        };
+      } else if (type === 'pie') {
+        updateOption = {
+          series: [{
+            data: data.map((item, index) => ({
+              ...item,
+              itemStyle: {
+                color: config.colors && config.colors[index] ? config.colors[index] : 
+                       ['#4E5859', '#96856F', '#4ce0b3', '#ffaa5b', '#ff3a5e'][index % 5]
+              }
+            }))
+          }]
+        };
+      }
+      
+      chartInstance.current.setOption(updateOption, { notMerge: false });
     }, [data, type, config]);
     
     return <div ref={chartRef} style={style} />;
-  };
+  }, (prevProps, nextProps) => {
+    // Comparação otimizada - só re-renderiza se dados essenciais mudaram
+    if (prevProps.type !== nextProps.type) return false;
+    if (JSON.stringify(prevProps.data) !== JSON.stringify(nextProps.data)) return false;
+    if (JSON.stringify(prevProps.config) !== JSON.stringify(nextProps.config)) return false;
+    if (JSON.stringify(prevProps.style) !== JSON.stringify(nextProps.style)) return false;
+    return true;
+  });
 
+  // Se está carregando, mostrar loading spinner
+  if (isLoading) {
+    return <LoadingSpinner message="Carregando dados de vendas..." />;
+  }
+
+  // Se não tem dados E não está carregando, mostrar erro
   if (!salesData) {
     return (
       <div className="dashboard-content">
@@ -494,7 +1007,7 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
   }
 
   return (
-    <div className="dashboard-content">
+    <div className={`dashboard-content ${isUpdating ? 'updating' : ''}`}>
       {/* CSS dos novos componentes de comparação e filtros de período */}
       <style>{`
         @keyframes shimmer {
@@ -1011,21 +1524,39 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
         <div className="section-title">
           <h2>Dashboard de Vendas</h2>
           <div className="dashboard-controls">
-            <div className="corretor-selector">
-              <select 
-                value={selectedCorretor} 
-                onChange={(e) => setSelectedCorretor(e.target.value)}
-                className="corretor-select"
-              >
-                <option value="">Todos os Corretores</option>
-                {corretores.map(corretor => (
-                  <option key={corretor.name} value={corretor.name}>
-                    {corretor.name} ({corretor.total_leads} leads)
-                  </option>
-                ))}
-              </select>
+            <div className="filters-group">
+              <div className="corretor-selector">
+                <label className="filter-label">Corretor:</label>
+                <select 
+                  value={selectedCorretor} 
+                  onChange={(e) => setSelectedCorretor(e.target.value)}
+                  className="corretor-select"
+                >
+                  <option value="">Todos os Corretores</option>
+                  {corretores.map(corretor => (
+                    <option key={corretor.name} value={corretor.name}>
+                      {corretor.name} ({corretor.total_leads} leads)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="source-selector">
+                <label className="filter-label">Fonte:</label>
+                <select 
+                  value={selectedSource} 
+                  onChange={(e) => setSelectedSource(e.target.value)}
+                  className="source-select"
+                >
+                  {sourceOptions.map(source => (
+                    <option key={source.value} value={source.value}>
+                      {source.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="period-controls">
+            <div className="period-controls" style={{ position: 'relative' }}>
               <div className="period-selector">
                 <button 
                   className={period === '7d' ? 'active' : ''} 
@@ -1053,17 +1584,49 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
                 </button>
                 <button 
                   className={period === 'custom' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('custom')}
+                  onClick={() => {
+                    console.log('🎯 Clicando no botão Personalizado');
+                    handlePeriodChange('custom');
+                  }}
+                  style={{
+                    backgroundColor: showCustomPeriod ? '#4f46e5' : '',
+                    color: showCustomPeriod ? '#fff' : ''
+                  }}
                 >
-                  📅 Personalizado
+                  📅 Personalizado {showCustomPeriod ? '(ATIVO)' : ''}
                 </button>
               </div>
               
               {/* Seletor de período customizado */}
               {showCustomPeriod && (
-                <>
-                  {isMobile && <div className="custom-period-overlay" onClick={() => setShowCustomPeriod(false)} />}
-                  <div className="custom-period-selector">
+                <div style={{
+                  position: 'fixed',
+                  top: '0',
+                  left: '0',
+                  right: '0',
+                  bottom: '0',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999
+                }}
+                onClick={() => {
+                  console.log('🚫 Sales: Fechando modal por clique fora');
+                  setShowCustomPeriod(false);
+                }}>
+                  <div style={{
+                    background: '#fff',
+                    borderRadius: '12px',
+                    padding: '30px',
+                    maxWidth: '500px',
+                    width: '90%',
+                    maxHeight: '90vh',
+                    overflowY: 'auto',
+                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="date-inputs">
                       <div style={{ marginBottom: '20px' }}>
                         <h4 style={{ margin: '0 0 12px 0', color: '#374151', fontSize: '16px', fontWeight: '600' }}>
@@ -1119,24 +1682,44 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
                         </button>
                       </div>
                       
-                      <div className="date-row">
-                        <div className="date-input-group">
-                          <label>📅 Data Inicial</label>
+                      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>📅 Data Inicial</label>
                           <input
                             type="date"
-                            value={customPeriod.startDate}
-                            onChange={(e) => setCustomPeriod({...customPeriod, startDate: e.target.value})}
+                            value={customPeriod.startDate || ''}
+                            onChange={(e) => {
+                              console.log('📅 Sales: Alterando data inicial:', e.target.value);
+                              setCustomPeriod({...customPeriod, startDate: e.target.value});
+                            }}
                             max={new Date().toISOString().split('T')[0]}
+                            style={{
+                              padding: '8px 12px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              width: '100%'
+                            }}
                           />
                         </div>
-                        <div className="date-input-group">
-                          <label>📅 Data Final</label>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>📅 Data Final</label>
                           <input
                             type="date"
-                            value={customPeriod.endDate}
-                            onChange={(e) => setCustomPeriod({...customPeriod, endDate: e.target.value})}
+                            value={customPeriod.endDate || ''}
+                            onChange={(e) => {
+                              console.log('📅 Sales: Alterando data final:', e.target.value);
+                              setCustomPeriod({...customPeriod, endDate: e.target.value});
+                            }}
                             max={new Date().toISOString().split('T')[0]}
-                            min={customPeriod.startDate}
+                            min={customPeriod.startDate || ''}
+                            style={{
+                              padding: '8px 12px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              width: '100%'
+                            }}
                           />
                         </div>
                       </div>
@@ -1154,24 +1737,46 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
                         </div>
                       )}
                       
-                      <div className="date-actions">
+                      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
                         <button 
-                          className="cancel-btn"
-                          onClick={() => setShowCustomPeriod(false)}
+                          onClick={() => {
+                            console.log('🚫 Sales: Cancelando período customizado');
+                            setShowCustomPeriod(false);
+                          }}
+                          style={{
+                            padding: '10px 20px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            background: '#fff',
+                            color: '#374151',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                          }}
                         >
                           Cancelar
                         </button>
                         <button 
-                          className="apply-btn"
-                          onClick={applyCustomPeriod}
+                          onClick={() => {
+                            console.log('✅ Sales: Aplicando período customizado:', customPeriod);
+                            applyCustomPeriod();
+                          }}
                           disabled={!customPeriod.startDate || !customPeriod.endDate}
+                          style={{
+                            padding: '10px 20px',
+                            border: 'none',
+                            borderRadius: '6px',
+                            background: customPeriod.startDate && customPeriod.endDate ? '#4f46e5' : '#9ca3af',
+                            color: '#fff',
+                            cursor: customPeriod.startDate && customPeriod.endDate ? 'pointer' : 'not-allowed',
+                            fontSize: '14px'
+                          }}
                         >
                           ✓ Aplicar Período
                         </button>
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -1185,30 +1790,22 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
           <div className="metrics-group">
             <MiniMetricCardWithTrend
               title="Total de Leads"
-              value={salesData.totalLeads || 0}
-              current={salesData.totalLeads || 0}
+              value={salesData?.totalLeads || 0}
+              current={salesData?.totalLeads || 0}
               previous={comparisonData?.previousPeriod?.totalLeads || 0}
               subtitle="Leads"
               color={COLORS.primary}
             />
             <MiniMetricCardWithTrend
               title="Leads Ativos"
-              value={salesData.analyticsOverview?.leads?.active || 
-                    (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
-              current={salesData.analyticsOverview?.leads?.active || 
-                      (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
+              value={salesData?.activeLeads || 
+                    (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
+              current={salesData?.activeLeads || 
+                      (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
               previous={comparisonData?.previousPeriod?.activeLeads || 0}
               color={COLORS.success}
             />
-            <MiniMetricCardWithTrend
-              title="Leads Perdidos"
-              value={salesData.analyticsOverview?.leads?.lost || 
-                    (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0)}
-              current={salesData.analyticsOverview?.leads?.lost || 
-                      (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.lost || 0), 0) : 0)}
-              previous={comparisonData?.previousPeriod?.lostLeads || 0}
-              color={COLORS.danger}
-            />
+           
           </div>
         </div>
 
@@ -1225,16 +1822,16 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
             />
             <MiniMetricCardWithTrend
               title="Win Rate"
-              value={`${salesData.winRate?.toFixed(1) || 0}%`}
-              current={salesData.winRate || 0}
+              value={`${salesData?.winRate?.toFixed(1) || 0}%`}
+              current={salesData?.winRate || 0}
               previous={comparisonData?.previousPeriod?.winRate || 0}
               color={COLORS.primary}
             />
             <MiniMetricCardWithTrend
               title="Total Vendas"
-              value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0}
-              current={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0}
-              previous={comparisonData?.previousPeriod?.wonLeads || 0}
+              value={salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
+              current={salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
+              previous={salesData?.previousWonLeads || 0}
               subtitle="Vendas"
               color={COLORS.secondary}
             />
@@ -1249,26 +1846,9 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
           <div className="card-title">Status dos Leads</div>
           <CompactChart 
             type="pie" 
-            data={[
-              { 
-                name: 'Leads em Negociação', 
-                value: salesData.analyticsOverview?.leads?.active || 
-                       (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)
-              },
-              { 
-                name: 'Leads em Remarketing', 
-                value: salesData.leadsByStage?.find(stage => stage.name === 'REMARKETING')?.value || 0
-              },
-              { 
-                name: 'Leads Reativados', 
-                value: salesData.salesbotRecovery || 0
-              }
-            ].filter(item => item.value > 0)} 
-            config={{ 
-              name: 'Status dos Leads',
-              colors: [COLORS.primary, COLORS.secondary, COLORS.success]
-            }}
-            style={{ height: getChartHeight('medium') }}
+            data={leadsStatusData} 
+            config={leadsStatusConfig}
+            style={leadsStatusStyle}
           />
         </div>
       </div>
@@ -1280,26 +1860,20 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
           <div className="metrics-group">
             <MiniMetricCardWithTrend
               title="Ticket Médio"
-              value={`R$ ${(salesData.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              current={salesData.averageDealSize || 0}
+              value={`R$ ${(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              current={salesData?.averageDealSize || 0}
               previous={comparisonData?.previousPeriod?.averageDealSize || 0}
               color={COLORS.success}
             />
             <MiniMetricCardWithTrend
               title="Receita Total"
-              value={`R$ ${(comparisonData?.currentPeriod?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              current={comparisonData?.currentPeriod?.totalRevenue || 0}
-              previous={comparisonData?.previousPeriod?.totalRevenue || 0}
+              value={`R$ ${(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              current={salesData?.totalRevenue || 0}
+              previous={0} // V2: previousTotalRevenue não disponível ainda
               subtitle="Receita"
               color={COLORS.warning}
             />
-            <MiniMetricCardWithTrend
-              title="Leads Perdidos"
-              value={salesData.analyticsOverview?.leads?.lost || 0}
-              current={salesData.analyticsOverview?.leads?.lost || 0}
-              previous={comparisonData?.previousPeriod?.lostLeads || 0}
-              color={COLORS.primary}
-            />
+           
           </div>
         </div>
       </div>
@@ -1307,78 +1881,69 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
 
       {/* Linha 5: Desempenho por corretor */}
       <div className="dashboard-row">
-        {salesData.leadsByUser && salesData.leadsByUser.length > 0 ? (
+        {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
             <div className="card card-md">
               <div className="card-title">Leads por Corretor</div>
               <CompactChart 
                 type="bar" 
-                data={salesData.leadsByUser} 
-                config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
-                style={{ height: getChartHeight('small') }}
-              />
+                data={sortedChartsData.sortedLeadsData} 
+                config={chartConfigs.leadsConfig}
+                style={chartStyle}
+                  />
             </div>
             
             <div className="card card-md">
               <div className="card-title">Rank Corretores - Reunião</div>
               <CompactChart 
                 type="bar" 
-                data={salesData.leadsByUser} 
-                config={{ xKey: 'name', yKey: 'meetings', color: COLORS.secondary }}
-                style={{ height: getChartHeight('small') }}
-              />
+                data={sortedChartsData.sortedMeetingsData} 
+                config={chartConfigs.meetingsConfig}
+                style={chartStyle}
+                  />
             </div>
             
             <div className="card card-md">
               <div className="card-title">Rank Corretores - Venda</div>
               <CompactChart 
                 type="bar" 
-                data={salesData.leadsByUser} 
-                config={{ xKey: 'name', yKey: 'sales', color: COLORS.success }}
-                style={{ height: getChartHeight('small') }}
-              />
+                data={sortedChartsData.sortedSalesData} 
+                config={chartConfigs.salesConfig}
+                style={chartStyle}
+                  />
             </div>
           </>
-        ) : salesData.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
+        ) : salesData?.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
           <>
             <div className="card card-md">
               <div className="card-title">Leads por Corretor</div>
               <CompactChart 
                 type="bar" 
-                data={salesData.analyticsTeam.user_performance.map(user => ({
-                  name: user.user_name,
-                  value: user.new_leads || 0
-                }))} 
-                config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
-                style={{ height: getChartHeight('small') }}
-              />
+                data={chartData.leadsData} 
+                config={chartConfigs.leadsConfig}
+                style={chartStyle}
+                  />
             </div>
             
             <div className="card card-md">
               <div className="card-title">Atividades por Corretor</div>
               <CompactChart 
                 type="bar" 
-                data={salesData.analyticsTeam.user_performance.map(user => ({
-                  name: user.user_name,
-                  value: user.activities || 0
-                }))} 
-                config={{ xKey: 'name', yKey: 'value', color: COLORS.secondary }}
-                style={{ height: getChartHeight('small') }}
-              />
+                data={chartData.activitiesData} 
+                config={chartConfigs.activitiesConfig}
+                style={chartStyle}
+                  />
             </div>
             
             <div className="card card-md">
               <div className="card-title">Rank Corretores - Venda</div>
               <CompactChart 
                 type="bar" 
-                data={salesData.analyticsTeam.user_performance.map(user => ({
-                  name: user.user_name,
-                  value: user.won_deals || 0
-                }))} 
-                config={{ xKey: 'name', yKey: 'value', color: COLORS.success }}
-                style={{ height: getChartHeight('small') }}
-              />
-              {salesData.analyticsTeam.team_stats?.top_performer && (
+                data={chartData.wonDealsData} 
+                config={chartConfigs.salesConfig}
+                style={chartStyle}
+                  />
+              {salesData?.analyticsTeam?.team_stats?.top_performer && (
                 <div className="team-info">
                   Top performer: {salesData.analyticsTeam.team_stats.top_performer}
                 </div>
@@ -1462,8 +2027,8 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
                   
                   <div className="conversion-details">
                     <div className="conversion-subtitle">
-                      {salesData.proposalStats ? 
-                        `${salesData.proposalStats.total || 0} de ${salesData.totalLeads || 0} leads` : 
+                      {salesData?.proposalStats ? 
+                        `${salesData.proposalStats.total || 0} de ${salesData?.totalLeads || 0} leads` : 
                         'Dados não disponíveis'
                       }
                     </div>
@@ -1529,185 +2094,30 @@ function DashboardSales({ period, setPeriod, windowSize, corretores, selectedCor
         </div>
       </div>
 
-      {/* Modal para tabelas detalhadas */}
-      {modalState.isOpen && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-          onClick={closeModal}
-        >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              padding: '24px',
-              maxWidth: '90vw',
-              maxHeight: '80vh',
-              width: '800px',
-              overflowY: 'auto',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header do modal */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: '20px',
-              borderBottom: `2px solid ${COLORS.primary}`,
-              paddingBottom: '12px'
-            }}>
-              <h3 style={{ margin: 0, color: COLORS.primary }}>{modalState.title}</h3>
-              <button 
-                onClick={closeModal}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: COLORS.tertiary,
-                  padding: '0',
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Conteúdo do modal */}
-            <div>
-              {modalState.isLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>
-                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-                  <div>Carregando dados...</div>
-                </div>
-              ) : modalState.error ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: COLORS.danger }}>
-                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
-                  <div><strong>Erro ao carregar dados</strong></div>
-                  <div style={{ fontSize: '14px', marginTop: '8px' }}>{modalState.error}</div>
-                </div>
-              ) : modalState.data.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: COLORS.tertiary }}>
-                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>
-                    {modalState.type === 'reunioes' ? '📊' : 
-                     modalState.type === 'propostas' ? '📋' : '💰'}
-                  </div>
-                  <div><strong>Nenhum registro encontrado</strong></div>
-                  <div style={{ fontSize: '14px', marginTop: '8px' }}>
-                    Não há {modalState.type} no período selecionado.
-                  </div>
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ 
-                    width: '100%', 
-                    borderCollapse: 'collapse',
-                    fontSize: '14px'
-                  }}>
-                    <thead>
-                      <tr style={{ backgroundColor: COLORS.lightBg }}>
-                        {modalState.type === 'reunioes' && (
-                          <>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                          </>
-                        )}
-                        {modalState.type === 'propostas' && (
-                          <>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Proposta</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                          </>
-                        )}
-                        {modalState.type === 'vendas' && (
-                          <>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Venda</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Valor da Venda</th>
-                          </>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {modalState.data.map((item, index) => (
-                        <tr key={index} style={{ 
-                          backgroundColor: index % 2 === 0 ? 'white' : COLORS.lightBg,
-                          borderBottom: `1px solid ${COLORS.light}`
-                        }}>
-                          {modalState.type === 'reunioes' && (
-                            <>
-                              <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
-                              <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                              <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                              <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                            </>
-                          )}
-                          {modalState.type === 'propostas' && (
-                            <>
-                              <td style={{ padding: '12px' }}>{item['Data da Proposta']}</td>
-                              <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                              <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                              <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                            </>
-                          )}
-                          {modalState.type === 'vendas' && (
-                            <>
-                              <td style={{ padding: '12px' }}>{item['Data da Venda']}</td>
-                              <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                              <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                              <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                              <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
-                                {item['Valor da Venda']}
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  
-                  {/* Footer com total */}
-                  <div style={{ 
-                    marginTop: '16px', 
-                    padding: '12px',
-                    backgroundColor: COLORS.lightBg,
-                    borderRadius: '4px',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: COLORS.primary
-                  }}>
-                    Total: {modalState.data.length} {modalState.type}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal para tabelas detalhadas - atualização forçada: {modalForceUpdate} */}
+      <DetailModal
+        isOpen={modalStateRef.current.isOpen}
+        onClose={closeModal}
+        type={modalStateRef.current.type}
+        title={modalStateRef.current.title}
+        isLoading={modalStateRef.current.isLoading}
+        data={modalStateRef.current.data}
+        error={modalStateRef.current.error}
+      />
 
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Previne re-render desnecessário do componente principal
+  // Não inclui modalForceUpdate para que modal não afete charts
+  return (
+    prevProps.period === nextProps.period &&
+    prevProps.selectedCorretor === nextProps.selectedCorretor &&
+    prevProps.selectedSource === nextProps.selectedSource &&
+    JSON.stringify(prevProps.data) === JSON.stringify(nextProps.data) &&
+    prevProps.windowSize.width === nextProps.windowSize.width &&
+    prevProps.windowSize.height === nextProps.windowSize.height
+  );
+});
 
 export default DashboardSales;
