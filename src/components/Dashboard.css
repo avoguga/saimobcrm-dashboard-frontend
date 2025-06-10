@@ -1949,38 +1949,413 @@ body {
   color: var(--warning-color);
 }
 
-/* Mobile adjustments for compact metrics */
-@media (max-width: 768px) {
-  .compact-metrics-row {
-    gap: 8px;
+/* Tablet adjustments */
+@media (max-width: 1024px) {
+  .dashboard-row {
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
   }
   
-  .compact-metric {
-    min-width: 50px;
-    padding: 6px 2px;
-  }
-  
-  .metric-value {
-    font-size: 12px;
-  }
-  
-  .section-subtitle {
-    font-size: 10px;
-  }
-
-  .campaign-selector {
-    margin-left: 0;
-    margin-top: var(--spacing-sm);
-  }
-  
-  .campaign-filter-button {
+  .card-lg {
     min-width: auto;
+    flex: 1;
+    min-width: 300px;
+  }
+  
+  .card-md {
+    flex: 1;
+    min-width: 250px;
+  }
+  
+  .card-sm {
     width: 100%;
+  }
+  
+  .metrics-group {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+  }
+  
+  .chart-container,
+  .chart-container > div {
+    width: 100% !important;
+    height: auto !important;
+  }
+  
+  .dashboard-controls {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: stretch;
   }
   
   .filters-group {
     flex-direction: column;
     gap: var(--spacing-sm);
+  }
+  
+  .period-controls {
+    width: 100%;
+  }
+  
+  .period-selector {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+  
+  .period-selector button {
+    flex: 1;
+    min-width: 80px;
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .dashboard-content {
+    padding: var(--spacing-sm);
+  }
+  
+  .dashboard-row {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .card-sm,
+  .card-md,
+  .card-lg {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .chart-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+  
+  .error-message {
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-sm);
+    text-align: center;
+  }
+  
+  .row-header {
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .section-title h2 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .dashboard-controls {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: stretch;
+  }
+  
+  .filters-group {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .source-selector,
+  .campaign-selector {
+    margin-left: 0;
+    margin-top: 0;
+  }
+  
+  .filter-label {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-xs);
+    display: block;
+  }
+  
+  .source-select,
+  .campaign-filter-button {
+    width: 100%;
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+  
+  .period-controls {
+    width: 100%;
+    position: static !important;
+  }
+  
+  .period-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-xs);
+    width: 100%;
+  }
+  
+  .period-selector button {
+    padding: var(--spacing-sm) var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+    min-height: 44px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .period-selector button.active {
+    background: var(--primary-color);
+    color: var(--white-color);
+    border-color: var(--primary-color);
+  }
+  
+  .period-selector button:hover {
+    background: var(--background);
+    border-color: var(--primary-color);
+  }
+  
+  .period-selector button.active:hover {
+    background: var(--primary-color);
+    opacity: 0.9;
+  }
+  
+  .card {
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .card-title {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .metrics-group {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xs);
+  }
+  
+  .mini-metric-card {
+    padding: var(--spacing-xs);
+    min-height: 60px;
+  }
+  
+  .mini-metric-value {
+    font-size: var(--font-size-sm);
+  }
+  
+  .mini-metric-title {
+    font-size: var(--font-size-xs);
+  }
+  
+  .mini-metric-subtitle {
+    font-size: 10px;
+  }
+  
+  .compact-metrics-row {
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+  }
+  
+  .compact-metric {
+    min-width: 60px;
+    padding: var(--spacing-xs);
+    flex: 1;
+  }
+  
+  .metric-value {
+    font-size: var(--font-size-xs);
+  }
+  
+  .metric-label {
+    font-size: 10px;
+  }
+  
+  .section-subtitle {
+    font-size: var(--font-size-xs);
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .dashboard-tabs {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .dashboard-tabs button {
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    border-radius: var(--border-radius);
+    text-align: center;
+  }
+  
+  .auto-refresh-controls {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    align-items: stretch;
+  }
+  
+  .auto-refresh-controls select,
+  .auto-refresh-controls button {
+    width: 100%;
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+  
+  .campaign-dropdown {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90vw;
+    max-width: 400px;
+    max-height: 80vh;
+    z-index: 9999;
+  }
+  
+  .engagement-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .campaign-insight-metrics {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  
+  .campaign-insight-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+}
+
+/* Small mobile adjustments */
+@media (max-width: 480px) {
+  .dashboard-content {
+    padding: var(--spacing-xs);
+  }
+  
+  .section-title h2 {
+    font-size: var(--font-size-base);
+  }
+  
+  .metrics-group {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+  }
+  
+  .period-selector {
+    grid-template-columns: 1fr;
+  }
+  
+  .period-selector button {
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+  
+  .compact-metrics-row {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  
+  .compact-metric {
+    min-width: auto;
+    width: 100%;
+    text-align: center;
+  }
+  
+  .campaign-filter-button {
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-sm);
+  }
+  
+  .campaign-dropdown {
+    width: 95vw;
+    max-height: 70vh;
+  }
+  
+  .campaign-search-input {
+    font-size: var(--font-size-sm);
+  }
+  
+  .campaign-item {
+    padding: var(--spacing-sm);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+  
+  .campaign-name {
+    font-size: var(--font-size-xs);
+    word-break: break-word;
+  }
+  
+  .select-all-btn,
+  .clear-all-btn {
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-xs);
+    flex: 1;
+  }
+  
+  .engagement-metrics {
+    grid-template-columns: 1fr;
+  }
+  
+  .custom-period-modal {
+    width: 95vw;
+    max-width: 350px;
+    padding: var(--spacing-sm);
+  }
+  
+  .custom-period-modal h3 {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .date-inputs {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .date-inputs label {
+    font-size: var(--font-size-sm);
+  }
+  
+  .date-inputs input {
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  
+  .modal-actions button {
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+  }
+  
+  .loading-spinner {
+    padding: var(--spacing-lg);
+  }
+  
+  .loading-spinner h3 {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .updating {
+    opacity: 0.8;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    text-align: center;
+  }
+  
+  .last-update {
+    font-size: var(--font-size-xs);
+    text-align: center;
   }
 }
 
