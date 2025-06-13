@@ -1462,7 +1462,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               subtitle="Receita"
               color={COLORS.warning}
             />
-           
           </div>
         </div>
         <div className="card card-metrics-group">
@@ -1484,6 +1483,27 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               previous={salesData?.previousWonLeads || 0}
               subtitle="Vendas"
               color={COLORS.secondary}
+            />
+            <MiniMetricCardWithTrend
+              title="Conv. Reuniões"
+              value={`${(salesData.conversionRates?.meetings || 0).toFixed(1)}%`}
+              current={salesData.conversionRates?.meetings || 0}
+              previous={comparisonData?.previousPeriod?.conversionRates?.meetings || 0}
+              color={COLORS.primary}
+            />
+            <MiniMetricCardWithTrend
+              title="Conv. Propostas"
+              value={`${(salesData.conversionRates?.prospects || 0).toFixed(1)}%`}
+              current={salesData.conversionRates?.prospects || 0}
+              previous={comparisonData?.previousPeriod?.conversionRates?.prospects || 0}
+              color={COLORS.secondary}
+            />
+            <MiniMetricCardWithTrend
+              title="Conv. Vendas"
+              value={`${(salesData.conversionRates?.sales || 0).toFixed(1)}%`}
+              current={salesData.conversionRates?.sales || 0}
+              previous={comparisonData?.previousPeriod?.conversionRates?.sales || 0}
+              color={COLORS.tertiary}
             />
           </div>
         </div>
