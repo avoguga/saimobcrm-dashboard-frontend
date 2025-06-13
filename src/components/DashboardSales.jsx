@@ -706,7 +706,10 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
               data: [], // Eixo vazio inicialmente
               axisLabel: { 
                 fontSize: isMobile ? 10 : 12,
-                rotate: isMobile ? 45 : 0
+                rotate: isMobile ? 45 : 0,
+                interval: 0, // Força mostrar todos os labels
+                overflow: 'truncate',
+                width: isMobile ? 60 : 80
               }
             },
             yAxis: {
@@ -851,7 +854,10 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
             data: data.map(item => item[config.xKey]),
             axisLabel: { 
               fontSize: isMobile ? 10 : 12,
-              rotate: isMobile ? 45 : 0
+              rotate: isMobile ? 45 : 0,
+              interval: 0, // Força mostrar todos os labels
+              overflow: 'truncate',
+              width: isMobile ? 60 : 80
             }
           },
           yAxis: {
@@ -1624,7 +1630,7 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
           <div className="card-title">Performance de Vendas</div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
-              title="Total Reunião Realizada"
+              title="Reuniões Realizadas"
               value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
               current={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
               previous={0}
