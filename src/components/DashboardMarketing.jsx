@@ -144,7 +144,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     }
   };
 
-  // Função para aplicar filtros de campanha
+  // Função para aplicar filtros de campanha (otimizada para evitar re-renders desnecessários)
   const handleCampaignFilterChange = async (newFilters) => {
     setCampaignFilters(newFilters);
     
@@ -188,10 +188,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         setCampaignInsights(insights);
         console.log('✅ Insights de campanhas carregados:', insights);
         
-        // Também atualizar os dados gerais se necessário
-        if (onDataRefresh) {
-          await onDataRefresh(newFilters);
-        }
+        // REMOVIDO: onDataRefresh para evitar re-render desnecessário
+        // Os insights já são suficientes para mostrar os dados filtrados
       } catch (error) {
         console.error('Erro ao carregar insights de campanhas:', error);
         setCampaignInsights(null);
@@ -199,11 +197,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         setLoadingInsights(false);
       }
     } else {
+      // Se não há campanhas selecionadas, apenas limpar insights
       setCampaignInsights(null);
-      // Se não há campanhas selecionadas, recarregar dados gerais
-      if (onDataRefresh) {
-        await onDataRefresh({});
-      }
+      console.log('✅ Filtros de campanha limpos, usando dados gerais');
     }
   };
 
@@ -590,12 +586,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                             className="select-all-btn"
                             onClick={() => {
                               if (selectedCampaigns.length === campaigns.length) {
-                                // Se todas estão selecionadas, desmarcar todas
+                                // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
                                 setSelectedCampaigns([]);
-                                handleCampaignFilterChange({
+                                setCampaignFilters({
                                   ...campaignFilters,
                                   campaignIds: []
                                 });
+                                setCampaignInsights(null); // Limpar insights apenas
+                                console.log('✅ Todas as campanhas desmarcadas, usando dados gerais');
                               } else {
                                 // Se nem todas estão selecionadas, selecionar todas
                                 const allCampaignIds = campaigns.map(c => c.id);
@@ -612,11 +610,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                           <button 
                             className="clear-all-btn"
                             onClick={() => {
+                              // Limpar sem recarregar dados
                               setSelectedCampaigns([]);
-                              handleCampaignFilterChange({
+                              setCampaignFilters({
                                 ...campaignFilters,
                                 campaignIds: []
                               });
+                              setCampaignInsights(null); // Limpar insights apenas
+                              console.log('✅ Filtros de campanha limpos (botão Limpar)');
                             }}
                           >
                             Limpar
@@ -699,26 +700,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               previous={filteredData.previousPeriodLeads || 0}
               color={COLORS.primary}
             />
-            {filteredData.leadsBySource && filteredData.leadsBySource.length > 0 && (
-              <>
-                <MiniMetricCardWithTrend
-                  title="Leads Facebook"
-                  value={filteredData.leadsBySource.find(src => src.name.includes('Facebook'))?.value || 0}
-                  current={filteredData.leadsBySource.find(src => src.name.includes('Facebook'))?.value || 0}
-                  previous={filteredData.previousFacebookLeads || 0}
-                  subtitle={`${Math.round((filteredData?.leadsBySource?.find(src => src.name.includes('Facebook'))?.value || 0) / (filteredData?.totalLeads || 1) * 100)}%`}
-                  color={COLORS.secondary}
-                />
-                {/* <MiniMetricCardWithTrend
-                  title="Leads OLX"
-                  value={filteredData.leadsBySource.find(src => src.name.includes('OLX'))?.value || 0}
-                  current={filteredData.leadsBySource.find(src => src.name.includes('OLX'))?.value || 0}
-                  previous={filteredData.previousOlxLeads || 0}
-                  subtitle={`${Math.round((filteredData?.leadsBySource?.find(src => src.name.includes('OLX'))?.value || 0) / (filteredData?.totalLeads || 1) * 100)}%`}
-                  color={COLORS.tertiary}
-                /> */}
-              </>
-            )}
           </div>
         </div>
 
@@ -744,13 +725,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               current={facebookMetrics.ctr || 0}
               previous={filteredData.previousFacebookMetrics?.ctr || 0}
               color={COLORS.secondary}
-            />
-            <MiniMetricCardWithTrend
-              title="CPC"
-              value={`R$ ${(facebookMetrics.cpc || 0).toFixed(2)}`}
-              current={facebookMetrics.cpc || 0}
-              previous={filteredData.previousFacebookMetrics?.cpc || 0}
-              color={COLORS.tertiary}
             />
             <MiniMetricCard
               title="CPM"
@@ -784,16 +758,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
                   color={COLORS.success}
                 />
-                <MiniMetricCard
-                  title="Link Click CTR"
-                  value={`${(facebookMetrics.inlineLinkClickCtr || 0).toFixed(2)}%`}
-                  color={COLORS.success}
-                />
-                <MiniMetricCard
-                  title="Custo por Link Click"
-                  value={`R$ ${(facebookMetrics.costPerInlineLinkClick || 0).toFixed(2)}`}
-                  color={COLORS.success}
-                />
               </>
             )}
             {campaignInsights && selectedCampaigns.length > 0 && (
@@ -802,11 +766,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   title="Engajamento Página"
                   value={(facebookMetrics.engagement.pageEngagement || 0).toLocaleString()}
                   color={COLORS.primary}
-                />
-                <MiniMetricCard
-                  title="Engajamento Post"
-                  value={(facebookMetrics.engagement.postEngagement || 0).toLocaleString()}
-                  color={COLORS.secondary}
                 />
                 <MiniMetricCard
                   title="Reações"
