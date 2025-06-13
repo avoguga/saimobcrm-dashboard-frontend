@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import * as echarts from 'echarts';
 import { KommoAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
+import SimpleModal from './SimpleModal';
 import './Dashboard.css';
 
 // Paleta de cores da SA IMOB
@@ -307,7 +308,9 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
   );
 });
 
-const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
+const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
+  console.log('🔄 DashboardSales renderizando - showCustomPeriod:', showCustomPeriod);
+  
   const [salesData, setSalesData] = useState(data);
   const [comparisonData, setComparisonData] = useState(null);
   
@@ -1101,167 +1104,6 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
           transform: translateY(-2px);
         }
 
-        /* Seletor customizado moderno */
-        .custom-period-selector {
-          position: absolute;
-          top: calc(100% + 8px);
-          right: 0;
-          background: white;
-          border-radius: 16px;
-          padding: 24px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          border: 1px solid #e0e6ed;
-          z-index: 1000;
-          min-width: 400px;
-          animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        .date-inputs {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .date-row {
-          display: flex;
-          gap: 16px;
-          align-items: end;
-        }
-
-        .date-input-group {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .date-input-group label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #374151;
-          margin-bottom: 4px;
-        }
-
-        .date-input-group input[type="date"] {
-          padding: 12px 16px;
-          border: 2px solid #e5e7eb;
-          border-radius: 10px;
-          font-size: 14px;
-          background: #fafbfc;
-          transition: all 0.2s ease;
-          color: #374151;
-        }
-
-        .date-input-group input[type="date"]:focus {
-          outline: none;
-          border-color: #4E5859;
-          background: white;
-          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
-        }
-
-        .date-input-group input[type="date"]:hover {
-          border-color: #9ca3af;
-          background: white;
-        }
-
-        .date-actions {
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-          padding-top: 16px;
-          border-top: 1px solid #f3f4f6;
-        }
-
-        .apply-btn, .cancel-btn {
-          padding: 10px 20px;
-          border-radius: 8px;
-          font-weight: 600;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          border: none;
-        }
-
-        .apply-btn {
-          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
-          color: white;
-        }
-
-        .apply-btn:hover:not(:disabled) {
-          background: linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%);
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
-        }
-
-        .apply-btn:disabled {
-          background: #e5e7eb;
-          color: #9ca3af;
-          cursor: not-allowed;
-        }
-
-        .cancel-btn {
-          background: #f3f4f6;
-          color: #6b7280;
-        }
-
-        .cancel-btn:hover {
-          background: #e5e7eb;
-          color: #374151;
-        }
-
-        /* Quick period shortcuts */
-        .quick-periods {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 16px;
-          flex-wrap: wrap;
-        }
-
-        .quick-period-btn {
-          padding: 6px 12px;
-          border: 1px solid #e5e7eb;
-          border-radius: 6px;
-          background: #fafbfc;
-          color: #6b7280;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .quick-period-btn:hover {
-          background: #f3f4f6;
-          border-color: #d1d5db;
-          color: #374151;
-        }
-
-        /* Overlay para mobile */
-        .custom-period-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          z-index: 999;
-          animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
 
         /* Estilos para as tabelas de detalhes */
         .details-tabs {
@@ -1922,50 +1764,195 @@ const DashboardSales = memo(({ period, setPeriod, windowSize, corretores, select
         error={modalStateRef.current.error}
       />
 
-      {/* Modal de período customizado */}
-      {showCustomPeriod && (
-        <div className="custom-period-backdrop" onClick={() => setShowCustomPeriod(false)}>
-          <div className="custom-period-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Selecionar Período Personalizado</h3>
-            <div className="date-inputs">
-              <label>
-                Data Inicial:
-                <input
-                  type="date"
-                  value={customPeriod.startDate}
-                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
-                />
+      {/* Modal de Período Personalizado */}
+      <SimpleModal
+        isOpen={showCustomPeriod}
+        onClose={() => {
+          console.log('🔴 onClose chamado no DashboardSales - showCustomPeriod atual:', showCustomPeriod);
+          setShowCustomPeriod(false);
+          console.log('🔴 setShowCustomPeriod(false) executado');
+        }}
+      >
+        <div style={{ display: 'grid', gap: '24px' }}>
+          {/* Campos de Data com Design Melhorado */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: '#4a5568',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>📅</span> Data Inicial
               </label>
-              <label>
-                Data Final:
-                <input
-                  type="date"
-                  value={customPeriod.endDate}
-                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
-                />
-              </label>
+              <input
+                type="date"
+                value={customPeriod?.startDate || ''}
+                onChange={(e) => setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '8px', 
+                  border: '2px solid #e2e8f0', 
+                  width: '100%',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: '#fafbfc'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#4E5859';
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(78, 88, 89, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.backgroundColor = '#fafbfc';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
             </div>
-            <div className="modal-actions">
-              <button onClick={() => setShowCustomPeriod(false)}>Cancelar</button>
-              <button onClick={applyCustomPeriod}>Aplicar</button>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: '#4a5568',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>🏁</span> Data Final
+              </label>
+              <input
+                type="date"
+                value={customPeriod?.endDate || ''}
+                onChange={(e) => setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '8px', 
+                  border: '2px solid #e2e8f0', 
+                  width: '100%',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: '#fafbfc'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#4E5859';
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(78, 88, 89, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.backgroundColor = '#fafbfc';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
             </div>
           </div>
+
+          {/* Preview do Período Selecionado */}
+          {customPeriod?.startDate && customPeriod?.endDate && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#0369a1'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📊</span> Período Selecionado
+              </div>
+              <div>
+                {new Date(customPeriod.startDate).toLocaleDateString('pt-BR')} até {' '}
+                {new Date(customPeriod.endDate).toLocaleDateString('pt-BR')}
+                {' '}({Math.ceil((new Date(customPeriod.endDate) - new Date(customPeriod.startDate)) / (1000 * 60 * 60 * 24))} dias)
+              </div>
+            </div>
+          )}
+
+          {/* Botões de Ação */}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '8px' }}>
+            <button 
+              onClick={() => setShowCustomPeriod(false)}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: '#f7fafc', 
+                color: '#4a5568',
+                border: '2px solid #e2e8f0', 
+                borderRadius: '8px', 
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#edf2f7';
+                e.target.style.borderColor = '#cbd5e0';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#f7fafc';
+                e.target.style.borderColor = '#e2e8f0';
+              }}
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={() => {
+                if (!customPeriod?.startDate || !customPeriod?.endDate) {
+                  alert('Por favor, selecione ambas as datas');
+                  return;
+                }
+                
+                const startDate = new Date(customPeriod.startDate);
+                const endDate = new Date(customPeriod.endDate);
+                
+                if (endDate <= startDate) {
+                  alert('Data final deve ser posterior à data inicial');
+                  return;
+                }
+                
+                applyCustomPeriod(customPeriod);
+                setShowCustomPeriod(false);
+              }}
+              disabled={!customPeriod?.startDate || !customPeriod?.endDate}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor:"#a0aec0", 
+                color: 'black',
+                border: 'none', 
+                borderRadius: '8px', 
+                cursor: (!customPeriod?.startDate || !customPeriod?.endDate) ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+              onMouseEnter={(e) => {
+                if (customPeriod?.startDate && customPeriod?.endDate) {
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(78, 88, 89, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
+               Aplicar Período
+            </button>
+          </div>
         </div>
-      )}
+      </SimpleModal>
 
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Previne re-render desnecessário do componente principal
-  // Não inclui modalForceUpdate para que modal não afete charts
-  return (
-    prevProps.period === nextProps.period &&
-    prevProps.selectedCorretor === nextProps.selectedCorretor &&
-    prevProps.selectedSource === nextProps.selectedSource &&
-    JSON.stringify(prevProps.data) === JSON.stringify(nextProps.data) &&
-    prevProps.windowSize.width === nextProps.windowSize.width &&
-    prevProps.windowSize.height === nextProps.windowSize.height
-  );
-});
+};
 
 export default DashboardSales;

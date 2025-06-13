@@ -431,11 +431,22 @@ function Dashboard() {
   };
 
   // Função para aplicar período customizado
-  const applyCustomPeriod = async () => {
-    if (customPeriod.startDate && customPeriod.endDate) {
+  const applyCustomPeriod = async (periodData = null) => {
+    // Usar dados passados ou dados do estado
+    const dataToUse = periodData || customPeriod;
+    
+    console.log('📅 applyCustomPeriod chamado com:', periodData);
+    console.log('📅 Dados sendo usados:', dataToUse);
+    
+    if (dataToUse.startDate && dataToUse.endDate) {
+      // Se dados vieram do modal, atualizar estado
+      if (periodData) {
+        setCustomPeriod(periodData);
+      }
+      
       // Validar se data final é maior que inicial
-      const startDate = new Date(customPeriod.startDate);
-      const endDate = new Date(customPeriod.endDate);
+      const startDate = new Date(dataToUse.startDate);
+      const endDate = new Date(dataToUse.endDate);
       
       if (endDate <= startDate) {
         alert('Data final deve ser posterior à data inicial');
@@ -444,19 +455,25 @@ function Dashboard() {
       
       // Fechar o modal
       setShowCustomPeriod(false);
-      console.log('📅 Período customizado aplicado:', customPeriod);
+      console.log('📅 Período customizado aplicado:', dataToUse);
       console.log('📅 Calculando dias:', Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
       
-      // Carregar dados manualmente
-      await loadCustomPeriodData();
+      // Carregar dados silenciosamente (sem loading) usando os dados corretos
+      await loadCustomPeriodDataSilent(dataToUse);
     } else {
+      console.log('❌ Dados inválidos:', dataToUse);
       alert('Por favor, selecione ambas as datas');
     }
   };
 
   // Função para carregar dados do período customizado manualmente
   const loadCustomPeriodData = async () => {
-    console.log('🚀 Carregando dados do período customizado...');
+    return await loadCustomPeriodDataWithPeriod(customPeriod);
+  };
+
+  // Função para carregar dados usando período específico (com loading)
+  const loadCustomPeriodDataWithPeriod = async (periodData) => {
+    console.log('🚀 Carregando dados do período customizado com:', periodData);
     
     setIsLoadingMarketing(true);
     setIsLoadingSales(true);
@@ -464,15 +481,19 @@ function Dashboard() {
     setError(null);
     
     try {
-      const days = calculateDays();
+      // Calcular dias baseado no período específico
+      const startDate = new Date(periodData.startDate);
+      const endDate = new Date(periodData.endDate);
+      const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
       
       // Preparar datas customizadas
       const customDates = {
-        start_date: customPeriod.startDate,
-        end_date: customPeriod.endDate
+        start_date: periodData.startDate,
+        end_date: periodData.endDate
       };
       
       console.log('📅 customDates para carregamento manual:', customDates);
+      console.log('📅 Dias calculados:', days);
       
       // Carregar dados em paralelo
       const [marketingResult, salesResult] = await Promise.all([
@@ -491,6 +512,45 @@ function Dashboard() {
       setIsLoadingMarketing(false);
       setIsLoadingSales(false);
       setIsLoadingFilters(false);
+    }
+  };
+
+  // Função para carregar dados silenciosamente (sem loading) - similar ao auto-refresh
+  const loadCustomPeriodDataSilent = async (periodData) => {
+    console.log('🔄 Carregando dados do período customizado silenciosamente:', periodData);
+    
+    // NÃO mostrar loading - atualização silenciosa como auto-refresh
+    
+    try {
+      // Calcular dias baseado no período específico
+      const startDate = new Date(periodData.startDate);
+      const endDate = new Date(periodData.endDate);
+      const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+      
+      // Preparar datas customizadas
+      const customDates = {
+        start_date: periodData.startDate,
+        end_date: periodData.endDate
+      };
+      
+      console.log('📅 customDates para carregamento silencioso:', customDates);
+      console.log('📅 Dias calculados:', days);
+      
+      // Carregar dados em paralelo (silenciosamente)
+      const [marketingResult, salesResult] = await Promise.all([
+        GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
+        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
+      ]);
+      
+      // Atualizar dados sem mostrar loading
+      setMarketingData(marketingResult);
+      setSalesData(salesResult);
+      
+      console.log('✅ Dados do período customizado carregados silenciosamente');
+    } catch (error) {
+      console.error('💥 Erro ao carregar dados do período customizado silenciosamente:', error);
+      // Não mostrar erro em loading silencioso
+      console.warn('⚠️ Falha no carregamento silencioso, mantendo dados atuais');
     }
   };
 
