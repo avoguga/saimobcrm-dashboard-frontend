@@ -1444,30 +1444,27 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
       {/* Linha 1: KPIs principais */}
       <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group">
-          <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
+         <div className="card card-metrics-group wide">
+          <div className="card-title">Métricas de Vendas</div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
-              title="Total de Leads"
-              value={salesData?.totalLeads || 0}
-              current={salesData?.totalLeads || 0}
-              previous={comparisonData?.previousPeriod?.totalLeads || 0}
-              subtitle="Leads"
-              color={COLORS.primary}
+              title="Ticket Médio"
+              value={`R$ ${(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              current={salesData?.averageDealSize || 0}
+              previous={comparisonData?.previousPeriod?.averageDealSize || 0}
+              color={COLORS.success}
             />
             <MiniMetricCardWithTrend
-              title="Leads Ativos"
-              value={salesData?.activeLeads || 
-                    (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
-              current={salesData?.activeLeads || 
-                      (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)}
-              previous={comparisonData?.previousPeriod?.activeLeads || 0}
-              color={COLORS.success}
+              title="Receita Total"
+              value={`R$ ${(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              current={salesData?.totalRevenue || 0}
+              previous={0} // V2: previousTotalRevenue não disponível ainda
+              subtitle="Receita"
+              color={COLORS.warning}
             />
            
           </div>
         </div>
-
         <div className="card card-metrics-group">
           <div className="card-title">Performance de Vendas</div>
           <div className="metrics-group">
@@ -1479,13 +1476,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               subtitle="Reuniões"
               color={COLORS.success}
             />
-            <MiniMetricCardWithTrend
-              title="Win Rate"
-              value={`${salesData?.winRate?.toFixed(1) || 0}%`}
-              current={salesData?.winRate || 0}
-              previous={comparisonData?.previousPeriod?.winRate || 0}
-              color={COLORS.primary}
-            />
+           
             <MiniMetricCardWithTrend
               title="Total Vendas"
               value={salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
@@ -1509,31 +1500,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             config={leadsStatusConfig}
             style={leadsStatusStyle}
           />
-        </div>
-      </div>
-
-      {/* Linha 4: Ticket médio e outros KPIs */}
-      <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group wide">
-          <div className="card-title">Métricas de Vendas</div>
-          <div className="metrics-group">
-            <MiniMetricCardWithTrend
-              title="Ticket Médio"
-              value={`R$ ${(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              current={salesData?.averageDealSize || 0}
-              previous={comparisonData?.previousPeriod?.averageDealSize || 0}
-              color={COLORS.success}
-            />
-            <MiniMetricCardWithTrend
-              title="Receita Total"
-              value={`R$ ${(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              current={salesData?.totalRevenue || 0}
-              previous={0} // V2: previousTotalRevenue não disponível ainda
-              subtitle="Receita"
-              color={COLORS.warning}
-            />
-           
-          </div>
         </div>
       </div>
 
