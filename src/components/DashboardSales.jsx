@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import * as echarts from 'echarts';
 import { KommoAPI } from '../services/api';
@@ -308,6 +308,42 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
   );
 });
 
+// Componente para exibir indicador de tendência
+const TrendIndicator = ({ value, showZero = false }) => {
+  // Se o valor for null, undefined ou 0 e showZero for false, não exibir nada
+  if ((value === null || value === undefined || (value === 0 && !showZero))) {
+    return null;
+  }
+  
+  // Determinar se o valor é positivo, negativo ou zero
+  const isPositive = value > 0;
+  
+  // Estilo para o indicador de tendência com setas diagonais
+  const style = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '4px',
+    padding: '4px 10px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: '600',
+    backgroundColor: isPositive 
+      ? 'rgba(76, 224, 179, 0.15)'  // Verde claro para positivo
+      : 'rgba(255, 58, 94, 0.15)',  // Vermelho claro para negativo
+    color: isPositive 
+      ? '#4ce0b3' // Verde para positivo
+      : '#ff3a5e', // Vermelho para negativo
+    marginLeft: '8px'
+  };
+  
+  return (
+    <div style={style} className="trend-indicator-square">
+      {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{Math.abs(value).toFixed(1)}%
+    </div>
+  );
+};
+
 const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
   console.log('🔄 DashboardSales renderizando - showCustomPeriod:', showCustomPeriod);
   
@@ -355,20 +391,20 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     if (salesData) {
       const comparison = {
         currentPeriod: {
-          totalLeads: salesData.totalLeads || 0,
-          activeLeads: salesData.activeLeads || 0,
-          winRate: salesData.winRate || 0,
-          averageDealSize: salesData.averageDealSize || 0,
-          totalRevenue: salesData.totalRevenue || 0,
-          conversionRates: salesData.conversionRates || { meetings: 0, prospects: 0, sales: 0 }
+          totalLeads: salesData?.totalLeads || 0,
+          activeLeads: salesData?.activeLeads || 0,
+          winRate: salesData?.winRate || 0,
+          averageDealSize: salesData?.averageDealSize || 0,
+          totalRevenue: salesData?.totalRevenue || 0,
+          conversionRates: salesData?.conversionRates || { meetings: 0, prospects: 0, sales: 0 }
         },
         previousPeriod: {
-          totalLeads: salesData.previousTotalLeads || 0,
-          activeLeads: salesData.previousActiveLeads || 0,
-          winRate: salesData.previousWinRate || 0,
-          averageDealSize: salesData.previousAverageDealSize || 0,
+          totalLeads: salesData?.previousTotalLeads || 0,
+          activeLeads: salesData?.previousActiveLeads || 0,
+          winRate: salesData?.previousWinRate || 0,
+          averageDealSize: salesData?.previousAverageDealSize || 0,
           totalRevenue: 0, // Não disponível nos V2 ainda
-          wonLeads: salesData.previousWonLeads || 0,
+          wonLeads: salesData?.previousWonLeads || 0,
           conversionRates: { meetings: 0, prospects: 0, sales: 0 } // Não disponível nos V2 ainda
         }
       };
@@ -566,125 +602,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     </div>
   );
 
-  // Enhanced Mini Metric Card with Trend
-  const MiniMetricCardWithTrend = ({ title, value, subtitle, color = COLORS.primary, current, previous }) => {
-    const getTrendInfo = () => {
-      if (!previous || previous === 0) return { text: '', color: COLORS.tertiary, bg: 'rgba(117, 119, 123, 0.1)', border: 'rgba(117, 119, 123, 0.3)' };
-      
-      const change = ((current - previous) / previous * 100).toFixed(1);
-      const isPositive = change >= 0;
-      
-      return {
-        text: `${isPositive ? '+' : ''}${change}%`,
-        icon: isPositive ? '↗' : '↘',
-        color: isPositive ? COLORS.success : COLORS.danger,
-        bg: isPositive ? 'rgba(76, 224, 179, 0.15)' : 'rgba(255, 58, 94, 0.15)',
-        border: isPositive ? 'rgba(76, 224, 179, 0.3)' : 'rgba(255, 58, 94, 0.3)'
-      };
-    };
-
-    const trendInfo = getTrendInfo();
-
-    return (
-      <div className="mini-metric-card">
-        <div className="mini-metric-value" style={{ color }}>{value}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-          <div className="mini-metric-title">{title}</div>
-          {trendInfo.text && (
-            <div 
-              className={`trend-tag-square ${(current - previous) < 0 ? 'negative' : ''}`}
-              style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: '2px',
-                padding: '8px',
-                borderRadius: '8px',
-                backgroundColor: trendInfo.bg,
-                border: `1px solid ${trendInfo.border}`,
-                color: trendInfo.color,
-                fontWeight: '600',
-                fontSize: '10px',
-                minWidth: '40px',
-                minHeight: '40px',
-                boxShadow: `0 2px 4px ${trendInfo.bg}60`,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span style={{ fontSize: '16px', lineHeight: 1 }}>
-                {trendInfo.icon}
-              </span>
-              <span style={{ lineHeight: 1, fontSize: '13px', fontWeight: '700' }}>
-                {trendInfo.text}
-              </span>
-            </div>
-          )}
-        </div>
-        {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
-      </div>
-    );
-  };
-
-  // Metric Card with Colored Trend Component
-  const MetricCardWithTrend = ({ title, current, previous, color = COLORS.primary }) => {
-    const getTrendInfo = () => {
-      if (previous === 0 || !previous) return { text: '', color: COLORS.tertiary, bg: 'rgba(117, 119, 123, 0.1)' };
-      
-      const change = ((current - previous) / previous * 100).toFixed(1);
-      const isPositive = change >= 0;
-      
-      return {
-        text: `${isPositive ? '+' : ''}${change}%`,
-        icon: isPositive ? '↗' : '↘',
-        color: isPositive ? COLORS.success : COLORS.danger,
-        bg: isPositive ? 'rgba(76, 224, 179, 0.15)' : 'rgba(255, 58, 94, 0.15)',
-        border: isPositive ? 'rgba(76, 224, 179, 0.3)' : 'rgba(255, 58, 94, 0.3)'
-      };
-    };
-
-    const trendInfo = getTrendInfo();
-
-    return (
-      <div className="mini-metric-card">
-        <div className="mini-metric-value" style={{ color }}>{current}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-          <div className="mini-metric-title">{title}</div>
-          {trendInfo.text && (
-            <div 
-              className={`trend-tag-square ${(current - previous) < 0 ? 'negative' : ''}`}
-              style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: '2px',
-                padding: '8px',
-                borderRadius: '8px',
-                backgroundColor: trendInfo.bg,
-                border: `1px solid ${trendInfo.border}`,
-                color: trendInfo.color,
-                fontWeight: '600',
-                fontSize: '10px',
-                minWidth: '40px',
-                minHeight: '40px',
-                boxShadow: `0 2px 4px ${trendInfo.bg}60`,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span style={{ fontSize: '16px', lineHeight: 1 }}>
-                {trendInfo.icon}
-              </span>
-              <span style={{ lineHeight: 1, fontSize: '13px', fontWeight: '700' }}>
-                {trendInfo.text}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   // Memoized Compact Chart Component com Loading Animation e Update Dinâmico
   const CompactChart = memo(({ data, type, config, style, loading = false }) => {
     const chartRef = useRef(null);
@@ -833,172 +750,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     return <div ref={chartRef} style={style} />;
   });
 
-  // Legacy chart rendering (manter compatibilidade)
-  const LegacyCompactChart = memo(({ data, type, config, style }) => {
-    const chartRef = useRef(null);
-    const chartInstance = useRef(null);
-
-    useEffect(() => {
-      if (!chartRef.current || !data || data.length === 0) {
-        return;
-      }
-
-      if (!chartInstance.current) {
-        chartInstance.current = echarts.init(chartRef.current);
-      }
-
-      let option = {};
-
-      if (type === 'bar') {
-        option = {
-          grid: { top: 20, right: 20, bottom: 40, left: 60 },
-          xAxis: {
-            type: 'category',
-            data: data.map(item => item[config.xKey]),
-            axisLabel: { 
-              fontSize: isMobile ? 10 : 12,
-              rotate: isMobile ? 45 : 0,
-              interval: 0, // Força mostrar todos os labels
-              overflow: 'truncate',
-              width: isMobile ? 60 : 80
-            }
-          },
-          yAxis: {
-            type: 'value',
-            axisLabel: { fontSize: isMobile ? 10 : 12 }
-          },
-          series: [{
-            data: data.map(item => item[config.yKey]),
-            type: 'bar',
-            itemStyle: { color: config.color },
-            barWidth: isMobile ? '60%' : '70%'
-          }],
-          tooltip: {
-            trigger: 'axis',
-            formatter: function(params) {
-              const item = params[0];
-              return `${item.name}: ${item.value}`;
-            }
-          }
-        };
-      } else if (type === 'pie') {
-        // Preparar dados com cores personalizadas
-        const pieData = data.map((item, index) => ({
-          ...item,
-          itemStyle: {
-            color: config.colors && config.colors[index] ? config.colors[index] : 
-                   ['#4E5859', '#96856F', '#4ce0b3', '#ffaa5b', '#ff3a5e'][index % 5]
-          }
-        }));
-
-        option = {
-          tooltip: {
-            trigger: 'item',
-            formatter: '{a} <br/>{b}: {c} ({d}%)'
-          },
-          legend: {
-            orient: isMobile ? 'horizontal' : 'vertical',
-            left: isMobile ? 'center' : 'left',
-            bottom: isMobile ? 0 : 'auto',
-            textStyle: { fontSize: isMobile ? 10 : 12 }
-          },
-          series: [{
-            name: config.name || 'Dados',
-            type: 'pie',
-            radius: isMobile ? ['20%', '50%'] : ['25%', '60%'],
-            center: isMobile ? ['50%', '40%'] : ['50%', '50%'],
-            data: pieData,
-            emphasis: {
-              itemStyle: {
-                shadowBlur: 10,
-                shadowOffsetX: 0,
-                shadowColor: 'rgba(0, 0, 0, 0.5)'
-              }
-            },
-            label: {
-              fontSize: isMobile ? 10 : 12,
-              formatter: '{b}\n{c} ({d}%)'
-            },
-            labelLine: {
-              show: true
-            }
-          }]
-        };
-      }
-
-      // Use merge mode to avoid flickering
-      chartInstance.current.setOption(option, { notMerge: false });
-      
-      const handleResize = () => {
-        if (chartInstance.current && !chartInstance.current.isDisposed()) {
-          chartInstance.current.resize();
-        }
-      };
-      
-      window.addEventListener('resize', handleResize);
-      
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        // Only dispose on unmount, not on every render
-        if (chartInstance.current && !chartInstance.current.isDisposed()) {
-          chartInstance.current.dispose();
-          chartInstance.current = null;
-        }
-      };
-    }, []);  // Dependências removidas para evitar re-renders
-    
-    // Atualizar chart apenas quando dados realmente mudarem
-    useEffect(() => {
-      if (!chartInstance.current || !data || data.length === 0) {
-        return;  // Não atualizar charts quando modal estiver aberto
-      }
-      
-      // Só atualiza se os dados realmente mudaram
-      const newDataString = JSON.stringify(data);
-      if (chartInstance.current._lastDataString === newDataString) {
-        return;
-      }
-      chartInstance.current._lastDataString = newDataString;
-      
-      // Atualizar apenas os dados, não recriar o chart
-      let updateOption = {};
-      
-      if (type === 'bar') {
-        updateOption = {
-          xAxis: {
-            data: data.map(item => item[config.xKey])
-          },
-          series: [{
-            data: data.map(item => item[config.yKey])
-          }]
-        };
-      } else if (type === 'pie') {
-        updateOption = {
-          series: [{
-            data: data.map((item, index) => ({
-              ...item,
-              itemStyle: {
-                color: config.colors && config.colors[index] ? config.colors[index] : 
-                       ['#4E5859', '#96856F', '#4ce0b3', '#ffaa5b', '#ff3a5e'][index % 5]
-              }
-            }))
-          }]
-        };
-      }
-      
-      chartInstance.current.setOption(updateOption, { notMerge: false });
-    }, [data, type, config]);
-    
-    return <div ref={chartRef} style={style} />;
-  }, (prevProps, nextProps) => {
-    // Comparação otimizada - só re-renderiza se dados essenciais mudaram
-    if (prevProps.type !== nextProps.type) return false;
-    if (JSON.stringify(prevProps.data) !== JSON.stringify(nextProps.data)) return false;
-    if (JSON.stringify(prevProps.config) !== JSON.stringify(nextProps.config)) return false;
-    if (JSON.stringify(prevProps.style) !== JSON.stringify(nextProps.style)) return false;
-    return true;
-  });
-
   // Se está carregando, mostrar loading spinner
   if (isLoading) {
     return <LoadingSpinner message="Carregando dados de vendas..." />;
@@ -1019,6 +770,32 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     <div className={`dashboard-content ${isUpdating ? 'updating' : ''}`}>
       {/* CSS dos novos componentes de comparação e filtros de período */}
       <style>{`
+        /* Estilos para o indicador de tendência */
+        .trend-indicator {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          margin-left: 8px;
+        }
+        
+        .trend-indicator.positive {
+          background-color: rgba(0, 200, 83, 0.15);
+          color: #00c853;
+        }
+        
+        .trend-indicator.negative {
+          background-color: rgba(255, 82, 82, 0.15);
+          color: #ff5252;
+        }
+        
+        .trend-indicator.neutral {
+          background-color: rgba(158, 158, 158, 0.15);
+          color: #9e9e9e;
+        }
+        
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           50% { transform: translateX(100%); }
@@ -1034,6 +811,17 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           cursor: default;
           user-select: none;
           flex-shrink: 0;
+        }
+        
+        .trend-indicator-square {
+          background-color: rgba(255, 82, 82, 0.15);
+          color: #ff3a5e;
+          border-radius: 8px;
+          padding: 4px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          display: inline-block;
+          text-align: center;
         }
 
         /* Estilização moderna dos controles de período */
@@ -1103,7 +891,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           background: linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%);
           transform: translateY(-2px);
         }
-
 
         /* Estilos para as tabelas de detalhes */
         .details-tabs {
@@ -1447,64 +1234,70 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
          <div className="card card-metrics-group wide">
           <div className="card-title">Métricas de Vendas</div>
           <div className="metrics-group">
-            <MiniMetricCardWithTrend
-              title="Ticket Médio"
-              value={`R$ ${(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              current={salesData?.averageDealSize || 0}
-              previous={comparisonData?.previousPeriod?.averageDealSize || 0}
-              color={COLORS.success}
-            />
-            <MiniMetricCardWithTrend
-              title="Receita Total"
-              value={`R$ ${(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              current={salesData?.totalRevenue || 0}
-              previous={0} // V2: previousTotalRevenue não disponível ainda
-              subtitle="Receita"
-              color={COLORS.warning}
-            />
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.success }}>
+                  R$ {(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">TICKET MÉDIO</div>
+              <div className="mini-metric-subtitle">Ticket</div>
+            </div>
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.warning }}>
+                  R$ {(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">RECEITA TOTAL</div>
+              <div className="mini-metric-subtitle">Receita</div>
+            </div>
           </div>
         </div>
         <div className="card card-metrics-group">
           <div className="card-title">Performance de Vendas</div>
           <div className="metrics-group">
-            <MiniMetricCardWithTrend
-              title="Reuniões Realizadas"
-              value={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
-              current={salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
-              previous={0}
-              subtitle="Reuniões"
-              color={COLORS.success}
-            />
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.success }}>
+                  {salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">REUNIÕES REALIZADAS</div>
+              <div className="mini-metric-subtitle">Reuniões</div>
+            </div>
            
-            <MiniMetricCardWithTrend
-              title="Total Vendas"
-              value={salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
-              current={salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
-              previous={salesData?.previousWonLeads || 0}
-              subtitle="Vendas"
-              color={COLORS.secondary}
-            />
-            <MiniMetricCardWithTrend
-              title="Conv. Reuniões"
-              value={`${(salesData.conversionRates?.meetings || 0).toFixed(1)}%`}
-              current={salesData.conversionRates?.meetings || 0}
-              previous={comparisonData?.previousPeriod?.conversionRates?.meetings || 0}
-              color={COLORS.primary}
-            />
-            <MiniMetricCardWithTrend
-              title="Conv. Propostas"
-              value={`${(salesData.conversionRates?.prospects || 0).toFixed(1)}%`}
-              current={salesData.conversionRates?.prospects || 0}
-              previous={comparisonData?.previousPeriod?.conversionRates?.prospects || 0}
-              color={COLORS.secondary}
-            />
-            <MiniMetricCardWithTrend
-              title="Conv. Vendas"
-              value={`${(salesData.conversionRates?.sales || 0).toFixed(1)}%`}
-              current={salesData.conversionRates?.sales || 0}
-              previous={comparisonData?.previousPeriod?.conversionRates?.sales || 0}
-              color={COLORS.tertiary}
-            />
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
+                  {salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">TOTAL VENDAS</div>
+              <div className="mini-metric-subtitle">Vendas</div>
+            </div>
+            <div className="mini-metric-card">
+              <div className="mini-metric-value" style={{ color: COLORS.primary }}>
+                {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
+              </div>
+              <div className="mini-metric-title">CONV. REUNIÕES</div>
+            </div>
+            <div className="mini-metric-card">
+              <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
+                {(salesData.conversionRates?.prospects || 0).toFixed(1)}%
+              </div>
+              <div className="mini-metric-title">CONV. PROPOSTAS</div>
+            </div>
+            <div className="mini-metric-card">
+              <div className="mini-metric-value" style={{ color: COLORS.tertiary }}>
+                {(salesData.conversionRates?.sales || 0).toFixed(1)}%
+              </div>
+              <div className="mini-metric-title">CONV. VENDAS</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1630,21 +1423,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   <div className="conversion-main-value">
                     {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
                   </div>
-                  
-                  <div className="conversion-trend">
-                    {(() => {
-                      const current = salesData.conversionRates?.meetings || 0;
-                      const previous = comparisonData?.previousPeriod?.conversionRates?.meetings || 0;
-                      const change = previous ? ((current - previous) / previous * 100) : 0;
-                      const isPositive = change >= 0;
-                      return (
-                        <div className={`trend-badge ${isPositive ? 'positive' : 'negative'}`}>
-                          <span className="trend-arrow">{isPositive ? '↗' : '↘'}</span>
-                          <span className="trend-value">{Math.abs(change).toFixed(1)}%</span>
-                        </div>
-                      );
-                    })()} 
-                  </div>
                 </div>
               </div>
             </div>
@@ -1677,21 +1455,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                         'Dados não disponíveis'
                       }
                     </div>
-                    
-                    <div className="conversion-trend">
-                      {(() => {
-                        const current = salesData.conversionRates?.prospects || 0;
-                        const previous = comparisonData?.previousPeriod?.conversionRates?.prospects || 0;
-                        const change = previous ? ((current - previous) / previous * 100) : 0;
-                        const isPositive = change >= 0;
-                        return (
-                          <div className={`trend-badge ${isPositive ? 'positive' : 'negative'}`}>
-                            <span className="trend-arrow">{isPositive ? '↗' : '↘'}</span>
-                            <span className="trend-value">{Math.abs(change).toFixed(1)}%</span>
-                          </div>
-                        );
-                      })()} 
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1717,21 +1480,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   <div className="conversion-main-value">
                     {(salesData.conversionRates?.sales || 0).toFixed(1)}%
                   </div>
-                  
-                  <div className="conversion-trend">
-                    {(() => {
-                      const current = salesData.conversionRates?.sales || 0;
-                      const previous = comparisonData?.previousPeriod?.conversionRates?.sales || 0;
-                      const change = previous ? ((current - previous) / previous * 100) : 0;
-                      const isPositive = change >= 0;
-                      return (
-                        <div className={`trend-badge ${isPositive ? 'positive' : 'negative'}`}>
-                          <span className="trend-arrow">{isPositive ? '↗' : '↘'}</span>
-                          <span className="trend-value">{Math.abs(change).toFixed(1)}%</span>
-                        </div>
-                      );
-                    })()} 
-                  </div>
                 </div>
               </div>
             </div>
@@ -1739,7 +1487,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         </div>
       </div>
 
-      {/* Modal para tabelas detalhadas - atualização forçada: {modalForceUpdate} */}
+      {/* Modal para tabelas detalhadas */}
       <DetailModal
         isOpen={modalStateRef.current.isOpen}
         onClose={closeModal}
@@ -1908,8 +1656,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               disabled={!customPeriod?.startDate || !customPeriod?.endDate}
               style={{ 
                 padding: '12px 24px', 
-                backgroundColor:"#a0aec0", 
-                color: 'black',
+                backgroundColor: "#4E5859", 
+                color: 'white',
                 border: 'none', 
                 borderRadius: '8px', 
                 cursor: (!customPeriod?.startDate || !customPeriod?.endDate) ? 'not-allowed' : 'pointer',
@@ -1931,7 +1679,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 e.target.style.boxShadow = 'none';
               }}
             >
-               Aplicar Período
+              <span>✓</span> Aplicar Período
             </button>
           </div>
         </div>

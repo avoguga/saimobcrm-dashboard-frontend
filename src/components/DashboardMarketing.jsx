@@ -120,14 +120,15 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       );
 
       const filtered = {
-        ...marketingData, // Preservar todas as métricas originais (Facebook, etc)
-        leadsBySource: filteredLeadsBySource,
-        totalLeads: selectedSourceLeads?.value || 0,
-        // Preservar leadsByAd se existir para a fonte específica
-        leadsByAd: marketingData.leadsByAd?.filter(ad => 
-          ad.source === selectedSource || !ad.source
-        ) || marketingData.leadsByAd || []
-      };
+  ...marketingData, // Preservar todas as métricas originais (Facebook, etc)
+  leadsBySource: filteredLeadsBySource,
+  totalLeads: selectedSourceLeads?.value || 0,
+  activeLeads: selectedSourceLeads?.active || 0, // Adicione esta linha
+  // Preservar leadsByAd se existir para a fonte específica
+  leadsByAd: marketingData.leadsByAd?.filter(ad => 
+    ad.source === selectedSource || !ad.source
+  ) || marketingData.leadsByAd || []
+};
       
       setFilteredData(filtered);
     }
@@ -715,20 +716,28 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
         </div>
       </div>
 
-      {/* Linha 1: KPIs principais */}
-      <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group">
-          <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
-          <div className="metrics-group">
-            <MiniMetricCardWithTrend
-              title="Total de Leads"
-              value={filteredData.totalLeads || 0}
-              current={filteredData.totalLeads || 0}
-              previous={filteredData.previousPeriodLeads || 0}
-              color={COLORS.primary}
-            />
-          </div>
-        </div>
+     {/* Linha 1: KPIs principais */}
+<div className="dashboard-row row-compact">
+  <div className="card card-metrics-group">
+    <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
+    <div className="metrics-group">
+      <MiniMetricCardWithTrend
+        title="Total de Leads"
+        value={filteredData.totalLeads || 0}
+        current={filteredData.totalLeads || 0}
+        previous={filteredData.previousPeriodLeads || 0}
+        color={COLORS.primary}
+      />
+      {/* Novo card para leads ativos */}
+     <MiniMetricCardWithTrend
+  title="Leads Ativos"
+  value={filteredData.leads?.active || 0}
+  current={filteredData.leads?.active || 0}
+  previous={filteredData.previousPeriod?.leads?.active || 0}
+  color={COLORS.success}
+/>
+    </div>
+  </div>
 
 
         <div className="card card-metrics-group">
