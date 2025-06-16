@@ -538,31 +538,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     return { leadsData: [], activitiesData: [], wonDealsData: [] };
   }, [salesData?.analyticsTeam?.user_performance]);
 
-  // Dados para gráfico de status dos leads (COMPATÍVEL COM V2)
-  const leadsStatusData = useMemo(() => [
-    {
-      name: 'Leads em Negociação',
-      value: salesData?.activeLeads ||  // V2: KPIs endpoint
-             (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)
-    },
-    {
-      name: 'Leads em Remarketing',
-      value: salesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0
-    },
-    {
-      name: 'Leads Reativados',
-      value: 0  // Temporariamente 0 até implementar salesbotRecovery nos V2
-    }
-  ].filter(item => item.value > 0), [salesData]);
-
-  // Config para gráfico de status dos leads
-  const leadsStatusConfig = useMemo(() => ({ 
-    name: 'Status dos Leads',
-    colors: [COLORS.primary, COLORS.secondary, COLORS.success]
-  }), []);
-
-  // Style para gráfico de status dos leads
-  const leadsStatusStyle = useMemo(() => ({ height: getChartHeight('medium') }), [getChartHeight]);
 
   // Dados ordenados para gráficos de corretores (DECRESCENTE - maior para menor)
   // SEMPRE MOSTRA TODOS OS CORRETORES, mesmo com valor 0
@@ -1231,9 +1206,40 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
       {/* Linha 1: KPIs principais */}
       <div className="dashboard-row row-compact">
-         <div className="card card-metrics-group wide">
+         <div className="card card-metrics-group">
+          <div className="card-title">Métricas de Produtividade</div>
+          <div className="metrics-group">
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.primary }}>
+                  {salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">REUNIÕES REALIZADAS</div>
+              <div className="mini-metric-subtitle">Reuniões</div>
+            </div>
+            <div className="mini-metric-card">
+              <div className="mini-metric-value" style={{ color: COLORS.primary }}>
+                {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
+              </div>
+              <div className="mini-metric-title">CONV. REUNIÕES</div>
+            </div>
+          </div>
+        </div>
+        <div className="card card-metrics-group">
           <div className="card-title">Métricas de Vendas</div>
           <div className="metrics-group">
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
+                  {salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">TOTAL VENDAS</div>
+              <div className="mini-metric-subtitle">Vendas</div>
+            </div>
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.success }}>
@@ -1254,38 +1260,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div className="mini-metric-title">RECEITA TOTAL</div>
               <div className="mini-metric-subtitle">Receita</div>
             </div>
-          </div>
-        </div>
-        <div className="card card-metrics-group">
-          <div className="card-title">Performance de Vendas</div>
-          <div className="metrics-group">
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: COLORS.success }}>
-                  {salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
-                </div>
-                <TrendIndicator value={-100.0} />
-              </div>
-              <div className="mini-metric-title">REUNIÕES REALIZADAS</div>
-              <div className="mini-metric-subtitle">Reuniões</div>
-            </div>
-           
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
-                  {salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
-                </div>
-                <TrendIndicator value={-100.0} />
-              </div>
-              <div className="mini-metric-title">TOTAL VENDAS</div>
-              <div className="mini-metric-subtitle">Vendas</div>
-            </div>
-            <div className="mini-metric-card">
-              <div className="mini-metric-value" style={{ color: COLORS.primary }}>
-                {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
-              </div>
-              <div className="mini-metric-title">CONV. REUNIÕES</div>
-            </div>
             <div className="mini-metric-card">
               <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
                 {(salesData.conversionRates?.prospects || 0).toFixed(1)}%
@@ -1302,19 +1276,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         </div>
       </div>
 
-      {/* Linha 2: Gráfico de Leads por Categoria */}
-      <div className="dashboard-row">
-        {/* Gráfico de Leads por Categoria do Funil */}
-        <div className="card card-lg">
-          <div className="card-title">Status dos Leads</div>
-          <CompactChart 
-            type="pie" 
-            data={leadsStatusData} 
-            config={leadsStatusConfig}
-            style={leadsStatusStyle}
-          />
-        </div>
-      </div>
 
 
       {/* Linha 5: Gráficos de Corretores - Layout Vertical */}
