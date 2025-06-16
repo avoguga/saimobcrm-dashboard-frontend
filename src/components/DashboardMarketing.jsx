@@ -576,102 +576,104 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
               {showCampaignFilter && (
                 <div className="campaign-selector">
                   <label className="filter-label">Campanhas:</label>
-                  {loadingCampaigns ? (
-                    <div className="campaign-loading">Carregando campanhas...</div>
-                  ) : (
-                    <div className="campaign-filter-container" ref={dropdownRef}>
-                      <button 
-                        className="campaign-filter-button"
-                        onClick={() => setShowDropdown(!showDropdown)}
-                      >
-                        {selectedCampaigns.length === 0 
-                          ? 'Selecionar campanhas' 
-                          : selectedCampaigns.length === campaigns.length 
-                            ? `Todas as campanhas (${selectedCampaigns.length})`
-                            : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
-                        <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
-                      </button>
-                      
-                      <div className={`campaign-dropdown ${showDropdown ? 'show' : ''}`}>
-                        <div className="campaign-search">
-                          <input
-                            type="text"
-                            placeholder="Buscar campanhas..."
-                            value={campaignFilters.searchTerm}
-                            onChange={(e) => setCampaignFilters({
-                              ...campaignFilters,
-                              searchTerm: e.target.value
-                            })}
-                            className="campaign-search-input"
-                          />
-                        </div>
+                  <div className="campaign-filter-content">
+                    {loadingCampaigns ? (
+                      <div className="campaign-loading">Carregando campanhas...</div>
+                    ) : (
+                      <div className="campaign-filter-container" ref={dropdownRef}>
+                        <button 
+                          className="campaign-filter-button"
+                          onClick={() => setShowDropdown(!showDropdown)}
+                        >
+                          {selectedCampaigns.length === 0 
+                            ? 'Selecionar campanhas' 
+                            : selectedCampaigns.length === campaigns.length 
+                              ? `Todas as campanhas (${selectedCampaigns.length})`
+                              : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
+                          <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
+                        </button>
                         
-                        <div className="campaign-actions">
-                          <button 
-                            className="select-all-btn"
-                            onClick={() => {
-                              if (selectedCampaigns.length === campaigns.length) {
-                                // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
+                        <div className={`campaign-dropdown ${showDropdown ? 'show' : ''}`}>
+                          <div className="campaign-search">
+                            <input
+                              type="text"
+                              placeholder="Buscar campanhas..."
+                              value={campaignFilters.searchTerm}
+                              onChange={(e) => setCampaignFilters({
+                                ...campaignFilters,
+                                searchTerm: e.target.value
+                              })}
+                              className="campaign-search-input"
+                            />
+                          </div>
+                          
+                          <div className="campaign-actions">
+                            <button 
+                              className="select-all-btn"
+                              onClick={() => {
+                                if (selectedCampaigns.length === campaigns.length) {
+                                  // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
+                                  setSelectedCampaigns([]);
+                                  setCampaignFilters({
+                                    ...campaignFilters,
+                                    campaignIds: []
+                                  });
+                                  setCampaignInsights(null); // Limpar insights apenas
+                                  console.log('✅ Todas as campanhas desmarcadas, usando dados gerais');
+                                } else {
+                                  // Se nem todas estão selecionadas, selecionar todas
+                                  const allCampaignIds = campaigns.map(c => c.id);
+                                  setSelectedCampaigns(allCampaignIds);
+                                  handleCampaignFilterChange({
+                                    ...campaignFilters,
+                                    campaignIds: allCampaignIds
+                                  });
+                                }
+                              }}
+                            >
+                              {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                            </button>
+                            <button 
+                              className="clear-all-btn"
+                              onClick={() => {
+                                // Limpar sem recarregar dados
                                 setSelectedCampaigns([]);
                                 setCampaignFilters({
                                   ...campaignFilters,
                                   campaignIds: []
                                 });
                                 setCampaignInsights(null); // Limpar insights apenas
-                                console.log('✅ Todas as campanhas desmarcadas, usando dados gerais');
-                              } else {
-                                // Se nem todas estão selecionadas, selecionar todas
-                                const allCampaignIds = campaigns.map(c => c.id);
-                                setSelectedCampaigns(allCampaignIds);
-                                handleCampaignFilterChange({
-                                  ...campaignFilters,
-                                  campaignIds: allCampaignIds
-                                });
-                              }
-                            }}
-                          >
-                            {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
-                          </button>
-                          <button 
-                            className="clear-all-btn"
-                            onClick={() => {
-                              // Limpar sem recarregar dados
-                              setSelectedCampaigns([]);
-                              setCampaignFilters({
-                                ...campaignFilters,
-                                campaignIds: []
-                              });
-                              setCampaignInsights(null); // Limpar insights apenas
-                              console.log('✅ Filtros de campanha limpos (botão Limpar)');
-                            }}
-                          >
-                            Limpar
-                          </button>
-                        </div>
-                        
-                        <div className="campaign-list">
-                          {campaigns
-                            .filter(campaign => 
-                              !campaignFilters.searchTerm || 
-                              campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
-                            )
-                            .map(campaign => (
-                              <label key={campaign.id} className="campaign-item">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCampaigns.includes(campaign.id)}
-                                  onChange={() => handleCampaignSelect(campaign.id)}
-                                />
-                                <span className="campaign-name">{campaign.name}</span>
-                                <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
-                                  {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
-                                </span>
-                              </label>
-                            ))}
+                                console.log('✅ Filtros de campanha limpos (botão Limpar)');
+                              }}
+                            >
+                              Limpar
+                            </button>
+                          </div>
+                          
+                          <div className="campaign-list">
+                            {campaigns
+                              .filter(campaign => 
+                                !campaignFilters.searchTerm || 
+                                campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
+                              )
+                              .map(campaign => (
+                                <label key={campaign.id} className="campaign-item">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCampaigns.includes(campaign.id)}
+                                    onChange={() => handleCampaignSelect(campaign.id)}
+                                  />
+                                  <span className="campaign-name">{campaign.name}</span>
+                                  <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
+                                    {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
+                                  </span>
+                                </label>
+                              ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
