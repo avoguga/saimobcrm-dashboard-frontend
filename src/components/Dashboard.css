@@ -2495,3 +2495,51 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.campaign-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.campaign-filter-content {
+  flex: 1;
+}
+
+/* Garanta que o label esteja centralizado verticalmente */
+.filter-label {
+  margin-bottom: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Ajustes para dispositivos móveis */
+@media (max-width: 768px) {
+  .campaign-selector {
+    width: 100%;
+  }
+  
+  .campaign-filter-content {
+    width: 100%;
+  }
+  
+  /* Em mobile, manter os labels alinhados */
+  .filters-group > div {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+}
+
+/* Ajustes para dispositivos muito pequenos */
+@media (max-width: 480px) {
+  .campaign-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+  
+  .filter-label {
+    margin-bottom: var(--spacing-xs);
+  }
+}

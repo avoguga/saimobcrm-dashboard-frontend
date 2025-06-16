@@ -102,6 +102,64 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     }
   }, [data]);
 
+  // Effect para atualizar insights quando o período muda (se há campanhas selecionadas)
+  useEffect(() => {
+    // Só executar se há campanhas selecionadas e o período mudou
+    if (selectedCampaigns.length > 0 && period) {
+      console.log('📅 Período mudou, atualizando insights das campanhas selecionadas:', { 
+        period, 
+        customPeriod, 
+        selectedCampaigns: selectedCampaigns.length 
+      });
+      
+      // Função assíncrona para atualizar insights sem mostrar loading
+      const updateInsightsSilently = async () => {
+        try {
+          // Preparar range de datas baseado no período selecionado
+          let dateRange;
+          if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+            dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+          } else {
+            // Calcular datas baseado no período
+            const endDate = new Date();
+            const startDate = new Date();
+            
+            switch (period) {
+              case '7d':
+                startDate.setDate(endDate.getDate() - 7);
+                break;
+              case '30d':
+                startDate.setDate(endDate.getDate() - 30);
+                break;
+              case '60d':
+                startDate.setDate(endDate.getDate() - 60);
+                break;
+              case '90d':
+                startDate.setDate(endDate.getDate() - 90);
+                break;
+              default:
+                startDate.setDate(endDate.getDate() - 30);
+            }
+            
+            dateRange = {
+              start: startDate.toISOString().split('T')[0],
+              end: endDate.toISOString().split('T')[0]
+            };
+          }
+          
+          // Carregar insights sem mostrar loading (similar ao auto-refresh)
+          const insights = await GranularAPI.getFacebookCampaignInsights(selectedCampaigns, dateRange);
+          setCampaignInsights(insights);
+          console.log('✅ Insights de campanhas atualizados silenciosamente:', insights);
+        } catch (error) {
+          console.error('Erro ao atualizar insights de campanhas:', error);
+        }
+      };
+      
+      updateInsightsSilently();
+    }
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]); // Monitorar mudanças no período
+
   // Filtrar dados dinamicamente sem recarregar da API
   useEffect(() => {
     if (!marketingData) return;
@@ -120,14 +178,15 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       );
 
       const filtered = {
-        ...marketingData, // Preservar todas as métricas originais (Facebook, etc)
-        leadsBySource: filteredLeadsBySource,
-        totalLeads: selectedSourceLeads?.value || 0,
-        // Preservar leadsByAd se existir para a fonte específica
-        leadsByAd: marketingData.leadsByAd?.filter(ad => 
-          ad.source === selectedSource || !ad.source
-        ) || marketingData.leadsByAd || []
-      };
+  ...marketingData, // Preservar todas as métricas originais (Facebook, etc)
+  leadsBySource: filteredLeadsBySource,
+  totalLeads: selectedSourceLeads?.value || 0,
+  activeLeads: selectedSourceLeads?.active || 0, // Adicione esta linha
+  // Preservar leadsByAd se existir para a fonte específica
+  leadsByAd: marketingData.leadsByAd?.filter(ad => 
+    ad.source === selectedSource || !ad.source
+  ) || marketingData.leadsByAd || []
+};
       
       setFilteredData(filtered);
     }
@@ -228,51 +287,76 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     </div>
   );
 
-  // Mini metric card with trend
-  const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLORS.primary, subtitle }) => {
-    const getTrendInfo = () => {
-      if (!previous || previous === 0) return { text: '', color: COLORS.tertiary, bg: 'rgba(117, 119, 123, 0.1)', border: 'rgba(117, 119, 123, 0.3)' };
-      
-      const change = current - previous;
-      const percentage = (change / previous) * 100;
-      
-      return {
-        text: `${change > 0 ? '+' : ''}${change.toLocaleString('pt-BR')} (${percentage > 0 ? '+' : ''}${percentage.toFixed(1)}%)`,
-        color: change > 0 ? COLORS.success : change < 0 ? COLORS.danger : COLORS.tertiary,
-        bg: change > 0 ? 'rgba(76, 224, 179, 0.1)' : change < 0 ? 'rgba(255, 58, 94, 0.1)' : 'rgba(117, 119, 123, 0.1)',
-        border: change > 0 ? 'rgba(76, 224, 179, 0.3)' : change < 0 ? 'rgba(255, 58, 94, 0.3)' : 'rgba(117, 119, 123, 0.3)'
-      };
+const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLORS.primary, subtitle }) => {
+  const getTrendInfo = () => {
+    // Sempre mostrar a tendência, mesmo com valores zero
+    if (!previous && previous !== 0) return { text: '', color: COLORS.tertiary, bg: 'rgba(117, 119, 123, 0.1)', border: 'rgba(117, 119, 123, 0.3)' };
+    
+    // Calcular a variação percentual
+    let change = 0;
+    let isPositive = true;
+    
+    if (previous === 0 && current !== 0) {
+      // Caso especial: crescimento a partir de zero
+      change = current > 0 ? 100 : -100;
+      isPositive = current > 0;
+    } else if (previous !== 0) {
+      // Caso normal: calcular variação percentual
+      change = ((current - previous) / Math.abs(previous)) * 100;
+      isPositive = change >= 0;
+    }
+    
+    return {
+      text: `${isPositive ? '+' : ''}${change.toFixed(1)}%`,
+      icon: isPositive ? '↗' : '↘',
+      color: isPositive ? COLORS.success : COLORS.danger,
+      bg: isPositive ? 'rgba(76, 224, 179, 0.15)' : 'rgba(255, 58, 94, 0.15)',
+      border: isPositive ? 'rgba(76, 224, 179, 0.3)' : 'rgba(255, 58, 94, 0.3)'
     };
-
-    const trendInfo = getTrendInfo();
-
-    return (
-      <div className="mini-metric-card">
-        <div className="mini-metric-header">
-          <div className="mini-metric-title" title={title}>{title}</div>
-        </div>
-        <div className="mini-metric-content">
-          <div className="mini-metric-value" style={{ color }}>{value}</div>
-          {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
-          {trendInfo.text && (
-            <div 
-              className="mini-metric-trend" 
-              style={{ 
-                color: trendInfo.color,
-                background: trendInfo.bg,
-                border: `1px solid ${trendInfo.border}`,
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: '10px'
-              }}
-            >
-              {trendInfo.text}
-            </div>
-          )}
-        </div>
-      </div>
-    );
   };
+
+  const trendInfo = getTrendInfo();
+
+  return (
+    <div className="mini-metric-card">
+      <div className="mini-metric-value" style={{ color }}>{value}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+        <div className="mini-metric-title">{title}</div>
+        {trendInfo.text && (
+          <div 
+            className={`trend-tag-square ${(current - previous) < 0 ? 'negative' : ''}`}
+            style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '8px',
+              borderRadius: '8px',
+              backgroundColor: trendInfo.bg,
+              border: `1px solid ${trendInfo.border}`,
+              color: trendInfo.color,
+              fontWeight: '600',
+              fontSize: '10px',
+              minWidth: '40px',
+              minHeight: '40px',
+              boxShadow: `0 2px 4px ${trendInfo.bg}60`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span style={{ fontSize: '16px', lineHeight: 1 }}>
+              {trendInfo.icon}
+            </span>
+            <span style={{ lineHeight: 1, fontSize: '13px', fontWeight: '700' }}>
+              {trendInfo.text}
+            </span>
+          </div>
+        )}
+      </div>
+      {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
+    </div>
+  );
+};
 
   // Enhanced Compact Chart Component with Dynamic Updates (ECharts Strategy)
   const CompactChart = memo(({ data, type, config, style, loading = false }) => {
@@ -551,102 +635,104 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               {showCampaignFilter && (
                 <div className="campaign-selector">
                   <label className="filter-label">Campanhas:</label>
-                  {loadingCampaigns ? (
-                    <div className="campaign-loading">Carregando campanhas...</div>
-                  ) : (
-                    <div className="campaign-filter-container" ref={dropdownRef}>
-                      <button 
-                        className="campaign-filter-button"
-                        onClick={() => setShowDropdown(!showDropdown)}
-                      >
-                        {selectedCampaigns.length === 0 
-                          ? 'Selecionar campanhas' 
-                          : selectedCampaigns.length === campaigns.length 
-                            ? `Todas as campanhas (${selectedCampaigns.length})`
-                            : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
-                        <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
-                      </button>
-                      
-                      <div className={`campaign-dropdown ${showDropdown ? 'show' : ''}`}>
-                        <div className="campaign-search">
-                          <input
-                            type="text"
-                            placeholder="Buscar campanhas..."
-                            value={campaignFilters.searchTerm}
-                            onChange={(e) => setCampaignFilters({
-                              ...campaignFilters,
-                              searchTerm: e.target.value
-                            })}
-                            className="campaign-search-input"
-                          />
-                        </div>
+                  <div className="campaign-filter-content">
+                    {loadingCampaigns ? (
+                      <div className="campaign-loading">Carregando campanhas...</div>
+                    ) : (
+                      <div className="campaign-filter-container" ref={dropdownRef}>
+                        <button 
+                          className="campaign-filter-button"
+                          onClick={() => setShowDropdown(!showDropdown)}
+                        >
+                          {selectedCampaigns.length === 0 
+                            ? 'Selecionar campanhas' 
+                            : selectedCampaigns.length === campaigns.length 
+                              ? `Todas as campanhas (${selectedCampaigns.length})`
+                              : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
+                          <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
+                        </button>
                         
-                        <div className="campaign-actions">
-                          <button 
-                            className="select-all-btn"
-                            onClick={() => {
-                              if (selectedCampaigns.length === campaigns.length) {
-                                // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
+                        <div className={`campaign-dropdown ${showDropdown ? 'show' : ''}`}>
+                          <div className="campaign-search">
+                            <input
+                              type="text"
+                              placeholder="Buscar campanhas..."
+                              value={campaignFilters.searchTerm}
+                              onChange={(e) => setCampaignFilters({
+                                ...campaignFilters,
+                                searchTerm: e.target.value
+                              })}
+                              className="campaign-search-input"
+                            />
+                          </div>
+                          
+                          <div className="campaign-actions">
+                            <button 
+                              className="select-all-btn"
+                              onClick={() => {
+                                if (selectedCampaigns.length === campaigns.length) {
+                                  // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
+                                  setSelectedCampaigns([]);
+                                  setCampaignFilters({
+                                    ...campaignFilters,
+                                    campaignIds: []
+                                  });
+                                  setCampaignInsights(null); // Limpar insights apenas
+                                  console.log('✅ Todas as campanhas desmarcadas, usando dados gerais');
+                                } else {
+                                  // Se nem todas estão selecionadas, selecionar todas
+                                  const allCampaignIds = campaigns.map(c => c.id);
+                                  setSelectedCampaigns(allCampaignIds);
+                                  handleCampaignFilterChange({
+                                    ...campaignFilters,
+                                    campaignIds: allCampaignIds
+                                  });
+                                }
+                              }}
+                            >
+                              {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                            </button>
+                            <button 
+                              className="clear-all-btn"
+                              onClick={() => {
+                                // Limpar sem recarregar dados
                                 setSelectedCampaigns([]);
                                 setCampaignFilters({
                                   ...campaignFilters,
                                   campaignIds: []
                                 });
                                 setCampaignInsights(null); // Limpar insights apenas
-                                console.log('✅ Todas as campanhas desmarcadas, usando dados gerais');
-                              } else {
-                                // Se nem todas estão selecionadas, selecionar todas
-                                const allCampaignIds = campaigns.map(c => c.id);
-                                setSelectedCampaigns(allCampaignIds);
-                                handleCampaignFilterChange({
-                                  ...campaignFilters,
-                                  campaignIds: allCampaignIds
-                                });
-                              }
-                            }}
-                          >
-                            {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
-                          </button>
-                          <button 
-                            className="clear-all-btn"
-                            onClick={() => {
-                              // Limpar sem recarregar dados
-                              setSelectedCampaigns([]);
-                              setCampaignFilters({
-                                ...campaignFilters,
-                                campaignIds: []
-                              });
-                              setCampaignInsights(null); // Limpar insights apenas
-                              console.log('✅ Filtros de campanha limpos (botão Limpar)');
-                            }}
-                          >
-                            Limpar
-                          </button>
-                        </div>
-                        
-                        <div className="campaign-list">
-                          {campaigns
-                            .filter(campaign => 
-                              !campaignFilters.searchTerm || 
-                              campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
-                            )
-                            .map(campaign => (
-                              <label key={campaign.id} className="campaign-item">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCampaigns.includes(campaign.id)}
-                                  onChange={() => handleCampaignSelect(campaign.id)}
-                                />
-                                <span className="campaign-name">{campaign.name}</span>
-                                <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
-                                  {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
-                                </span>
-                              </label>
-                            ))}
+                                console.log('✅ Filtros de campanha limpos (botão Limpar)');
+                              }}
+                            >
+                              Limpar
+                            </button>
+                          </div>
+                          
+                          <div className="campaign-list">
+                            {campaigns
+                              .filter(campaign => 
+                                !campaignFilters.searchTerm || 
+                                campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
+                              )
+                              .map(campaign => (
+                                <label key={campaign.id} className="campaign-item">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCampaigns.includes(campaign.id)}
+                                    onChange={() => handleCampaignSelect(campaign.id)}
+                                  />
+                                  <span className="campaign-name">{campaign.name}</span>
+                                  <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
+                                    {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
+                                  </span>
+                                </label>
+                              ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -688,20 +774,28 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         </div>
       </div>
 
-      {/* Linha 1: KPIs principais */}
-      <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group">
-          <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
-          <div className="metrics-group">
-            <MiniMetricCardWithTrend
-              title="Total de Leads"
-              value={filteredData.totalLeads || 0}
-              current={filteredData.totalLeads || 0}
-              previous={filteredData.previousPeriodLeads || 0}
-              color={COLORS.primary}
-            />
-          </div>
-        </div>
+     {/* Linha 1: KPIs principais */}
+<div className="dashboard-row row-compact">
+  <div className="card card-metrics-group">
+    <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
+    <div className="metrics-group">
+      <MiniMetricCardWithTrend
+        title="Total de Leads"
+        value={filteredData.totalLeads || 0}
+        current={filteredData.totalLeads || 0}
+        previous={filteredData.previousPeriodLeads || 0}
+        color={COLORS.primary}
+      />
+      {/* Novo card para leads ativos */}
+     <MiniMetricCardWithTrend
+  title="Leads Ativos"
+  value={filteredData.leads?.active || 0}
+  current={filteredData.leads?.active || 0}
+  previous={filteredData.previousPeriod?.leads?.active || 0}
+  color={COLORS.success}
+/>
+    </div>
+  </div>
 
 
         <div className="card card-metrics-group">
@@ -726,55 +820,71 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               previous={filteredData.previousFacebookMetrics?.ctr || 0}
               color={COLORS.secondary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="CPM"
               value={`R$ ${(facebookMetrics.cpm || 0).toFixed(2)}`}
+              current={facebookMetrics.cpm || 0}
+              previous={filteredData.previousFacebookMetrics?.cpm || 0}
               color={COLORS.dark}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Impressões"
               value={(facebookMetrics.impressions || 0).toLocaleString()}
+              current={facebookMetrics.impressions || 0}
+              previous={filteredData.previousFacebookMetrics?.impressions || 0}
               color={COLORS.primary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Alcance"
               value={(facebookMetrics.reach || 0).toLocaleString()}
+              current={facebookMetrics.reach || 0}
+              previous={filteredData.previousFacebookMetrics?.reach || 0}
               color={COLORS.secondary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Cliques"
               value={(facebookMetrics.clicks || 0).toLocaleString()}
+              current={facebookMetrics.clicks || 0}
+              previous={filteredData.previousFacebookMetrics?.clicks || 0}
               color={COLORS.tertiary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Gasto"
               value={`R$ ${(facebookMetrics.spend || 0).toFixed(2)}`}
+              current={facebookMetrics.spend || 0}
+              previous={filteredData.previousFacebookMetrics?.spend || 0}
               color={COLORS.warning}
             />
             {(facebookMetrics.inlineLinkClicks || 0) > 0 && (
-              <>
-                <MiniMetricCard
-                  title="Link Clicks"
-                  value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
-                  color={COLORS.success}
-                />
-              </>
+              <MiniMetricCardWithTrend
+                title="Link Clicks"
+                value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
+                current={facebookMetrics.inlineLinkClicks || 0}
+                previous={filteredData.previousFacebookMetrics?.inlineLinkClicks || 0}
+                color={COLORS.success}
+              />
             )}
             {campaignInsights && selectedCampaigns.length > 0 && (
               <>
-                <MiniMetricCard
+                <MiniMetricCardWithTrend
                   title="Engajamento Página"
                   value={(facebookMetrics.engagement.pageEngagement || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.pageEngagement || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.pageEngagement || 0}
                   color={COLORS.primary}
                 />
-                <MiniMetricCard
+                <MiniMetricCardWithTrend
                   title="Reações"
                   value={(facebookMetrics.engagement.likes || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.likes || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.likes || 0}
                   color={COLORS.success}
                 />
-                <MiniMetricCard
+                <MiniMetricCardWithTrend
                   title="Comentários"
                   value={(facebookMetrics.engagement.comments || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.comments || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.comments || 0}
                   color={COLORS.warning}
                 />
               </>
