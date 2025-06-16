@@ -102,6 +102,64 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     }
   }, [data]);
 
+  // Effect para atualizar insights quando o período muda (se há campanhas selecionadas)
+  useEffect(() => {
+    // Só executar se há campanhas selecionadas e o período mudou
+    if (selectedCampaigns.length > 0 && period) {
+      console.log('📅 Período mudou, atualizando insights das campanhas selecionadas:', { 
+        period, 
+        customPeriod, 
+        selectedCampaigns: selectedCampaigns.length 
+      });
+      
+      // Função assíncrona para atualizar insights sem mostrar loading
+      const updateInsightsSilently = async () => {
+        try {
+          // Preparar range de datas baseado no período selecionado
+          let dateRange;
+          if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+            dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+          } else {
+            // Calcular datas baseado no período
+            const endDate = new Date();
+            const startDate = new Date();
+            
+            switch (period) {
+              case '7d':
+                startDate.setDate(endDate.getDate() - 7);
+                break;
+              case '30d':
+                startDate.setDate(endDate.getDate() - 30);
+                break;
+              case '60d':
+                startDate.setDate(endDate.getDate() - 60);
+                break;
+              case '90d':
+                startDate.setDate(endDate.getDate() - 90);
+                break;
+              default:
+                startDate.setDate(endDate.getDate() - 30);
+            }
+            
+            dateRange = {
+              start: startDate.toISOString().split('T')[0],
+              end: endDate.toISOString().split('T')[0]
+            };
+          }
+          
+          // Carregar insights sem mostrar loading (similar ao auto-refresh)
+          const insights = await GranularAPI.getFacebookCampaignInsights(selectedCampaigns, dateRange);
+          setCampaignInsights(insights);
+          console.log('✅ Insights de campanhas atualizados silenciosamente:', insights);
+        } catch (error) {
+          console.error('Erro ao atualizar insights de campanhas:', error);
+        }
+      };
+      
+      updateInsightsSilently();
+    }
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]); // Monitorar mudanças no período
+
   // Filtrar dados dinamicamente sem recarregar da API
   useEffect(() => {
     if (!marketingData) return;
