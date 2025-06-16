@@ -228,51 +228,76 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     </div>
   );
 
-  // Mini metric card with trend
-  const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLORS.primary, subtitle }) => {
-    const getTrendInfo = () => {
-      if (!previous || previous === 0) return { text: '', color: COLORS.tertiary, bg: 'rgba(117, 119, 123, 0.1)', border: 'rgba(117, 119, 123, 0.3)' };
-      
-      const change = current - previous;
-      const percentage = (change / previous) * 100;
-      
-      return {
-        text: `${change > 0 ? '+' : ''}${change.toLocaleString('pt-BR')} (${percentage > 0 ? '+' : ''}${percentage.toFixed(1)}%)`,
-        color: change > 0 ? COLORS.success : change < 0 ? COLORS.danger : COLORS.tertiary,
-        bg: change > 0 ? 'rgba(76, 224, 179, 0.1)' : change < 0 ? 'rgba(255, 58, 94, 0.1)' : 'rgba(117, 119, 123, 0.1)',
-        border: change > 0 ? 'rgba(76, 224, 179, 0.3)' : change < 0 ? 'rgba(255, 58, 94, 0.3)' : 'rgba(117, 119, 123, 0.3)'
-      };
+const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLORS.primary, subtitle }) => {
+  const getTrendInfo = () => {
+    // Sempre mostrar a tendência, mesmo com valores zero
+    if (!previous && previous !== 0) return { text: '', color: COLORS.tertiary, bg: 'rgba(117, 119, 123, 0.1)', border: 'rgba(117, 119, 123, 0.3)' };
+    
+    // Calcular a variação percentual
+    let change = 0;
+    let isPositive = true;
+    
+    if (previous === 0 && current !== 0) {
+      // Caso especial: crescimento a partir de zero
+      change = current > 0 ? 100 : -100;
+      isPositive = current > 0;
+    } else if (previous !== 0) {
+      // Caso normal: calcular variação percentual
+      change = ((current - previous) / Math.abs(previous)) * 100;
+      isPositive = change >= 0;
+    }
+    
+    return {
+      text: `${isPositive ? '+' : ''}${change.toFixed(1)}%`,
+      icon: isPositive ? '↗' : '↘',
+      color: isPositive ? COLORS.success : COLORS.danger,
+      bg: isPositive ? 'rgba(76, 224, 179, 0.15)' : 'rgba(255, 58, 94, 0.15)',
+      border: isPositive ? 'rgba(76, 224, 179, 0.3)' : 'rgba(255, 58, 94, 0.3)'
     };
-
-    const trendInfo = getTrendInfo();
-
-    return (
-      <div className="mini-metric-card">
-        <div className="mini-metric-header">
-          <div className="mini-metric-title" title={title}>{title}</div>
-        </div>
-        <div className="mini-metric-content">
-          <div className="mini-metric-value" style={{ color }}>{value}</div>
-          {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
-          {trendInfo.text && (
-            <div 
-              className="mini-metric-trend" 
-              style={{ 
-                color: trendInfo.color,
-                background: trendInfo.bg,
-                border: `1px solid ${trendInfo.border}`,
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: '10px'
-              }}
-            >
-              {trendInfo.text}
-            </div>
-          )}
-        </div>
-      </div>
-    );
   };
+
+  const trendInfo = getTrendInfo();
+
+  return (
+    <div className="mini-metric-card">
+      <div className="mini-metric-value" style={{ color }}>{value}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+        <div className="mini-metric-title">{title}</div>
+        {trendInfo.text && (
+          <div 
+            className={`trend-tag-square ${(current - previous) < 0 ? 'negative' : ''}`}
+            style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '8px',
+              borderRadius: '8px',
+              backgroundColor: trendInfo.bg,
+              border: `1px solid ${trendInfo.border}`,
+              color: trendInfo.color,
+              fontWeight: '600',
+              fontSize: '10px',
+              minWidth: '40px',
+              minHeight: '40px',
+              boxShadow: `0 2px 4px ${trendInfo.bg}60`,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span style={{ fontSize: '16px', lineHeight: 1 }}>
+              {trendInfo.icon}
+            </span>
+            <span style={{ lineHeight: 1, fontSize: '13px', fontWeight: '700' }}>
+              {trendInfo.text}
+            </span>
+          </div>
+        )}
+      </div>
+      {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
+    </div>
+  );
+};
 
   // Enhanced Compact Chart Component with Dynamic Updates (ECharts Strategy)
   const CompactChart = memo(({ data, type, config, style, loading = false }) => {
@@ -726,55 +751,71 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               previous={filteredData.previousFacebookMetrics?.ctr || 0}
               color={COLORS.secondary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="CPM"
               value={`R$ ${(facebookMetrics.cpm || 0).toFixed(2)}`}
+              current={facebookMetrics.cpm || 0}
+              previous={filteredData.previousFacebookMetrics?.cpm || 0}
               color={COLORS.dark}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Impressões"
               value={(facebookMetrics.impressions || 0).toLocaleString()}
+              current={facebookMetrics.impressions || 0}
+              previous={filteredData.previousFacebookMetrics?.impressions || 0}
               color={COLORS.primary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Alcance"
               value={(facebookMetrics.reach || 0).toLocaleString()}
+              current={facebookMetrics.reach || 0}
+              previous={filteredData.previousFacebookMetrics?.reach || 0}
               color={COLORS.secondary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Cliques"
               value={(facebookMetrics.clicks || 0).toLocaleString()}
+              current={facebookMetrics.clicks || 0}
+              previous={filteredData.previousFacebookMetrics?.clicks || 0}
               color={COLORS.tertiary}
             />
-            <MiniMetricCard
+            <MiniMetricCardWithTrend
               title="Gasto"
               value={`R$ ${(facebookMetrics.spend || 0).toFixed(2)}`}
+              current={facebookMetrics.spend || 0}
+              previous={filteredData.previousFacebookMetrics?.spend || 0}
               color={COLORS.warning}
             />
             {(facebookMetrics.inlineLinkClicks || 0) > 0 && (
-              <>
-                <MiniMetricCard
-                  title="Link Clicks"
-                  value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
-                  color={COLORS.success}
-                />
-              </>
+              <MiniMetricCardWithTrend
+                title="Link Clicks"
+                value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
+                current={facebookMetrics.inlineLinkClicks || 0}
+                previous={filteredData.previousFacebookMetrics?.inlineLinkClicks || 0}
+                color={COLORS.success}
+              />
             )}
             {campaignInsights && selectedCampaigns.length > 0 && (
               <>
-                <MiniMetricCard
+                <MiniMetricCardWithTrend
                   title="Engajamento Página"
                   value={(facebookMetrics.engagement.pageEngagement || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.pageEngagement || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.pageEngagement || 0}
                   color={COLORS.primary}
                 />
-                <MiniMetricCard
+                <MiniMetricCardWithTrend
                   title="Reações"
                   value={(facebookMetrics.engagement.likes || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.likes || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.likes || 0}
                   color={COLORS.success}
                 />
-                <MiniMetricCard
+                <MiniMetricCardWithTrend
                   title="Comentários"
                   value={(facebookMetrics.engagement.comments || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.comments || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.comments || 0}
                   color={COLORS.warning}
                 />
               </>
