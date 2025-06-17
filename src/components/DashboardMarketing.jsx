@@ -18,7 +18,7 @@ const COLORS = {
   lightBg: '#f8f9fa'
 };
 
-function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
+function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, salesData, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
   const [marketingData, setMarketingData] = useState(data);
   const [filteredData, setFilteredData] = useState(data);
   
@@ -774,31 +774,9 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
         </div>
       </div>
 
-     {/* Linha 1: KPIs principais */}
-<div className="dashboard-row row-compact">
-  <div className="card card-metrics-group">
-    <div className="card-title">Leads - Últimos {period.replace('d','')} dias</div>
-    <div className="metrics-group">
-      <MiniMetricCardWithTrend
-        title="Total de Leads"
-        value={filteredData.totalLeads || 0}
-        current={filteredData.totalLeads || 0}
-        previous={filteredData.previousPeriodLeads || 0}
-        color={COLORS.primary}
-      />
-      {/* Novo card para leads ativos */}
-     <MiniMetricCardWithTrend
-  title="Leads Ativos"
-  value={filteredData.leads?.active || 0}
-  current={filteredData.leads?.active || 0}
-  previous={filteredData.previousPeriod?.leads?.active || 0}
-  color={COLORS.success}
-/>
-    </div>
-  </div>
-
-
-        <div className="card card-metrics-group">
+     {/* Linha 1: Facebook Ads sozinho */}
+      <div className="dashboard-row row-compact">
+        <div className="card card-metrics-group wide">
           <div className="card-title">
             {campaignInsights && selectedCampaigns.length > 0 
               ? `Facebook Ads - ${selectedCampaigns.length} Campanha(s) Selecionada(s)`
@@ -891,13 +869,57 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
             )}
           </div>
         </div>
-
       </div>
 
-      {/* Linha 2: Gráficos */}
+      {/* Linha 2: Status dos Leads de Marketing */}
+      <div className="dashboard-row row-compact">
+        <div className="card card-metrics-group wide">
+          <div className="card-title">Status dos Leads de Marketing</div>
+          <div className="metrics-group">
+            <MiniMetricCardWithTrend
+              title="Total de Leads"
+              value={filteredData.totalLeads || 0}
+              current={filteredData.totalLeads || 0}
+              previous={filteredData.previousPeriodLeads || 0}
+              color={COLORS.primary}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Linha 3: Gráficos - Primeira linha com 2 gráficos pie */}
       <div className="dashboard-row">
+        {/* Status dos Leads CRM - movido do dashboard de vendas */}
+        <div className="card card-lg">
+          <div className="card-title">Status dos Leads CRM</div>
+          <CompactChart 
+            type="pie" 
+            data={[
+              {
+                name: 'Leads em Negociação',
+                value: salesData?.activeLeads ||  // V2: KPIs endpoint - usando dados de vendas
+                       (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)
+              },
+              {
+                name: 'Leads em Remarketing',
+                value: salesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0
+              },
+              {
+                name: 'Leads Reativados',
+                value: 0  // Temporariamente 0 até implementar salesbotRecovery nos V2
+              }
+            ].filter(item => item.value > 0)} 
+            config={{ 
+              name: 'Status dos Leads CRM',
+              colors: [COLORS.primary, COLORS.secondary, COLORS.success]
+            }}
+            style={{ height: getChartHeight('medium') }}
+            loading={false}
+          />
+        </div>
+
         {filteredData.leadsBySource && filteredData.leadsBySource.length > 0 && (
-          <div className="card card-md">
+          <div className="card card-lg">
             <div className="card-title">Leads por Fonte</div>
             <CompactChart 
               type="pie" 
@@ -908,9 +930,12 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
             />
           </div>
         )}
+      </div>
 
-        {filteredData.leadsByAd && filteredData.leadsByAd.length > 0 && (
-          <div className="card card-md">
+      {/* Linha 4: Segunda linha com gráfico de barras */}
+      {filteredData.leadsByAd && filteredData.leadsByAd.length > 0 && (
+        <div className="dashboard-row">
+          <div className="card card-full">
             <div className="card-title">Leads por Anúncio</div>
             <CompactChart 
               type="bar" 
@@ -920,10 +945,10 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
               loading={false}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Linha 3: Tendência e métricas do Facebook */}
+      {/* Linha 5: Tendência e métricas do Facebook */}
       <div className="dashboard-row">
         {filteredData.metricsTrend && filteredData.metricsTrend.length > 0 && (
           <div className="card card-lg">
@@ -938,36 +963,7 @@ const MiniMetricCardWithTrend = ({ title, value, current, previous, color = COLO
           </div>
         )}
         
-        <div className="card card-sm">
-          <div className="card-title">Métricas Detalhadas do Facebook</div>
-          
-          {/* Seção de Engajamento */}
-          <div className="compact-metrics-section">
-            <h4 className="section-subtitle">Engajamento do Facebook</h4>
-            <div className="compact-metrics-row">
-              <div className="compact-metric">
-                <span className="metric-label">Curtidas</span>
-                <span className="metric-value">{(facebookMetrics.engagement?.likes || 0).toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="compact-metric">
-                <span className="metric-label">Comentários</span>
-                <span className="metric-value">{(facebookMetrics.engagement?.comments || 0).toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="compact-metric">
-                <span className="metric-label">Compartilh.</span>
-                <span className="metric-value">{(facebookMetrics.engagement?.shares || 0).toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="compact-metric">
-                <span className="metric-label">Vídeos</span>
-                <span className="metric-value">{(facebookMetrics.engagement?.videoViews || 0).toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="compact-metric">
-                <span className="metric-label">Visitas</span>
-                <span className="metric-value">{(facebookMetrics.engagement?.profileVisits || 0).toLocaleString('pt-BR')}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      
       </div>
       
       {/* Modal de período customizado */}

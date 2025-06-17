@@ -634,6 +634,7 @@ function Dashboard() {
           setSelectedSource={setSelectedSource}
           sourceOptions={sourceOptions}
           data={marketingData}
+          salesData={salesData}
           isLoading={isLoadingMarketing}
           isUpdating={isLoadingFilters}
           customPeriod={customPeriod}
