@@ -1209,7 +1209,15 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
          <div className="card card-metrics-group">
           <div className="card-title">Métricas de Produtividade</div>
           <div className="metrics-group">
-            <div className="mini-metric-card">
+            <div 
+              className="mini-metric-card"
+              onClick={() => openModal('reunioes')}
+              onKeyDown={(e) => e.key === 'Enter' && openModal('reunioes')}
+              tabIndex={0}
+              role="button"
+              aria-label="Clique para ver detalhes das reuniões realizadas"
+              style={{ cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.primary }}>
                   {salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
@@ -1217,28 +1225,63 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <TrendIndicator value={-100.0} />
               </div>
               <div className="mini-metric-title">REUNIÕES REALIZADAS</div>
-              <div className="mini-metric-subtitle">Reuniões</div>
-            </div>
-            <div className="mini-metric-card">
-              <div className="mini-metric-value" style={{ color: COLORS.primary }}>
-                {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
+              <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: COLORS.primary, fontWeight: '600' }}>
+                  {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
+                </span>
+                <span>TAXA CONV.</span>
               </div>
-              <div className="mini-metric-title">CONV. REUNIÕES</div>
+            </div>
+            <div 
+              className="mini-metric-card"
+              onClick={() => openModal('propostas')}
+              onKeyDown={(e) => e.key === 'Enter' && openModal('propostas')}
+              tabIndex={0}
+              role="button"
+              aria-label="Clique para ver detalhes das propostas realizadas"
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
+                  {salesData?.proposalStats?.total || 0}
+                </div>
+                <TrendIndicator value={-100.0} />
+              </div>
+              <div className="mini-metric-title">PROPOSTAS REALIZADAS</div>
+              <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: COLORS.secondary, fontWeight: '600' }}>
+                  {(salesData.conversionRates?.prospects || 0).toFixed(1)}%
+                </span>
+                <span>TAXA CONV.</span>
+              </div>
             </div>
           </div>
         </div>
         <div className="card card-metrics-group">
           <div className="card-title">Métricas de Vendas</div>
           <div className="metrics-group">
-            <div className="mini-metric-card">
+            <div 
+              className="mini-metric-card"
+              onClick={() => openModal('vendas')}
+              onKeyDown={(e) => e.key === 'Enter' && openModal('vendas')}
+              tabIndex={0}
+              role="button"
+              aria-label="Clique para ver detalhes das vendas realizadas"
+              style={{ cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
+                <div className="mini-metric-value" style={{ color: COLORS.success }}>
                   {salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
                 </div>
                 <TrendIndicator value={-100.0} />
               </div>
-              <div className="mini-metric-title">TOTAL VENDAS</div>
-              <div className="mini-metric-subtitle">Vendas</div>
+              <div className="mini-metric-title">VENDAS REALIZADAS</div>
+              <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: COLORS.success, fontWeight: '600' }}>
+                  {(salesData.conversionRates?.sales || 0).toFixed(1)}%
+                </span>
+                <span>TAXA CONV.</span>
+              </div>
             </div>
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -1259,18 +1302,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               </div>
               <div className="mini-metric-title">RECEITA TOTAL</div>
               <div className="mini-metric-subtitle">Receita</div>
-            </div>
-            <div className="mini-metric-card">
-              <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
-                {(salesData.conversionRates?.prospects || 0).toFixed(1)}%
-              </div>
-              <div className="mini-metric-title">CONV. PROPOSTAS</div>
-            </div>
-            <div className="mini-metric-card">
-              <div className="mini-metric-value" style={{ color: COLORS.tertiary }}>
-                {(salesData.conversionRates?.sales || 0).toFixed(1)}%
-              </div>
-              <div className="mini-metric-title">CONV. VENDAS</div>
             </div>
           </div>
         </div>
@@ -1356,97 +1387,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         )}
       </div>
 
-      {/* Linha 6: Taxas de conversão */}
-      <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group wide">
-          <div className="card-title">
-            Taxas de Conversão
-          </div>
-          <div className="metrics-group">
-            <div 
-              onClick={() => openModal('reunioes')} 
-              onKeyDown={(e) => e.key === 'Enter' && openModal('reunioes')}
-              tabIndex={0}
-              role="button"
-              aria-label="Clique para ver detalhes das reuniões realizadas"
-              className="conversion-card-enhanced"
-            >
-              <div className="conversion-card-content">
-                <div className="conversion-header">
-                  <h4 className="conversion-title">Conversão em Reuniões</h4>
-                  <div className="click-indicator">
-                    <span className="click-text">Ver detalhes</span>
-                    <div className="click-arrow">→</div>
-                  </div>
-                </div>
-                
-                <div className="conversion-value-section">
-                  <div className="conversion-main-value">
-                    {(salesData.conversionRates?.meetings || 0).toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div 
-              onClick={() => openModal('propostas')} 
-              onKeyDown={(e) => e.key === 'Enter' && openModal('propostas')}
-              tabIndex={0}
-              role="button"
-              aria-label="Clique para ver detalhes das propostas realizadas"
-              className="conversion-card-enhanced"
-            >
-              <div className="conversion-card-content">
-                <div className="conversion-header">
-                  <h4 className="conversion-title">Conversão em Propostas</h4>
-                  <div className="click-indicator">
-                    <span className="click-text">Ver detalhes</span>
-                    <div className="click-arrow">→</div>
-                  </div>
-                </div>
-                
-                <div className="conversion-value-section">
-                  <div className="conversion-main-value">
-                    {(salesData.conversionRates?.prospects || 0).toFixed(1)}%
-                  </div>
-                  
-                  <div className="conversion-details">
-                    <div className="conversion-subtitle">
-                      {salesData?.proposalStats ? 
-                        `${salesData.proposalStats.total || 0} de ${salesData?.totalLeads || 0} leads` : 
-                        'Dados não disponíveis'
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div 
-              onClick={() => openModal('vendas')} 
-              onKeyDown={(e) => e.key === 'Enter' && openModal('vendas')}
-              tabIndex={0}
-              role="button"
-              aria-label="Clique para ver detalhes das vendas realizadas"
-              className="conversion-card-enhanced"
-            >
-              <div className="conversion-card-content">
-                <div className="conversion-header">
-                  <h4 className="conversion-title">Conversão em Vendas</h4>
-                  <div className="click-indicator">
-                    <span className="click-text">Ver detalhes</span>
-                    <div className="click-arrow">→</div>
-                  </div>
-                </div>
-                
-                <div className="conversion-value-section">
-                  <div className="conversion-main-value">
-                    {(salesData.conversionRates?.sales || 0).toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Modal para tabelas detalhadas */}
       <DetailModal
