@@ -401,6 +401,183 @@ export class GranularAPI {
   }
 
   /**
+   * 🚀 BUSCAR INSIGHTS COM BREAKDOWNS (GÊNERO)
+   * Usa o endpoint de insights com parâmetro de breakdown para gênero
+   */
+  static async getFacebookInsightsWithBreakdowns(campaignIds = [], dateRange = null) {
+    try {
+      const since = dateRange?.start || '2025-06-01';
+      const until = dateRange?.end || '2025-06-09';
+      
+      console.log(`🎯 Buscando insights com breakdown de gênero`);
+      
+      // Usar endpoint com level=campaign e breakdown=gender
+      const params = new URLSearchParams({
+        level: 'campaign',
+        breakdowns: 'gender',
+        since,
+        until
+      });
+      
+      const response = await fetch(`${API_URL}/facebook-ads/insights?${params}`);
+      const data = await response.json();
+      
+      console.log('✅ Insights com breakdown de gênero:', data);
+      
+      // Processar dados de gênero
+      const genderData = this.processGenderData(data);
+      
+      // Retornar apenas dados de gênero reais
+      return {
+        genderData,
+        cityData: [] // Não usar mais dados de cidade
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar insights com breakdowns:', error);
+      return {
+        genderData: [],
+        cityData: [],
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 🔧 PROCESSAR DADOS DE GÊNERO
+   * Agrupa e processa os dados de gênero do response da API
+   */
+  static processGenderData(response) {
+    const genderMap = new Map();
+    
+    if (response && response.data && Array.isArray(response.data)) {
+      response.data.forEach(item => {
+        if (item.gender) {
+          // Extrair leads das actions
+          let leads = 0;
+          if (item.actions) {
+            const leadAction = item.actions.find(a => a.action_type === 'lead');
+            if (leadAction) {
+              leads = parseInt(leadAction.value || 0);
+            }
+          }
+          
+          // Mapear nome do gênero
+          const genderName = item.gender === 'male' ? 'Masculino' : 
+                           item.gender === 'female' ? 'Feminino' : 
+                           'Não informado';
+          
+          // Agregar dados por gênero
+          const current = genderMap.get(genderName) || { 
+            name: genderName,
+            value: 0,
+            impressions: 0,
+            spend: 0
+          };
+          
+          current.value += leads;
+          current.impressions += parseInt(item.impressions || 0);
+          current.spend += parseFloat(item.spend || 0);
+          
+          genderMap.set(genderName, current);
+        }
+      });
+    }
+    
+    // Converter para array e ordenar por quantidade de leads
+    const genderData = Array.from(genderMap.values())
+      .sort((a, b) => b.value - a.value);
+    
+    console.log('📊 Dados de gênero processados:', genderData);
+    return genderData;
+  }
+
+  /**
+   * 🔧 PROCESSAR DADOS DE BREAKDOWNS (LEGACY - mantido para compatibilidade)
+   * Agrupa e processa os dados de gênero e cidade
+   */
+  static processBreakdownData(rawData, breakdowns) {
+    const result = {
+      genderData: [],
+      cityData: []
+    };
+    
+    // Mapas para agregar dados
+    const genderMap = new Map();
+    const cityMap = new Map();
+    
+    // Função helper para processar cada item de dados
+    const processDataItem = (item) => {
+      // Extrair leads das actions
+      let leads = 0;
+      if (item.actions) {
+        const leadAction = item.actions.find(a => a.action_type === 'lead');
+        if (leadAction) {
+          leads = parseInt(leadAction.value || 0);
+        }
+      }
+      
+      // Processar por gênero
+      if (item.gender && breakdowns.includes('gender')) {
+        const current = genderMap.get(item.gender) || { 
+          name: item.gender === 'male' ? 'Masculino' : item.gender === 'female' ? 'Feminino' : 'Não informado',
+          value: 0,
+          impressions: 0,
+          spend: 0
+        };
+        current.value += leads;
+        current.impressions += parseInt(item.impressions || 0);
+        current.spend += parseFloat(item.spend || 0);
+        genderMap.set(item.gender, current);
+      }
+      
+      // Processar por cidade
+      if (item.city && breakdowns.includes('city')) {
+        const current = cityMap.get(item.city) || { 
+          name: item.city,
+          value: 0,
+          impressions: 0,
+          spend: 0
+        };
+        current.value += leads;
+        current.impressions += parseInt(item.impressions || 0);
+        current.spend += parseFloat(item.spend || 0);
+        cityMap.set(item.city, current);
+      }
+    };
+    
+    // Processar dados baseado na estrutura recebida
+    if (Array.isArray(rawData)) {
+      // Dados diretos do endpoint geral
+      if (rawData.length > 0 && rawData[0].data) {
+        // Estrutura com múltiplas campanhas
+        rawData.forEach(campaign => {
+          if (campaign.data && Array.isArray(campaign.data)) {
+            campaign.data.forEach(processDataItem);
+          }
+        });
+      } else {
+        // Array direto de insights
+        rawData.forEach(processDataItem);
+      }
+    } else if (rawData.data && Array.isArray(rawData.data)) {
+      // Resposta única com array de dados
+      rawData.data.forEach(processDataItem);
+    }
+    
+    // Converter mapas para arrays e ordenar
+    result.genderData = Array.from(genderMap.values())
+      .sort((a, b) => b.value - a.value);
+    
+    result.cityData = Array.from(cityMap.values())
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5); // Top 5 cidades
+    
+    console.log('📊 Dados processados de breakdowns:', result);
+    return result;
+  }
+
+  /**
    * Retorna estrutura vazia para insights
    */
   static getEmptyInsights() {

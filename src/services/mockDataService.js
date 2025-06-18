@@ -98,14 +98,33 @@ export const MockDataService = {
     const activeLeads = Math.floor(totalLeads * (0.65 + Math.random() * 0.1)); // 65-75%
     const wonLeads = Math.floor(totalLeads * (0.10 + Math.random() * 0.1)); // 10-20%
     
+    // Calcular propostas baseado em reuniões e garantir consistência
+    const totalMeetings = Math.floor(totalLeads * (0.20 + Math.random() * 0.15)); // 20-35% dos leads viram reuniões
+    let totalProposals = Math.floor(totalMeetings * (0.40 + Math.random() * 0.20)); // 40-60% das reuniões viram propostas
+    
+    // Garantir que há pelo menos 1 proposta se há vendas
+    if (wonLeads > 0 && totalProposals < wonLeads) {
+      totalProposals = wonLeads + Math.floor(Math.random() * 5); // Pelo menos as vendas + algumas extras
+    }
+    
+    const averageDealSize = random(350000, 650000);
+    
     return {
       totalLeads,
       activeLeads,
       wonLeads,
       lostLeads: totalLeads - activeLeads - wonLeads,
       winRate: wonLeads > 0 ? (wonLeads / totalLeads * 100) : 0,
-      averageDealSize: random(350000, 650000),
-      totalRevenue: wonLeads * random(350000, 650000),
+      averageDealSize,
+      totalRevenue: wonLeads * averageDealSize, // Usar o mesmo averageDealSize para consistência
+      
+      // Adicionar estatísticas de propostas
+      proposalStats: {
+        total: totalProposals,
+        pending: Math.floor(totalProposals * 0.3),
+        approved: Math.floor(totalProposals * 0.4),
+        rejected: Math.floor(totalProposals * 0.3)
+      },
       
       // Comparação período anterior (COMPATÍVEL COM V2)
       previousTotalLeads: Math.floor(totalLeads * 0.9),
@@ -134,14 +153,20 @@ export const MockDataService = {
     // Se filtrado por corretor, retornar apenas ele
     const corretoresToShow = corretor ? [corretor] : CORRETORES;
     
-    const leadsByUser = corretoresToShow.map(name => ({
-      name,
-      value: generateTimeBasedVariation(60, 0.2),
-      active: generateTimeBasedVariation(45, 0.25),
-      meetings: generateTimeBasedVariation(18, 0.3),
-      sales: generateTimeBasedVariation(6, 0.4),
-      lost: generateTimeBasedVariation(8, 0.3)
-    }));
+    const leadsByUser = corretoresToShow.map(name => {
+      const leads = generateTimeBasedVariation(60, 0.2);
+      const meetings = Math.floor(leads * (0.20 + Math.random() * 0.15)); // 20-35% dos leads viram reuniões
+      const sales = Math.floor(meetings * (0.10 + Math.random() * 0.15)); // 10-25% das reuniões viram vendas
+      return {
+        name,
+        value: leads,
+        active: generateTimeBasedVariation(45, 0.25),
+        meetings: meetings,
+        meetingsHeld: meetings, // Propriedade consistente
+        sales: sales,
+        lost: generateTimeBasedVariation(8, 0.3)
+      };
+    });
     
     return {
       leadsByUser,
@@ -217,6 +242,10 @@ export const MockDataService = {
           profileVisits: random(200, 800)
         }
       },
+      
+      // Novos dados mockados para demografia
+      profileVisits: random(2500, 3200), // Total de visitas ao perfil
+      whatsappConversations: random(350, 450), // Conversas iniciadas pelo WhatsApp
       
       // Período anterior para comparação
       previousFacebookMetrics: {

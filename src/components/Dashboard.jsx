@@ -8,9 +8,20 @@ import './Dashboard.css';
 
 // Dashboard principal otimizado
 function Dashboard() {
+  // Função para calcular o período padrão (do dia 1 do mês atual até hoje)
+  const getDefaultPeriod = () => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    return {
+      startDate: firstDayOfMonth.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    };
+  };
+
   const [activeTab, setActiveTab] = useState('marketing');
-  const [period, setPeriod] = useState('7d');
-  const [customPeriod, setCustomPeriod] = useState({ startDate: '', endDate: '' });
+  const [period, setPeriod] = useState('current_month');
+  const [customPeriod, setCustomPeriod] = useState(getDefaultPeriod());
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
   const [corretores, setCorretores] = useState([]);
   const [selectedCorretor, setSelectedCorretor] = useState('');
@@ -117,6 +128,12 @@ function Dashboard() {
 
   // Função para calcular dias do período
   const calculateDays = () => {
+    if (period === 'current_month') {
+      const defaultPeriod = getDefaultPeriod();
+      const start = new Date(defaultPeriod.startDate);
+      const end = new Date(defaultPeriod.endDate);
+      return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    }
     if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
       const start = new Date(customPeriod.startDate);
       const end = new Date(customPeriod.endDate);
@@ -127,6 +144,9 @@ function Dashboard() {
 
   // Função para verificar se o período está válido para fazer requisição
   const isPeriodValid = () => {
+    if (period === 'current_month') {
+      return true; // Mês atual sempre é válido
+    }
     if (period === 'custom') {
       const isValid = Boolean(customPeriod.startDate && customPeriod.endDate);
       console.log('📅 Validando período customizado:', { period, customPeriod, isValid });
@@ -152,19 +172,26 @@ function Dashboard() {
           const days = calculateDays();
           const params = { days };
           
-          // Se for período customizado, enviar datas específicas
-          if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          // Se for período customizado ou mês atual, enviar datas específicas
+          let customDates = null;
+          if (period === 'current_month') {
+            const defaultPeriod = getDefaultPeriod();
+            params.start_date = defaultPeriod.startDate;
+            params.end_date = defaultPeriod.endDate;
+            customDates = {
+              start_date: defaultPeriod.startDate,
+              end_date: defaultPeriod.endDate
+            };
+          } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
             params.start_date = customPeriod.startDate;
             params.end_date = customPeriod.endDate;
+            customDates = {
+              start_date: customPeriod.startDate,
+              end_date: customPeriod.endDate
+            };
           }
           
           console.log('🚀 Carregando dados GRANULARES V2 de marketing...');
-          
-          // Preparar datas customizadas se período for custom
-          const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
-            start_date: customPeriod.startDate,
-            end_date: customPeriod.endDate
-          } : null;
           
           // CARREGAMENTO PARALELO: Dashboard geral + Insights de campanhas Facebook
           const [marketingResult, facebookCampaigns] = await Promise.all([
@@ -224,11 +251,20 @@ function Dashboard() {
           const days = calculateDays();
           
           // Não mostrar loading no auto-refresh para não atrapalhar a UX
-          // Preparar datas customizadas se período for custom
-          const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
-            start_date: customPeriod.startDate,
-            end_date: customPeriod.endDate
-          } : null;
+          // Preparar datas customizadas se período for custom ou mês atual
+          let customDates = null;
+          if (period === 'current_month') {
+            const defaultPeriod = getDefaultPeriod();
+            customDates = {
+              start_date: defaultPeriod.startDate,
+              end_date: defaultPeriod.endDate
+            };
+          } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+            customDates = {
+              start_date: customPeriod.startDate,
+              end_date: customPeriod.endDate
+            };
+          }
           
           if (activeTab === 'marketing') {
             const marketingResult = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
@@ -281,19 +317,26 @@ function Dashboard() {
           const days = calculateDays();
           const params = { days };
           
-          // Se for período customizado, enviar datas específicas
-          if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          // Se for período customizado ou mês atual, enviar datas específicas
+          let customDates = null;
+          if (period === 'current_month') {
+            const defaultPeriod = getDefaultPeriod();
+            params.start_date = defaultPeriod.startDate;
+            params.end_date = defaultPeriod.endDate;
+            customDates = {
+              start_date: defaultPeriod.startDate,
+              end_date: defaultPeriod.endDate
+            };
+          } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
             params.start_date = customPeriod.startDate;
             params.end_date = customPeriod.endDate;
+            customDates = {
+              start_date: customPeriod.startDate,
+              end_date: customPeriod.endDate
+            };
           }
           
           console.log('🚀 Carregando dados GRANULARES V2 de vendas...');
-          
-          // Preparar datas customizadas se período for custom
-          const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
-            start_date: customPeriod.startDate,
-            end_date: customPeriod.endDate
-          } : null;
           
           // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO!
           const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);

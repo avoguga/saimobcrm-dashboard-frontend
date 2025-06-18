@@ -37,6 +37,13 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
+  
+  // Estados para dados demográficos
+  const [demographicData, setDemographicData] = useState({
+    genderData: [],
+    cityData: []
+  });
+  const [loadingDemographics, setLoadingDemographics] = useState(false);
 
   // Constantes de responsividade
   const isMobile = windowSize.width < 768;
@@ -117,7 +124,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         try {
           // Preparar range de datas baseado no período selecionado
           let dateRange;
-          if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          if (period === 'current_month') {
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            dateRange = {
+              start: firstDayOfMonth.toISOString().split('T')[0],
+              end: today.toISOString().split('T')[0]
+            };
+          } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
             dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
           } else {
             // Calcular datas baseado no período
@@ -159,6 +173,75 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       updateInsightsSilently();
     }
   }, [period, customPeriod?.startDate, customPeriod?.endDate]); // Monitorar mudanças no período
+  
+  // Effect para carregar dados demográficos
+  useEffect(() => {
+    const loadDemographicData = async () => {
+      setLoadingDemographics(true);
+      try {
+        let dateRange;
+        if (period === 'current_month') {
+          const today = new Date();
+          const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          dateRange = {
+            start: firstDayOfMonth.toISOString().split('T')[0],
+            end: today.toISOString().split('T')[0]
+          };
+        } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+        } else {
+          const endDate = new Date();
+          const startDate = new Date();
+          
+          switch (period) {
+            case '7d':
+              startDate.setDate(endDate.getDate() - 7);
+              break;
+            case '30d':
+              startDate.setDate(endDate.getDate() - 30);
+              break;
+            case '60d':
+              startDate.setDate(endDate.getDate() - 60);
+              break;
+            case '90d':
+              startDate.setDate(endDate.getDate() - 90);
+              break;
+            default:
+              startDate.setDate(endDate.getDate() - 30);
+          }
+          
+          dateRange = {
+            start: startDate.toISOString().split('T')[0],
+            end: endDate.toISOString().split('T')[0]
+          };
+        }
+        
+        // Buscar dados demográficos (gênero real, cidade mockada)
+        const demographics = await GranularAPI.getFacebookInsightsWithBreakdowns(
+          selectedCampaigns.length > 0 ? selectedCampaigns : [],
+          dateRange
+        );
+        
+        setDemographicData(demographics);
+        console.log('📊 Dados demográficos carregados:', demographics);
+      } catch (error) {
+        console.error('Erro ao carregar dados demográficos:', error);
+        // Em caso de erro, usar dados mockados apenas para gênero
+        setDemographicData({
+          genderData: [
+            { name: 'Masculino', value: 427 },
+            { name: 'Feminino', value: 358 },
+            { name: 'Não informado', value: 62 }
+          ],
+          cityData: [] // Não usar dados de cidade
+        });
+      } finally {
+        setLoadingDemographics(false);
+      }
+    };
+    
+    loadDemographicData();
+  }, [period, customPeriod?.startDate, customPeriod?.endDate, selectedCampaigns]);
 
   // Filtrar dados dinamicamente sem recarregar da API
   useEffect(() => {
@@ -213,7 +296,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       try {
         // Preparar range de datas baseado no período selecionado
         let dateRange;
-        if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+        if (period === 'current_month') {
+          const today = new Date();
+          const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          dateRange = {
+            start: firstDayOfMonth.toISOString().split('T')[0],
+            end: today.toISOString().split('T')[0]
+          };
+        } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
           dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
         } else {
           // Calcular datas baseado no período
@@ -716,6 +806,12 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             <div className="period-controls" style={{ position: 'relative' }}>
               <div className="period-selector">
                 <button 
+                  className={period === 'current_month' ? 'active' : ''} 
+                  onClick={() => handlePeriodChange('current_month')}
+                >
+                  Mês Atual
+                </button>
+                <button 
                   className={period === '7d' ? 'active' : ''} 
                   onClick={() => handlePeriodChange('7d')}
                 >
@@ -962,6 +1058,30 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         )}
         
       
+      </div>
+
+      {/* Linha 7: Demografia - Gênero */}
+      <div className="dashboard-row">
+        <div className="card card-lg">
+          <div className="card-title">
+            Leads por Gênero
+            {loadingDemographics && <span className="loading-indicator"> - Carregando...</span>}
+          </div>
+          <CompactChart 
+            type="pie" 
+            data={demographicData.genderData.length > 0 ? demographicData.genderData : [
+              { name: 'Sem dados', value: 1 }
+            ]} 
+            config={{ 
+              name: 'Leads por Gênero',
+              colors: demographicData.genderData.length > 0 ? 
+                [COLORS.primary, COLORS.secondary, COLORS.light] : 
+                [COLORS.light]
+            }}
+            style={{ height: getChartHeight('medium') }}
+            loading={loadingDemographics}
+          />
+        </div>
       </div>
       
       {/* Modal de período customizado */}
