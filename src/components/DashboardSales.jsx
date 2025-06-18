@@ -1330,7 +1330,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 })()} />
               </div>
               <div className="mini-metric-title">TICKET MÉDIO</div>
-              <div className="mini-metric-subtitle">Ticket</div>
             </div>
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -1344,7 +1343,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 })()} />
               </div>
               <div className="mini-metric-title">RECEITA TOTAL</div>
-              <div className="mini-metric-subtitle">Receita</div>
             </div>
           </div>
         </div>
