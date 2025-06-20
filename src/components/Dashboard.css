@@ -507,7 +507,7 @@ body {
 /* Charts */
 .chart-container {
   flex: 1;
-  min-height: 300px;
+  min-height: 380px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1458,7 +1458,7 @@ body {
   
   /* Ajustes para gráficos em mobile */
   .chart-container {
-    min-height: 200px;
+    min-height: 280px;
   }
   
   /* Modal em mobile */

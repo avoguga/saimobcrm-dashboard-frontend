@@ -278,11 +278,11 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   // Helpers responsivos
   const getChartHeight = (size = 'medium') => {
     if (size === 'small') {
-      return isMobile ? '200px' : '240px';
+      return isMobile ? '280px' : '320px';
     } else if (size === 'medium') {
-      return isMobile ? '250px' : '300px';
+      return isMobile ? '320px' : '380px';
     } else {
-      return isMobile ? '300px' : '350px';
+      return isMobile ? '380px' : '420px';
     }
   };
 
@@ -442,13 +442,30 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         
         if (type === 'bar') {
           emptyOption = {
-            grid: { top: 20, right: 20, bottom: 40, left: 60 },
+            grid: { 
+              top: isMobile ? 30 : 20, 
+              right: isMobile ? 10 : 20, 
+              bottom: isMobile ? 80 : 40, 
+              left: isMobile ? 50 : 60 
+            },
             xAxis: {
               type: 'category',
               data: [], // Eixo vazio inicialmente
               axisLabel: { 
-                fontSize: isMobile ? 10 : 12,
-                rotate: isMobile ? 45 : 0
+                fontSize: isMobile ? 11 : 12,
+                rotate: isMobile ? 45 : 0,
+                interval: 0, // Força mostrar todos os labels
+                overflow: 'none',
+                width: isMobile ? 80 : 100,
+                rich: {
+                  a: {
+                    fontSize: isMobile ? 10 : 12,
+                    fontWeight: 'normal'
+                  }
+                }
+              },
+              axisLine: {
+                show: true
               }
             },
             yAxis: {
@@ -460,7 +477,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               data: [], // Dados vazios inicialmente
               type: 'bar',
               itemStyle: { color: config.color },
-              barWidth: isMobile ? '60%' : '70%'
+              barWidth: isMobile ? '50%' : '70%',
+              label: {
+                show: isMobile ? true : false,
+                position: 'top',
+                fontSize: isMobile ? 10 : 12,
+                fontWeight: 'bold',
+                color: '#333',
+                formatter: function(params) {
+                  return params.value;
+                }
+              }
             }],
             tooltip: {
               trigger: 'axis',
@@ -564,7 +591,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           },
           series: [{
             name: config.name || 'Data', // Use name for navigation
-            data: data.map(item => item[config.yKey])
+            data: data.map(item => item[config.yKey]),
+            label: {
+              show: isMobile ? true : false,
+              position: 'top',
+              fontSize: isMobile ? 10 : 12,
+              fontWeight: 'bold',
+              color: '#333',
+              formatter: function(params) {
+                return params.value;
+              }
+            }
           }]
         };
       } else if (type === 'pie') {
