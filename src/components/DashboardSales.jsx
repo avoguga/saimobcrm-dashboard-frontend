@@ -1690,7 +1690,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 label="Corretor"
                 options={corretores.map(corretor => ({
                   value: corretor.name,
-                  label: `${corretor.name} (${corretor.total_leads} leads)`
+                  label: corretor.name
                 }))}
                 selectedValues={selectedCorretor ? (selectedCorretor.includes(',') ? selectedCorretor.split(',') : [selectedCorretor]) : []}
                 onChange={(values) => setSelectedCorretor(values.length === 0 ? '' : values.join(','))}
