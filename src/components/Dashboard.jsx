@@ -600,9 +600,10 @@ function Dashboard() {
   return (
     <div className="dashboard-optimized">
       <div className="dashboard-header">
-        <div className="brand">
-          <h1>SA IMOB</h1>
-          <span className="subtitle">SA IMOB - Dashboard</span>
+        <div className="brand" style={{ display: 'flex', alignItems: 'center' }}>
+          <img src="/icon.png" alt="SA IMOB" style={{ width: '32px', height: '32px', marginRight: '12px' }} />
+            <h1>SA IMOB</h1>
+            <span className="subtitle">Dashboard</span>
           {isLoadingFilters && (
             <div className="filter-loading-indicator">
               <span className="loading-icon">⏳</span>
