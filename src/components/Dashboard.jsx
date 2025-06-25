@@ -46,7 +46,7 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMarketing, setIsLoadingMarketing] = useState(false);
   const [isLoadingSales, setIsLoadingSales] = useState(false);
-  const [isLoadingFilters, setIsLoadingFilters] = useState(false); // Para mudanças de filtros
+  // Removido isLoadingFilters - filtragem agora é instantânea no frontend
   const [error, setError] = useState(null);
   const [marketingData, setMarketingData] = useState(null);
   const [salesData, setSalesData] = useState(null);
@@ -165,7 +165,6 @@ function Dashboard() {
     const timeoutId = setTimeout(() => {
       const fetchMarketingData = async () => {
         setIsLoadingMarketing(true);
-        setIsLoadingFilters(true); // Indicar que filtros estão sendo aplicados
         setError(null);
         
         try {
@@ -226,7 +225,6 @@ function Dashboard() {
           setError(`Falha ao carregar dados de marketing: ${error.message}`);
         } finally {
           setIsLoadingMarketing(false);
-          setIsLoadingFilters(false); // Parar loading de filtros
           setIsLoading(false); // Loading geral só para primeira carga
         }
       };
@@ -271,7 +269,8 @@ function Dashboard() {
             setMarketingData(marketingResult);
             console.log('✅ Marketing data atualizado automaticamente');
           } else {
-            const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
+            // Carregar dados sem filtros (filtragem será feita no frontend)
+            const salesResult = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
             setSalesData(salesResult);
             console.log('✅ Sales data atualizado automaticamente');
           }
@@ -289,7 +288,7 @@ function Dashboard() {
         clearInterval(intervalId);
       }
     };
-  }, [autoRefresh, refreshInterval, activeTab, period, selectedCorretor, selectedSource, customPeriod]);
+  }, [autoRefresh, refreshInterval, activeTab, period, customPeriod]);
 
   // Hook para detectar mudança de aba e setar loading apropriado
   useEffect(() => {
@@ -310,7 +309,6 @@ function Dashboard() {
     const timeoutId = setTimeout(() => {
       const fetchSalesData = async () => {
         setIsLoadingSales(true);
-        setIsLoadingFilters(true); // Indicar que filtros estão sendo aplicados
         setError(null);
         
         try {
@@ -339,7 +337,8 @@ function Dashboard() {
           console.log('🚀 Carregando dados GRANULARES V2 de vendas...');
           
           // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO!
-          const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
+          // Carregar dados sem filtros (filtragem será feita no frontend)
+          const salesResult = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
           
           setSalesData(salesResult);
           console.log('✅ Sales dashboard carregado (GRANULAR):', salesResult);
@@ -348,7 +347,6 @@ function Dashboard() {
           setError(`Falha ao carregar dados de vendas: ${error.message}`);
         } finally {
           setIsLoadingSales(false);
-          setIsLoadingFilters(false); // Parar loading de filtros
           setIsLoading(false); // Loading geral só para primeira carga
         }
       };
@@ -357,7 +355,7 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period, selectedCorretor, selectedSource]); // REMOVIDO: customPeriod.startDate, customPeriod.endDate - filtragem apenas no Aplicar
+  }, [period]); // REMOVIDO: selectedCorretor, selectedSource - filtragem agora é apenas no frontend
 
   // Atualizar dados (só executa se período for válido)
   const refreshData = async (forceRefresh = false) => {
@@ -379,7 +377,6 @@ function Dashboard() {
     }
     
     // Sempre mostrar loading de filtros no refresh manual
-    setIsLoadingFilters(true);
     
     try {
       const days = calculateDays();
@@ -411,7 +408,8 @@ function Dashboard() {
         // Limpar cache da API granular também
         GranularAPI.clearCache();
         
-        const salesResponse = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
+        // Carregar dados sem filtros (filtragem será feita no frontend)
+        const salesResponse = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
         setSalesData(salesResponse);
       }
     } catch (error) {
@@ -445,8 +443,7 @@ function Dashboard() {
   const refreshMarketingWithCampaignFilters = async (campaignFilters = {}) => {
     try {
       setIsLoadingMarketing(true);
-      setIsLoadingFilters(true);
-      
+        
       const days = calculateDays();
       const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
         start_date: customPeriod.startDate,
@@ -520,7 +517,6 @@ function Dashboard() {
     
     setIsLoadingMarketing(true);
     setIsLoadingSales(true);
-    setIsLoadingFilters(true);
     setError(null);
     
     try {
@@ -538,10 +534,10 @@ function Dashboard() {
       console.log('📅 customDates para carregamento manual:', customDates);
       console.log('📅 Dias calculados:', days);
       
-      // Carregar dados em paralelo
+      // Carregar dados em paralelo (sem filtros - filtragem será feita no frontend)
       const [marketingResult, salesResult] = await Promise.all([
         GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
-        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
+        GranularAPI.loadSalesDashboard(days, null, null, customDates)
       ]);
       
       setMarketingData(marketingResult);
@@ -579,10 +575,10 @@ function Dashboard() {
       console.log('📅 customDates para carregamento silencioso:', customDates);
       console.log('📅 Dias calculados:', days);
       
-      // Carregar dados em paralelo (silenciosamente)
+      // Carregar dados em paralelo (silenciosamente, sem filtros - filtragem será feita no frontend)
       const [marketingResult, salesResult] = await Promise.all([
         GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
-        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
+        GranularAPI.loadSalesDashboard(days, null, null, customDates)
       ]);
       
       // Atualizar dados sem mostrar loading
@@ -604,7 +600,7 @@ function Dashboard() {
           <img src="/icon.png" alt="SA IMOB" style={{ width: '32px', height: '32px', marginRight: '12px' }} />
             <h1>SA IMOB</h1>
             <span className="subtitle">Dashboard</span>
-          {isLoadingFilters && (
+          {false && (
             <div className="filter-loading-indicator">
               <span className="loading-icon">⏳</span>
               <span className="loading-text">Aplicando filtros...</span>
@@ -654,11 +650,11 @@ function Dashboard() {
           <button 
             className="action-button" 
             onClick={() => refreshData(true)} 
-            disabled={isLoadingMarketing || isLoadingSales || isLoadingFilters}
+            disabled={isLoadingMarketing || isLoadingSales}
             title="Atualizar dados (limpar cache)"
           >
-            <span className="icon">{(isLoadingMarketing || isLoadingSales || isLoadingFilters) ? '⏳' : '🔄'}</span> 
-            {(isLoadingMarketing || isLoadingSales || isLoadingFilters) ? 'Atualizando...' : 'Refresh Cache'}
+            <span className="icon">{(isLoadingMarketing || isLoadingSales) ? '⏳' : '🔄'}</span> 
+            {(isLoadingMarketing || isLoadingSales) ? 'Atualizando...' : 'Refresh Cache'}
           </button>
         </div>
       </div>
@@ -680,7 +676,7 @@ function Dashboard() {
           data={marketingData}
           salesData={salesData}
           isLoading={isLoadingMarketing}
-          isUpdating={isLoadingFilters}
+          isUpdating={false}
           customPeriod={customPeriod}
           setCustomPeriod={setCustomPeriod}
           showCustomPeriod={showCustomPeriod}
@@ -702,7 +698,7 @@ function Dashboard() {
           sourceOptions={sourceOptions}
           data={salesData}
           isLoading={isLoadingSales}
-          isUpdating={isLoadingFilters}
+          isUpdating={false}
           customPeriod={customPeriod}
           setCustomPeriod={setCustomPeriod}
           showCustomPeriod={showCustomPeriod}

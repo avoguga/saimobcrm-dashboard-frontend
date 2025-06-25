@@ -362,10 +362,100 @@ const TrendIndicator = ({ value, showZero = false }) => {
   );
 };
 
+// Componente MultiSelectFilter
+const MultiSelectFilter = ({ label, options, selectedValues, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Fechar dropdown quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleToggleOption = (value) => {
+    const newSelectedValues = selectedValues.includes(value)
+      ? selectedValues.filter(v => v !== value)
+      : [...selectedValues, value];
+    
+    onChange(newSelectedValues);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedValues.length === options.length) {
+      onChange([]);
+    } else {
+      onChange(options.map(option => option.value));
+    }
+  };
+
+  const getDisplayText = () => {
+    if (selectedValues.length === 0) return placeholder;
+    if (selectedValues.length === 1) {
+      const option = options.find(opt => opt.value === selectedValues[0]);
+      return option?.label || selectedValues[0];
+    }
+    return `${selectedValues.length} selecionados`;
+  };
+
+  return (
+    <div className="multi-select-container" ref={dropdownRef}>
+      <label className="filter-label">{label}:</label>
+      <div className="multi-select-wrapper">
+        <button
+          type="button"
+          className="multi-select-button"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          <span className="multi-select-text">{getDisplayText()}</span>
+          <span className={`multi-select-arrow ${isOpen ? 'open' : ''}`}>▼</span>
+        </button>
+
+        {isOpen && (
+          <div className="multi-select-dropdown">
+            <div className="multi-select-option select-all" onClick={handleSelectAll}>
+              <input
+                type="checkbox"
+                checked={selectedValues.length === options.length}
+                readOnly
+              />
+              <span>Selecionar Todos</span>
+            </div>
+            <div className="multi-select-divider"></div>
+            {options.map((option) => (
+              <div
+                key={option.value}
+                className={`multi-select-option ${selectedValues.includes(option.value) ? 'selected' : ''}`}
+                onClick={() => handleToggleOption(option.value)}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedValues.includes(option.value)}
+                  readOnly
+                />
+                <span>{option.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
   console.log('🔄 DashboardSales renderizando - showCustomPeriod:', showCustomPeriod);
   
-  const [salesData, setSalesData] = useState(data);
+  const [rawSalesData, setRawSalesData] = useState(data); // Dados originais sem filtro
+  const [salesData, setSalesData] = useState(data); // Dados filtrados
   const [comparisonData, setComparisonData] = useState(null);
   
   // Estado do modal usando ref para não causar re-renders
@@ -397,12 +487,59 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     });
   }, [customPeriod, showCustomPeriod, period]);
 
+  // Função para filtrar dados no frontend (INSTANTÂNEO)
+  const filterSalesData = useMemo(() => {
+    if (!rawSalesData) return null;
+
+    // Se não há filtros selecionados, retorna dados originais
+    if (!selectedCorretor && !selectedSource) {
+      return rawSalesData;
+    }
+
+    const filteredData = { ...rawSalesData };
+
+    // Filtrar leadsByUser por corretor selecionado
+    if (selectedCorretor && filteredData.leadsByUser) {
+      const selectedCorretores = selectedCorretor.includes(',') 
+        ? selectedCorretor.split(',').map(c => c.trim())
+        : [selectedCorretor.trim()];
+
+      filteredData.leadsByUser = filteredData.leadsByUser.filter(user => 
+        selectedCorretores.includes(user.name)
+      );
+    }
+
+    // Filtro por fonte será implementado conforme estrutura dos dados
+    // Para agora, manter todas as fontes pois filtragem de fonte será feita
+    // principalmente nas tabelas detalhadas e análises específicas
+
+    // Recalcular KPIs baseados nos dados filtrados
+    if (filteredData.leadsByUser && filteredData.leadsByUser.length > 0) {
+      // Recalcular totais baseados nos corretores filtrados
+      const filteredTotalLeads = filteredData.leadsByUser.reduce((sum, user) => sum + (user.value || 0), 0);
+      const filteredTotalMeetings = filteredData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || user.meetings || 0), 0);
+      const filteredTotalSales = filteredData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0);
+
+      // Atualizar KPIs filtrados
+      filteredData.totalLeads = filteredTotalLeads;
+      filteredData.activeLeads = filteredTotalLeads; // Assumindo que leads ativos = total leads para simplificar
+      filteredData.wonLeads = filteredTotalSales;
+    }
+
+    return filteredData;
+  }, [rawSalesData, selectedCorretor, selectedSource]);
+
   // Atualizar dados quando recebidos do cache
   useEffect(() => {
     if (data) {
-      setSalesData(data);
+      setRawSalesData(data);
     }
   }, [data]);
+
+  // Atualizar dados filtrados quando filtros mudarem (INSTANTÂNEO - sem loading)
+  useEffect(() => {
+    setSalesData(filterSalesData);
+  }, [filterSalesData]);
 
   // Criar dados de comparação usando os campos V2 que já vêm nos KPIs
   useEffect(() => {
@@ -475,8 +612,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.days = periodToDays[period] || 30;
       }
 
-      // Usar o corretor específico clicado, mantendo a fonte selecionada
-      const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource, extraParams);
+      // Usar o corretor específico clicado, sem filtros de backend (dados já filtrados no frontend)
+      const tablesData = await KommoAPI.getDetailedTables(corretorName, '', extraParams);
       
       const dataMap = {
         'leads': tablesData.leadsDetalhes || [], // Usar leadsDetalhes direto do backend
@@ -547,7 +684,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.days = periodToDays[period] || 30;
       }
 
-      const tablesData = await KommoAPI.getDetailedTables(selectedCorretor, selectedSource, extraParams);
+      // Buscar dados sem filtros de backend (filtragem será feita no frontend)
+      const tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       
       const dataMap = {
         'reunioes': tablesData.reunioesDetalhes || [],
@@ -1319,6 +1457,228 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             font-size: 13px;
           }
         }
+
+        /* Estilos para MultiSelectFilter */
+        .multi-select-container {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          position: relative;
+          min-width: 200px;
+        }
+
+        .multi-select-wrapper {
+          position: relative;
+        }
+
+        .multi-select-button {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 10px 12px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 14px;
+          color: #2d3748;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-height: 42px;
+        }
+
+        .multi-select-button:hover {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+        }
+
+        .multi-select-button:focus {
+          outline: none;
+          border-color: #4E5859;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
+        }
+
+        .multi-select-text {
+          flex: 1;
+          text-align: left;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .multi-select-arrow {
+          margin-left: 8px;
+          font-size: 12px;
+          transition: transform 0.2s ease;
+          transform-origin: center;
+        }
+
+        .multi-select-arrow.open {
+          transform: rotate(180deg);
+        }
+
+        .multi-select-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+          max-height: 250px;
+          overflow-y: auto;
+          margin-top: 2px;
+        }
+
+        .multi-select-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          cursor: pointer;
+          transition: background-color 0.15s ease;
+          font-size: 14px;
+        }
+
+        .multi-select-option:hover {
+          background-color: #f7fafc;
+        }
+
+        .multi-select-option.selected {
+          background-color: rgba(78, 88, 89, 0.1);
+          color: #4E5859;
+          font-weight: 500;
+        }
+
+        .multi-select-option.select-all {
+          background-color: #f8f9fa;
+          font-weight: 600;
+          color: #4E5859;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .multi-select-option.select-all:hover {
+          background-color: #e9ecef;
+        }
+
+        .multi-select-divider {
+          height: 1px;
+          background-color: #e2e8f0;
+          margin: 0;
+        }
+
+        .multi-select-option input[type="checkbox"] {
+          margin: 0;
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .multi-select-option span {
+          flex: 1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* Responsividade para MultiSelectFilter */
+        @media (max-width: 768px) {
+          .multi-select-container {
+            min-width: 150px;
+          }
+          
+          .multi-select-button {
+            padding: 8px 10px;
+            font-size: 13px;
+            min-height: 38px;
+          }
+          
+          .multi-select-option {
+            padding: 8px 10px;
+            font-size: 13px;
+          }
+          
+          .multi-select-dropdown {
+            max-height: 200px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .filters-group {
+            flex-direction: column;
+            gap: 12px;
+          }
+          
+          .multi-select-container {
+            min-width: unset;
+          }
+        }
+
+        /* Estilos para o indicador de filtros ativos */
+        .filter-indicator {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          background: rgba(78, 88, 89, 0.1);
+          border: 2px solid #4E5859;
+          border-radius: 8px;
+          font-size: 14px;
+          color: #4E5859;
+          font-weight: 600;
+          white-space: nowrap;
+          margin-left: 8px;
+        }
+
+        .filter-icon {
+          font-size: 16px;
+        }
+
+        .filter-text {
+          font-size: 13px;
+        }
+
+        .clear-filters-btn {
+          background: none;
+          border: none;
+          color: #4E5859;
+          font-size: 18px;
+          font-weight: bold;
+          cursor: pointer;
+          padding: 0;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: all 0.2s ease;
+        }
+
+        .clear-filters-btn:hover {
+          background: rgba(78, 88, 89, 0.2);
+          transform: scale(1.1);
+        }
+
+        /* Responsividade para indicador de filtros */
+        @media (max-width: 768px) {
+          .filter-indicator {
+            padding: 6px 10px;
+            font-size: 12px;
+            margin-left: 0;
+            margin-top: 8px;
+          }
+          
+          .filter-icon {
+            font-size: 14px;
+          }
+          
+          .filter-text {
+            font-size: 12px;
+          }
+        }
       `}</style>
 
       <div className="dashboard-row row-header">
@@ -1326,36 +1686,42 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           <h2>Dashboard de Vendas</h2>
           <div className="dashboard-controls">
             <div className="filters-group">
-              <div className="corretor-selector">
-                <label className="filter-label">Corretor:</label>
-                <select 
-                  value={selectedCorretor} 
-                  onChange={(e) => setSelectedCorretor(e.target.value)}
-                  className="corretor-select"
-                >
-                  <option value="">Todos os Corretores</option>
-                  {corretores.map(corretor => (
-                    <option key={corretor.name} value={corretor.name}>
-                      {corretor.name} ({corretor.total_leads} leads)
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <MultiSelectFilter 
+                label="Corretor"
+                options={corretores.map(corretor => ({
+                  value: corretor.name,
+                  label: `${corretor.name} (${corretor.total_leads} leads)`
+                }))}
+                selectedValues={selectedCorretor ? (selectedCorretor.includes(',') ? selectedCorretor.split(',') : [selectedCorretor]) : []}
+                onChange={(values) => setSelectedCorretor(values.length === 0 ? '' : values.join(','))}
+                placeholder="Todos os Corretores"
+              />
               
-              <div className="source-selector">
-                <label className="filter-label">Fonte:</label>
-                <select 
-                  value={selectedSource} 
-                  onChange={(e) => setSelectedSource(e.target.value)}
-                  className="source-select"
-                >
-                  {sourceOptions.map(source => (
-                    <option key={source.value} value={source.value}>
-                      {source.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <MultiSelectFilter 
+                label="Fonte"
+                options={sourceOptions}
+                selectedValues={selectedSource ? (selectedSource.includes(',') ? selectedSource.split(',') : [selectedSource]) : []}
+                onChange={(values) => setSelectedSource(values.length === 0 ? '' : values.join(','))}
+                placeholder="Todas as Fontes"
+              />
+
+              {/* Indicador de filtros ativos */}
+              {(selectedCorretor || selectedSource) && (
+                <div className="filter-indicator">
+                  <span className="filter-icon">🔍</span>
+                  <span className="filter-text">Filtros Ativos</span>
+                  <button 
+                    className="clear-filters-btn"
+                    onClick={() => {
+                      setSelectedCorretor('');
+                      setSelectedSource('');
+                    }}
+                    title="Limpar todos os filtros"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
             <div className="period-controls" style={{ position: 'relative' }}>
               <div className="period-selector">

@@ -82,6 +82,7 @@ export class GranularAPI {
           console.log('📅 Usando período em dias:', days);
         }
         
+        // Suporta múltiplas seleções separadas por vírgula
         if (corretor) params.append('corretor', corretor);
         if (fonte) params.append('fonte', fonte);
 

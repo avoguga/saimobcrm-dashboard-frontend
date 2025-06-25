@@ -179,6 +179,7 @@ export const KommoAPI = {
    */
   async getSalesComparison(corretor = null, fonte = null) {
     const params = {};
+    // Suporta múltiplas seleções separadas por vírgula
     if (corretor && corretor.trim() !== '') {
       params.corretor = corretor;
     }
@@ -196,11 +197,13 @@ export const KommoAPI = {
     const params = { ...extraParams };
     
     // Aplicar filtro de corretor se especificado
+    // Suporta múltiplas seleções separadas por vírgula
     if (corretor && corretor.trim() !== '') {
       params.corretor = corretor;
     }
     
-    // Aplicar filtro de fonte se especificado
+    // Aplicar filtro de fonte se especificado  
+    // Suporta múltiplas seleções separadas por vírgula
     if (fonte && fonte.trim() !== '') {
       params.fonte = fonte;
     }
