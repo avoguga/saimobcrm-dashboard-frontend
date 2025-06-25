@@ -28,20 +28,8 @@ function Dashboard() {
   const [selectedSource, setSelectedSource] = useState('');
   const [sourceOptions, setSourceOptions] = useState([{ value: '', label: 'Todas as Fontes' }]);
   
-  // Debug: Log mudanças no sourceOptions
-  useEffect(() => {
-    console.log('🔄 sourceOptions state atualizado:', sourceOptions);
-  }, [sourceOptions]);
 
-  // Debug: Log mudanças no estado showCustomPeriod
-  useEffect(() => {
-    console.log('🎛️ showCustomPeriod state mudou:', showCustomPeriod);
-  }, [showCustomPeriod]);
 
-  // Debug: Log mudanças no estado customPeriod
-  useEffect(() => {
-    console.log('📅 customPeriod state mudou:', customPeriod);
-  }, [customPeriod]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMarketing, setIsLoadingMarketing] = useState(false);
@@ -84,7 +72,6 @@ function Dashboard() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        console.log('🚀 Iniciando carregamento de dados iniciais...');
         
         // Carregar corretores e fontes em paralelo
         const [corretoresResponse, sourceOptionsResponse] = await Promise.all([
@@ -92,27 +79,19 @@ function Dashboard() {
           KommoAPI.getSourceOptions()
         ]);
         
-        console.log('📋 Respostas recebidas:', { corretoresResponse, sourceOptionsResponse });
         
         if (corretoresResponse?.corretores) {
           setCorretores(corretoresResponse.corretores);
         }
         
-        console.log('🔍 sourceOptionsResponse recebido:', sourceOptionsResponse);
-        console.log('🔍 É array?', Array.isArray(sourceOptionsResponse));
         
         if (sourceOptionsResponse && Array.isArray(sourceOptionsResponse)) {
-          console.log('✅ Atualizando sourceOptions com:', sourceOptionsResponse);
           setSourceOptions(sourceOptionsResponse);
-          console.log('📋 Opções de fonte definidas no estado');
         } else {
-          console.warn('⚠️ sourceOptionsResponse inválido, mantendo fallback');
         }
       } catch (error) {
-        console.error('💥 Erro ao carregar dados iniciais:', error);
         
         // Em caso de erro, garantir que pelo menos o fallback seja definido
-        console.log('🆘 Aplicando fallback de emergência para sourceOptions');
         setSourceOptions([
           { value: '', label: 'Todas as Fontes' },
           { value: 'Google', label: 'Google' },
@@ -148,9 +127,7 @@ function Dashboard() {
       return true; // Mês atual sempre é válido
     }
     if (period === 'custom') {
-      const isValid = Boolean(customPeriod.startDate && customPeriod.endDate);
-      console.log('📅 Validando período customizado:', { period, customPeriod, isValid });
-      return isValid;
+      return Boolean(customPeriod.startDate && customPeriod.endDate);
     }
     return Boolean(period && period !== 'custom');
   };
@@ -190,7 +167,6 @@ function Dashboard() {
             };
           }
           
-          console.log('🚀 Carregando dados GRANULARES V2 de marketing...');
           
           // CARREGAMENTO PARALELO: Dashboard geral + Insights de campanhas Facebook
           const [marketingResult, facebookCampaigns] = await Promise.all([
@@ -208,7 +184,6 @@ function Dashboard() {
             } : null;
             
             campaignInsights = await GranularAPI.getFacebookCampaignInsights(allCampaignIds, dateRange);
-            console.log('✅ Insights de campanhas carregados automaticamente:', campaignInsights);
           }
           
           // Integrar insights das campanhas nos dados do marketing
@@ -219,9 +194,7 @@ function Dashboard() {
           };
           
           setMarketingData(enrichedMarketingData);
-          console.log('✅ Marketing dashboard carregado (GRANULAR + Campanhas):', enrichedMarketingData);
         } catch (error) {
-          console.error('Erro ao carregar dados de marketing:', error);
           setError(`Falha ao carregar dados de marketing: ${error.message}`);
         } finally {
           setIsLoadingMarketing(false);
@@ -240,10 +213,8 @@ function Dashboard() {
     let intervalId = null;
     
     if (autoRefresh && isPeriodValid()) {
-      console.log(`🔄 Iniciando auto-refresh a cada ${refreshInterval} segundos`);
       
       intervalId = setInterval(async () => {
-        console.log('🔄 Auto-refresh executando...');
         
         try {
           const days = calculateDays();
@@ -267,24 +238,20 @@ function Dashboard() {
           if (activeTab === 'marketing') {
             const marketingResult = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
             setMarketingData(marketingResult);
-            console.log('✅ Marketing data atualizado automaticamente');
           } else {
             // Carregar dados sem filtros (filtragem será feita no frontend)
             const salesResult = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
             setSalesData(salesResult);
-            console.log('✅ Sales data atualizado automaticamente');
           }
           
           setLastUpdate(new Date());
         } catch (error) {
-          console.error('💥 Erro no auto-refresh:', error);
         }
       }, refreshInterval * 1000);
     }
     
     return () => {
       if (intervalId) {
-        console.log('🛑 Parando auto-refresh');
         clearInterval(intervalId);
       }
     };
@@ -334,16 +301,13 @@ function Dashboard() {
             };
           }
           
-          console.log('🚀 Carregando dados GRANULARES V2 de vendas...');
           
           // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO!
           // Carregar dados sem filtros (filtragem será feita no frontend)
           const salesResult = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
           
           setSalesData(salesResult);
-          console.log('✅ Sales dashboard carregado (GRANULAR):', salesResult);
         } catch (error) {
-          console.error('Erro ao carregar dados de vendas:', error);
           setError(`Falha ao carregar dados de vendas: ${error.message}`);
         } finally {
           setIsLoadingSales(false);
@@ -360,14 +324,12 @@ function Dashboard() {
   // Atualizar dados (só executa se período for válido)
   const refreshData = async (forceRefresh = false) => {
     if (!isPeriodValid()) {
-      console.log('Período inválido, não atualizando dados');
       return;
     }
 
     // Limpar cache se for refresh forçado
     if (forceRefresh) {
       KommoAPI.clearCache();
-      console.log('🔄 Refresh forçado - cache limpo');
     }
 
     if (activeTab === 'marketing') {
@@ -388,7 +350,6 @@ function Dashboard() {
         params.end_date = customPeriod.endDate;
       }
       
-      console.log('🔄 Atualizando dados...', { activeTab, days, selectedCorretor, selectedSource });
       
       // Preparar datas customizadas se período for custom
       const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
@@ -397,14 +358,12 @@ function Dashboard() {
       } : null;
       
       if (activeTab === 'marketing') {
-        console.log('🚀 Refresh GRANULAR V2 marketing...');
         // Limpar cache da API granular também
         GranularAPI.clearCache();
         
         const marketingResponse = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
         setMarketingData(marketingResponse);
       } else {
-        console.log('🚀 Refresh GRANULAR V2 vendas...');
         // Limpar cache da API granular também
         GranularAPI.clearCache();
         
@@ -413,7 +372,6 @@ function Dashboard() {
         setSalesData(salesResponse);
       }
     } catch (error) {
-      console.error('Erro ao atualizar dados:', error);
       setError(`Não foi possível atualizar os dados: ${error.message}`);
     } finally {
       if (activeTab === 'marketing') {
@@ -427,15 +385,12 @@ function Dashboard() {
 
   // Função para lidar com mudança de período
   const handlePeriodChange = (newPeriod) => {
-    console.log('🔄 Mudando período:', { from: period, to: newPeriod });
     setPeriod(newPeriod);
     if (newPeriod !== 'custom') {
       setShowCustomPeriod(false);
       setCustomPeriod({ startDate: '', endDate: '' });
-      console.log('📅 Período padrão selecionado, fechando modal custom');
     } else {
       setShowCustomPeriod(true);
-      console.log('📅 Período custom selecionado, abrindo modal custom');
     }
   };
 
@@ -450,7 +405,6 @@ function Dashboard() {
         end_date: customPeriod.endDate
       } : null;
       
-      console.log('🚀 Atualizando marketing com filtros de campanha:', campaignFilters);
       
       const marketingResponse = await GranularAPI.loadMarketingDashboard(
         days, 
@@ -459,10 +413,8 @@ function Dashboard() {
         campaignFilters
       );
       setMarketingData(marketingResponse);
-      console.log('✅ Marketing data atualizado com filtros de campanha');
       
     } catch (error) {
-      console.error('Erro ao atualizar marketing com campanhas:', error);
       setError(`Erro ao aplicar filtros de campanha: ${error.message}`);
     } finally {
       setIsLoadingMarketing(false);
@@ -475,8 +427,6 @@ function Dashboard() {
     // Usar dados passados ou dados do estado
     const dataToUse = periodData || customPeriod;
     
-    console.log('📅 applyCustomPeriod chamado com:', periodData);
-    console.log('📅 Dados sendo usados:', dataToUse);
     
     if (dataToUse.startDate && dataToUse.endDate) {
       // Se dados vieram do modal, atualizar estado
@@ -495,13 +445,10 @@ function Dashboard() {
       
       // Fechar o modal
       setShowCustomPeriod(false);
-      console.log('📅 Período customizado aplicado:', dataToUse);
-      console.log('📅 Calculando dias:', Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
       
       // Carregar dados silenciosamente (sem loading) usando os dados corretos
       await loadCustomPeriodDataSilent(dataToUse);
     } else {
-      console.log('❌ Dados inválidos:', dataToUse);
       alert('Por favor, selecione ambas as datas');
     }
   };
@@ -513,7 +460,6 @@ function Dashboard() {
 
   // Função para carregar dados usando período específico (com loading)
   const loadCustomPeriodDataWithPeriod = async (periodData) => {
-    console.log('🚀 Carregando dados do período customizado com:', periodData);
     
     setIsLoadingMarketing(true);
     setIsLoadingSales(true);
@@ -531,8 +477,6 @@ function Dashboard() {
         end_date: periodData.endDate
       };
       
-      console.log('📅 customDates para carregamento manual:', customDates);
-      console.log('📅 Dias calculados:', days);
       
       // Carregar dados em paralelo (sem filtros - filtragem será feita no frontend)
       const [marketingResult, salesResult] = await Promise.all([
@@ -543,9 +487,7 @@ function Dashboard() {
       setMarketingData(marketingResult);
       setSalesData(salesResult);
       
-      console.log('✅ Dados do período customizado carregados com sucesso');
     } catch (error) {
-      console.error('💥 Erro ao carregar dados do período customizado:', error);
       setError(`Falha ao carregar dados: ${error.message}`);
     } finally {
       setIsLoadingMarketing(false);
@@ -556,7 +498,6 @@ function Dashboard() {
 
   // Função para carregar dados silenciosamente (sem loading) - similar ao auto-refresh
   const loadCustomPeriodDataSilent = async (periodData) => {
-    console.log('🔄 Carregando dados do período customizado silenciosamente:', periodData);
     
     // NÃO mostrar loading - atualização silenciosa como auto-refresh
     
@@ -572,8 +513,6 @@ function Dashboard() {
         end_date: periodData.endDate
       };
       
-      console.log('📅 customDates para carregamento silencioso:', customDates);
-      console.log('📅 Dias calculados:', days);
       
       // Carregar dados em paralelo (silenciosamente, sem filtros - filtragem será feita no frontend)
       const [marketingResult, salesResult] = await Promise.all([
@@ -585,11 +524,8 @@ function Dashboard() {
       setMarketingData(marketingResult);
       setSalesData(salesResult);
       
-      console.log('✅ Dados do período customizado carregados silenciosamente');
     } catch (error) {
-      console.error('💥 Erro ao carregar dados do período customizado silenciosamente:', error);
       // Não mostrar erro em loading silencioso
-      console.warn('⚠️ Falha no carregamento silencioso, mantendo dados atuais');
     }
   };
 

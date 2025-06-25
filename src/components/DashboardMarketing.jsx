@@ -49,17 +49,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   const isMobile = windowSize.width < 768;
   const isSmallMobile = windowSize.width < 480;
 
-  // Debug: Verificar se os props estão chegando corretamente
-  useEffect(() => {
-    console.log('🔍 DashboardMarketing props:', { 
-      customPeriod, 
-      showCustomPeriod, 
-      period,
-      setCustomPeriod: typeof setCustomPeriod,
-      setShowCustomPeriod: typeof setShowCustomPeriod,
-      applyCustomPeriod: typeof applyCustomPeriod
-    });
-  }, [customPeriod, showCustomPeriod, period]);
+  // Effect to track props changes
 
   // Usar dados que vêm do componente pai (Dashboard.jsx)
   useEffect(() => {
@@ -83,7 +73,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     
     if (data && data.campaignInsights) {
       setCampaignInsights(data.campaignInsights);
-      console.log('✅ Usando insights que vieram do Dashboard.jsx:', data.campaignInsights);
     }
   }, [data]);
 
@@ -113,12 +102,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   useEffect(() => {
     // Só executar se há campanhas selecionadas e o período mudou
     if (selectedCampaigns.length > 0 && period) {
-      console.log('📅 Período mudou, atualizando insights das campanhas selecionadas:', { 
-        period, 
-        customPeriod, 
-        selectedCampaigns: selectedCampaigns.length 
-      });
-      
       // Função assíncrona para atualizar insights sem mostrar loading
       const updateInsightsSilently = async () => {
         try {
@@ -164,9 +147,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           // Carregar insights sem mostrar loading (similar ao auto-refresh)
           const insights = await GranularAPI.getFacebookCampaignInsights(selectedCampaigns, dateRange);
           setCampaignInsights(insights);
-          console.log('✅ Insights de campanhas atualizados silenciosamente:', insights);
         } catch (error) {
-          console.error('Erro ao atualizar insights de campanhas:', error);
+          // Error handled silently
         }
       };
       
@@ -223,9 +205,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         );
         
         setDemographicData(demographics);
-        console.log('📊 Dados demográficos carregados:', demographics);
       } catch (error) {
-        console.error('Erro ao carregar dados demográficos:', error);
+        // Error handled, fallback to mock data
         // Em caso de erro, usar dados mockados apenas para gênero
         setDemographicData({
           genderData: [
@@ -335,12 +316,10 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         
         const insights = await GranularAPI.getFacebookCampaignInsights(newFilters.campaignIds, dateRange);
         setCampaignInsights(insights);
-        console.log('✅ Insights de campanhas carregados:', insights);
         
         // REMOVIDO: onDataRefresh para evitar re-render desnecessário
         // Os insights já são suficientes para mostrar os dados filtrados
       } catch (error) {
-        console.error('Erro ao carregar insights de campanhas:', error);
         setCampaignInsights(null);
       } finally {
         setLoadingInsights(false);
@@ -348,7 +327,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     } else {
       // Se não há campanhas selecionadas, apenas limpar insights
       setCampaignInsights(null);
-      console.log('✅ Filtros de campanha limpos, usando dados gerais');
     }
   };
 
@@ -788,7 +766,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                                     campaignIds: []
                                   });
                                   setCampaignInsights(null); // Limpar insights apenas
-                                  console.log('✅ Todas as campanhas desmarcadas, usando dados gerais');
                                 } else {
                                   // Se nem todas estão selecionadas, selecionar todas
                                   const allCampaignIds = campaigns.map(c => c.id);
@@ -812,7 +789,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                                   campaignIds: []
                                 });
                                 setCampaignInsights(null); // Limpar insights apenas
-                                console.log('✅ Filtros de campanha limpos (botão Limpar)');
                               }}
                             >
                               Limpar

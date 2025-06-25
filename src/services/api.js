@@ -40,7 +40,6 @@ export const KommoAPI = {
    */
   clearCache() {
     this._cache.clear();
-    console.log('🗑️ Cache da API limpo');
   },
 
   /**
@@ -51,8 +50,6 @@ export const KommoAPI = {
       const url = new URL(`${API_URL}${endpoint}`);
       Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
 
-      console.log(`🌐 Fazendo requisição para: ${url.toString()}`);
-
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -62,15 +59,12 @@ export const KommoAPI = {
       });
 
       if (!response.ok) {
-        console.warn(`⚠️ Resposta não OK: ${response.status} - ${response.statusText}`);
         throw new Error(`Erro na requisição: ${response.status} - ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log(`✅ Dados recebidos de ${endpoint}:`, data);
       return data;
     } catch (error) {
-      console.error(`💥 Erro ao acessar ${endpoint}:`, error);
       return this.getDefaultResponse(endpoint);
     }
   },
@@ -161,7 +155,7 @@ export const KommoAPI = {
         ];
       }
     } catch (error) {
-      console.error('💥 Erro ao buscar opções de fonte:', error);
+      // Error handled silently
     }
     
     // Fallback

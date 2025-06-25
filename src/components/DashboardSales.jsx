@@ -452,7 +452,6 @@ const MultiSelectFilter = ({ label, options, selectedValues, onChange, placehold
 };
 
 const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
-  console.log('🔄 DashboardSales renderizando - showCustomPeriod:', showCustomPeriod);
   
   const [rawSalesData, setRawSalesData] = useState(data); // Dados originais sem filtro
   const [salesData, setSalesData] = useState(data); // Dados filtrados
@@ -475,17 +474,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   const isMobile = useMemo(() => windowSize.width < 768, [windowSize.width]);
   const isSmallMobile = useMemo(() => windowSize.width < 480, [windowSize.width]);
 
-  // Debug: Verificar se os props estão chegando corretamente
-  useEffect(() => {
-    console.log('🔍 DashboardSales props:', { 
-      customPeriod, 
-      showCustomPeriod, 
-      period,
-      setCustomPeriod: typeof setCustomPeriod,
-      setShowCustomPeriod: typeof setShowCustomPeriod,
-      applyCustomPeriod: typeof applyCustomPeriod
-    });
-  }, [customPeriod, showCustomPeriod, period]);
 
   // Função para filtrar dados no frontend (INSTANTÂNEO)
   const filterSalesData = useMemo(() => {
@@ -565,7 +553,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       };
       
       setComparisonData(comparison);
-      console.log('✅ Dados de comparação criados a partir dos V2 KPIs:', comparison);
     }
   }, [salesData]);
 
@@ -701,7 +688,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       
       setModalForceUpdate(prev => prev + 1);
     } catch (error) {
-      console.error('Erro ao carregar dados do modal:', error);
       modalStateRef.current = {
         ...modalStateRef.current,
         isLoading: false,
@@ -1984,15 +1970,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         ) : (
           <div className="card card-full">
             <div className="error-message">
-              {(() => {
-                console.log('🚨 PROBLEMA - Analisando dados:');
-                console.log('1. leadsByUser existe?', !!salesData?.leadsByUser);
-                console.log('1. leadsByUser length:', salesData?.leadsByUser?.length);
-                console.log('2. analyticsTeam existe?', !!salesData?.analyticsTeam);
-                console.log('2. user_performance existe?', !!salesData?.analyticsTeam?.user_performance);
-                console.log('2. user_performance length:', salesData?.analyticsTeam?.user_performance?.length);
-                return '';
-              })()}
               Não há dados de desempenho por corretor disponíveis
             </div>
           </div>
@@ -2015,9 +1992,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       <SimpleModal
         isOpen={showCustomPeriod}
         onClose={() => {
-          console.log('🔴 onClose chamado no DashboardSales - showCustomPeriod atual:', showCustomPeriod);
           setShowCustomPeriod(false);
-          console.log('🔴 setShowCustomPeriod(false) executado');
         }}
       >
         <div style={{ display: 'grid', gap: '24px' }}>

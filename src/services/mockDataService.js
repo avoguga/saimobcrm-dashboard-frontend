@@ -81,7 +81,7 @@ export const MockDataService = {
   async getSalesKPIs(days = 30, corretor = null, fonte = null, customDates = null) {
     await simulateNetworkDelay();
     
-    console.log('📊 MockDataService: Gerando KPIs de vendas...', { days, corretor, fonte, customDates });
+    // Generating sales KPIs
     
     // Simular lógica de filtros
     const filterMultiplier = corretor ? 0.3 : 1; // Corretor reduz métricas
@@ -148,7 +148,7 @@ export const MockDataService = {
   async getLeadsByUserChart(days = 30, corretor = null, fonte = null) {
     await simulateNetworkDelay();
     
-    console.log('👥 MockDataService: Gerando dados de leads por usuário...', { days, corretor, fonte });
+    // Generating leads by user data
     
     // Se filtrado por corretor, retornar apenas ele
     const corretoresToShow = corretor ? [corretor] : CORRETORES;
@@ -184,7 +184,7 @@ export const MockDataService = {
   async getConversionRates(days = 30, corretor = null, fonte = null) {
     await simulateNetworkDelay();
     
-    console.log('🎯 MockDataService: Gerando taxas de conversão...', { days, corretor, fonte });
+    // Generating conversion rates
     
     return {
       conversionRates: {
@@ -212,7 +212,7 @@ export const MockDataService = {
   async getMarketingKPIs(days = 30, fonte = null, customDates = null) {
     await simulateNetworkDelay();
     
-    console.log('📈 MockDataService: Gerando KPIs de marketing...', { days, fonte, customDates });
+    // Generating marketing KPIs
     
     const baseTotalLeads = random(300, 800);
     const filterMultiplier = fonte ? 0.3 : 1;
@@ -280,7 +280,7 @@ export const MockDataService = {
   async getLeadsBySource(days = 30, fonte = null) {
     await simulateNetworkDelay();
     
-    console.log('📊 MockDataService: Gerando leads por fonte...', { days, fonte });
+    // Generating leads by source
     
     // Se filtrado por fonte, mostrar apenas ela
     const fontesToShow = fonte ? [fonte] : FONTES;
@@ -307,7 +307,7 @@ export const MockDataService = {
   async getPipelineStatus(days = 30, corretor = null, fonte = null) {
     await simulateNetworkDelay();
     
-    console.log('📈 MockDataService: Gerando status do pipeline...', { days, corretor, fonte });
+    // Generating pipeline status
     
     const stages = [
       { name: 'Leads em Negociação', value: random(50, 150) },

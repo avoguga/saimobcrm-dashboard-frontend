@@ -76,10 +76,8 @@ export class GranularAPI {
         if (customDates && customDates.start_date && customDates.end_date) {
           params.append('start_date', customDates.start_date);
           params.append('end_date', customDates.end_date);
-          console.log('📅 Usando período customizado:', customDates);
         } else {
           params.append('days', days);
-          console.log('📅 Usando período em dias:', days);
         }
         
         // Suporta múltiplas seleções separadas por vírgula
@@ -95,8 +93,6 @@ export class GranularAPI {
 
         console.timeEnd('Sales Dashboard V2 Load');
         
-        console.log('🔍 DEBUG - leadsByUser response:', leadsByUser);
-        console.log('🔍 DEBUG - analyticsTeam no leadsByUser:', leadsByUser.analyticsTeam);
 
         return {
           ...kpis,
@@ -144,10 +140,8 @@ export class GranularAPI {
         if (customDates && customDates.start_date && customDates.end_date) {
           params.append('start_date', customDates.start_date);
           params.append('end_date', customDates.end_date);
-          console.log('📅 Marketing: Usando período customizado:', customDates);
         } else {
           params.append('days', days);
-          console.log('📅 Marketing: Usando período em dias:', days);
         }
         
         if (fonte) params.append('fonte', fonte);
@@ -179,7 +173,6 @@ export class GranularAPI {
         const marketingData = await fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json());
 
         console.timeEnd('Marketing Dashboard Load');
-        console.log('✅ Marketing data completo recebido:', marketingData);
 
         return {
           ...marketingData,
@@ -202,7 +195,6 @@ export class GranularAPI {
       const since = dateRange?.start || '2025-06-01';
       const until = dateRange?.end || '2025-06-09';
       
-      console.log(`🚀 Buscando insights para ${campaignIds.length} campanhas de ${since} até ${until}`);
       
       // Buscar insights de cada campanha em paralelo (conforme recomendação do backend)
       const campaignInsights = await Promise.all(
@@ -211,7 +203,6 @@ export class GranularAPI {
           const cached = this.getCached(cacheKey);
           
           if (cached) {
-            console.log(`📦 Cache hit para campanha ${id}`);
             return { campaignId: id, ...cached };
           }
 
@@ -220,7 +211,6 @@ export class GranularAPI {
             const insightData = await response.json();
             
             this.setCache(cacheKey, insightData);
-            console.log(`✅ Insight carregado para campanha ${id}:`, insightData);
             
             return { 
               campaignId: id, 
@@ -228,31 +218,17 @@ export class GranularAPI {
               paging: insightData.paging || null
             };
           } catch (error) {
-            console.error(`❌ Erro ao buscar insight da campanha ${id}:`, error);
             return { campaignId: id, error: error.message };
           }
         })
       );
 
       // Processar e agregar os dados (método interno)
-      console.log('🔍 Debug - Campaign insights antes do processamento:', campaignInsights);
       const aggregatedData = this.processInsights(campaignInsights);
       
-      console.log('✅ Dados agregados dos insights:', aggregatedData);
-      console.log('📊 Totais calculados:', {
-        leads: aggregatedData.totalLeads,
-        impressions: aggregatedData.totalImpressions,
-        reach: aggregatedData.totalReach,
-        spend: aggregatedData.totalSpend,
-        ctr: aggregatedData.averageCTR,
-        cpc: aggregatedData.averageCPC,
-        cpm: aggregatedData.averageCPM,
-        costPerLead: aggregatedData.costPerLead
-      });
       return aggregatedData;
       
     } catch (error) {
-      console.error('❌ Erro geral ao buscar insights:', error);
       return this.getEmptyInsights();
     }
   }
@@ -262,9 +238,7 @@ export class GranularAPI {
    * Processa os dados brutos das campanhas conforme estrutura real do backend
    */
   static processInsights(campaignInsights) {
-    console.log('🔍 Debug processInsights - Input:', campaignInsights);
     const validInsights = campaignInsights.filter(insight => !insight.error && insight.data);
-    console.log('🔍 Debug processInsights - Valid insights:', validInsights);
     
     // Inicializar totais
     const aggregated = {
@@ -397,10 +371,8 @@ export class GranularAPI {
       const response = await fetch(`${API_URL}/facebook-ads/insights/summary?since=${since}&until=${until}`);
       const summary = await response.json();
       
-      console.log('✅ Resumo geral de insights:', summary);
       return summary;
     } catch (error) {
-      console.error('❌ Erro ao buscar resumo de insights:', error);
       return this.getEmptyInsights();
     }
   }
@@ -414,7 +386,6 @@ export class GranularAPI {
       const since = dateRange?.start || '2025-06-01';
       const until = dateRange?.end || '2025-06-09';
       
-      console.log(`🎯 Buscando insights com breakdown de gênero`);
       
       // Usar endpoint com level=campaign e breakdown=gender
       const params = new URLSearchParams({
@@ -427,7 +398,6 @@ export class GranularAPI {
       const response = await fetch(`${API_URL}/facebook-ads/insights?${params}`);
       const data = await response.json();
       
-      console.log('✅ Insights com breakdown de gênero:', data);
       
       // Processar dados de gênero
       const genderData = this.processGenderData(data);
@@ -439,7 +409,6 @@ export class GranularAPI {
       };
       
     } catch (error) {
-      console.error('❌ Erro ao buscar insights com breakdowns:', error);
       return {
         genderData: [],
         cityData: [],
@@ -493,7 +462,6 @@ export class GranularAPI {
     const genderData = Array.from(genderMap.values())
       .sort((a, b) => b.value - a.value);
     
-    console.log('📊 Dados de gênero processados:', genderData);
     return genderData;
   }
 
@@ -578,7 +546,6 @@ export class GranularAPI {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5); // Top 5 cidades
     
-    console.log('📊 Dados processados de breakdowns:', result);
     return result;
   }
 
@@ -616,7 +583,6 @@ export class GranularAPI {
     const cached = this.getCached(cacheKey);
     
     if (cached) {
-      console.log('📦 Campanhas do Facebook do cache');
       return cached;
     }
 
@@ -625,11 +591,9 @@ export class GranularAPI {
       const campaigns = await response.json();
       
       this.setCache(cacheKey, campaigns);
-      console.log('✅ Campanhas do Facebook carregadas:', campaigns);
       
       return campaigns;
     } catch (error) {
-      console.error('❌ Erro ao buscar campanhas do Facebook:', error);
       // Retornar array vazio em caso de erro
       return [];
     }
@@ -641,7 +605,6 @@ export class GranularAPI {
    */
   static clearCache() {
     this.cache.clear();
-    console.log('🗑️ Cache limpo');
   }
 }
 
