@@ -179,8 +179,12 @@ export const KommoAPI = {
    */
   async getSalesComparison(corretor = null, fonte = null) {
     const params = {};
-    if (corretor) params.corretor = encodeURIComponent(corretor);
-    if (fonte) params.fonte = encodeURIComponent(fonte);
+    if (corretor && corretor.trim() !== '') {
+      params.corretor = corretor;
+    }
+    if (fonte && fonte.trim() !== '') {
+      params.fonte = fonte;
+    }
     return this.get(`/dashboard/sales-comparison`, params);
   },
 
@@ -190,8 +194,17 @@ export const KommoAPI = {
    */
   async getDetailedTables(corretor = null, fonte = null, extraParams = {}) {
     const params = { ...extraParams };
-    if (corretor) params.corretor = encodeURIComponent(corretor);
-    if (fonte) params.fonte = encodeURIComponent(fonte);
+    
+    // Aplicar filtro de corretor se especificado
+    if (corretor && corretor.trim() !== '') {
+      params.corretor = corretor;
+    }
+    
+    // Aplicar filtro de fonte se especificado
+    if (fonte && fonte.trim() !== '') {
+      params.fonte = fonte;
+    }
+    
     return this.get(`/dashboard/detailed-tables`, params);
   }
 };

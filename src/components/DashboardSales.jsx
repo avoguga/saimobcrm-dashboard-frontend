@@ -515,7 +515,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   // Configurações dos gráficos memoizadas para evitar hooks condicionais
   const chartConfigs = useMemo(() => ({
     leadsConfig: { xKey: 'name', yKey: 'value', color: COLORS.primary },
-    meetingsConfig: { xKey: 'name', yKey: 'meetings', color: COLORS.secondary },
+    meetingsConfig: { xKey: 'name', yKey: 'meetingsHeld', color: COLORS.secondary },
     salesConfig: { xKey: 'name', yKey: 'sales', color: COLORS.success },
     activitiesConfig: { xKey: 'name', yKey: 'value', color: COLORS.secondary }
   }), []);
@@ -577,7 +577,11 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       // Ordenar por reuniões - decrescente  
       // Garantir que todos os corretores apareçam
       sortedMeetingsData: [...salesData.leadsByUser]
-        .sort((a, b) => (b.meetings || 0) - (a.meetings || 0)),
+        .map(user => ({
+          ...user,
+          meetingsHeld: user.meetingsHeld || user.meetings || 0
+        }))
+        .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0)),
         
       // Ordenar por vendas - decrescente
       // Garantir que todos os corretores apareçam
