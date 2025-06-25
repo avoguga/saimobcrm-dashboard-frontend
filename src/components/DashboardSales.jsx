@@ -222,7 +222,16 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
               }}>
                 <thead>
                   <tr style={{ backgroundColor: COLORS.lightBg }}>
-                    {(type === 'reunioes' || type === 'leads') && (
+                    {type === 'leads' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data de Criação</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Status</th>
+                      </>
+                    )}
+                    {type === 'reunioes' && (
                       <>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
@@ -255,7 +264,16 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                       backgroundColor: index % 2 === 0 ? 'white' : COLORS.lightBg,
                       borderBottom: `1px solid ${COLORS.light}`
                     }}>
-                      {(type === 'reunioes' || type === 'leads') && (
+                      {type === 'leads' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data de Criação']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px' }}>{item['Status']}</td>
+                        </>
+                      )}
+                      {type === 'reunioes' && (
                         <>
                           <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
@@ -417,7 +435,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   // Função para abrir modal específico por corretor
   const openModalByCorretor = async (type, corretorName) => {
     const titles = {
-      'leads': `Atividades de ${corretorName} (Reuniões)`,
+      'leads': `Leads de ${corretorName}`,
       'reunioes': `Reuniões de ${corretorName}`,
       'vendas': `Vendas de ${corretorName}`
     };
@@ -461,7 +479,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource, extraParams);
       
       const dataMap = {
-        'leads': tablesData.reunioesDetalhes || [], // Para leads, mostrar reuniões como proxy
+        'leads': tablesData.leadsDetalhes || [], // Usar leadsDetalhes direto do backend
         'reunioes': tablesData.reunioesDetalhes || [],
         'vendas': tablesData.vendasDetalhes || []
       };
@@ -1599,7 +1617,18 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           </>
         ) : (
           <div className="card card-full">
-            <div className="error-message">Não há dados de desempenho por corretor disponíveis</div>
+            <div className="error-message">
+              {(() => {
+                console.log('🚨 PROBLEMA - Analisando dados:');
+                console.log('1. leadsByUser existe?', !!salesData?.leadsByUser);
+                console.log('1. leadsByUser length:', salesData?.leadsByUser?.length);
+                console.log('2. analyticsTeam existe?', !!salesData?.analyticsTeam);
+                console.log('2. user_performance existe?', !!salesData?.analyticsTeam?.user_performance);
+                console.log('2. user_performance length:', salesData?.analyticsTeam?.user_performance?.length);
+                return '';
+              })()}
+              Não há dados de desempenho por corretor disponíveis
+            </div>
           </div>
         )}
       </div>

@@ -93,10 +93,14 @@ export class GranularAPI {
         ]);
 
         console.timeEnd('Sales Dashboard V2 Load');
+        
+        console.log('🔍 DEBUG - leadsByUser response:', leadsByUser);
+        console.log('🔍 DEBUG - analyticsTeam no leadsByUser:', leadsByUser.analyticsTeam);
 
         return {
           ...kpis,
           leadsByUser: leadsByUser.leadsByUser || [],
+          analyticsTeam: leadsByUser.analyticsTeam || null, // Incluir analyticsTeam do endpoint leads-by-user
           conversionRates: conversionRates.conversionRates || {},
           funnelData: conversionRates.funnelData || [],
           pipelineStatus: pipelineStatus.pipelineStatus || [], // V2: Corrigido de leadsByStage
