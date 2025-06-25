@@ -1073,7 +1073,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && (
         <div className="dashboard-row">
           <div className="card card-full">
-            <div className="card-title">Leads por Corretor</div>
+            <div className="card-title">Leads criados no período</div>
             <CompactChart 
               type="bar" 
               data={salesData.leadsByUser.sort((a, b) => (b.value || 0) - (a.value || 0))} 

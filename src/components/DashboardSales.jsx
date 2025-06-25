@@ -205,7 +205,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           ) : data.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: COLORS.tertiary }}>
               <div style={{ fontSize: '24px', marginBottom: '12px' }}>
-                {type === 'reunioes' ? '📊' : 
+                {type === 'reunioes' || type === 'leads' ? '📊' : 
                  type === 'propostas' ? '📋' : '💰'}
               </div>
               <div><strong>Nenhum registro encontrado</strong></div>
@@ -222,7 +222,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
               }}>
                 <thead>
                   <tr style={{ backgroundColor: COLORS.lightBg }}>
-                    {type === 'reunioes' && (
+                    {(type === 'reunioes' || type === 'leads') && (
                       <>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
@@ -255,7 +255,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                       backgroundColor: index % 2 === 0 ? 'white' : COLORS.lightBg,
                       borderBottom: `1px solid ${COLORS.light}`
                     }}>
-                      {type === 'reunioes' && (
+                      {(type === 'reunioes' || type === 'leads') && (
                         <>
                           <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
@@ -414,6 +414,76 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     }
   }, [salesData]);
 
+  // Função para abrir modal específico por corretor
+  const openModalByCorretor = async (type, corretorName) => {
+    const titles = {
+      'leads': `Atividades de ${corretorName} (Reuniões)`,
+      'reunioes': `Reuniões de ${corretorName}`,
+      'vendas': `Vendas de ${corretorName}`
+    };
+
+    modalStateRef.current = {
+      isOpen: true,
+      type,
+      title: titles[type] || `Dados de ${corretorName}`,
+      isLoading: true,
+      data: [],
+      error: null
+    };
+    
+    setModalForceUpdate(prev => prev + 1);
+
+    try {
+      const extraParams = {};
+      
+      if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+        extraParams.start_date = customPeriod.startDate;
+        extraParams.end_date = customPeriod.endDate;
+      } else if (period === 'current_month') {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const firstDayStr = firstDay.toISOString().split('T')[0];
+        const todayStr = now.toISOString().split('T')[0];
+        
+        extraParams.start_date = firstDayStr;
+        extraParams.end_date = todayStr;
+      } else {
+        const periodToDays = {
+          '7d': 7,
+          '30d': 30,
+          '60d': 60,
+          '90d': 90
+        };
+        extraParams.days = periodToDays[period] || 30;
+      }
+
+      // Usar o corretor específico clicado, mantendo a fonte selecionada
+      const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource, extraParams);
+      
+      const dataMap = {
+        'leads': tablesData.reunioesDetalhes || [], // Para leads, mostrar reuniões como proxy
+        'reunioes': tablesData.reunioesDetalhes || [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
+
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        data: dataMap[type]
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
+    } catch (error) {
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        error: error.message
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
+    }
+  };
+
   // Função para abrir modal sem causar re-render
   const openModal = async (type) => {
     const titles = {
@@ -570,13 +640,15 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     return {
       // Ordenar por total de leads (value) - decrescente
-      // Garantir que todos os corretores apareçam
+      // Filtrar corretores válidos
       sortedLeadsData: [...salesData.leadsByUser]
+        .filter(user => user.name !== 'SA IMOB' && user.name !== 'Desconhecido')
         .sort((a, b) => (b.value || 0) - (a.value || 0)),
         
       // Ordenar por reuniões - decrescente  
-      // Garantir que todos os corretores apareçam
+      // Filtrar corretores válidos
       sortedMeetingsData: [...salesData.leadsByUser]
+        .filter(user => user.name !== 'SA IMOB' && user.name !== 'Desconhecido')
         .map(user => ({
           ...user,
           meetingsHeld: user.meetingsHeld || user.meetings || 0
@@ -584,8 +656,9 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0)),
         
       // Ordenar por vendas - decrescente
-      // Garantir que todos os corretores apareçam
+      // Filtrar corretores válidos
       sortedSalesData: [...salesData.leadsByUser]
+        .filter(user => user.name !== 'SA IMOB' && user.name !== 'Desconhecido')
         .sort((a, b) => (b.sales || 0) - (a.sales || 0))
     };
   }, [salesData?.leadsByUser]);
@@ -600,7 +673,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   );
 
   // Memoized Compact Chart Component com Loading Animation e Update Dinâmico
-  const CompactChart = memo(({ data, type, config, style, loading = false }) => {
+  const CompactChart = memo(({ data, type, config, style, loading = false, onBarClick = null }) => {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [isLoading, setIsLoading] = useState(loading);
@@ -651,7 +724,22 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               name: config.name || 'Data',
               data: [], // Dados vazios inicialmente
               type: 'bar',
-              itemStyle: { color: config.color },
+              itemStyle: { 
+                color: config.color,
+                emphasis: {
+                  color: config.color,
+                  opacity: 0.8
+                }
+              },
+              emphasis: {
+                focus: 'series',
+                itemStyle: {
+                  shadowBlur: 10,
+                  shadowOffsetX: 0,
+                  shadowOffsetY: 0,
+                  shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+              },
               barWidth: isMobile ? '50%' : '70%',
               label: {
                 show: true,
@@ -695,8 +783,15 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         }
         
         chartInstance.current.setOption(emptyOption);
+        
+        // Adicionar evento de clique se fornecido
+        if (onBarClick && type === 'bar') {
+          chartInstance.current.on('click', function (params) {
+            onBarClick(params.name, params.value, params);
+          });
+        }
       }
-    }, [type, config, isMobile]);
+    }, [type, config, isMobile, onBarClick]);
 
     // Controlar loading animation
     useEffect(() => {
@@ -731,6 +826,22 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           series: [{
             name: config.name || 'Data', // Use name for navigation
             data: data.map(item => item[config.yKey]),
+            itemStyle: { 
+              color: config.color,
+              emphasis: {
+                color: config.color,
+                opacity: 0.8
+              }
+            },
+            emphasis: {
+              focus: 'series',
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowOffsetY: 0,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            },
             label: {
               show: true,
               position: 'top',
@@ -784,7 +895,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       };
     }, []);
 
-    return <div ref={chartRef} style={style} />;
+    return <div ref={chartRef} style={{...style, cursor: onBarClick ? 'pointer' : 'default'}} />;
   });
 
   // Se está carregando, mostrar loading spinner
@@ -1417,12 +1528,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
             <div className="card card-full">
-              <div className="card-title">Leads por Corretor</div>
+              <div className="card-title">Leads criados no período</div>
               <CompactChart 
                 type="bar" 
                 data={sortedChartsData.sortedLeadsData} 
                 config={chartConfigs.leadsConfig}
                 style={chartStyle}
+                onBarClick={(corretorName) => openModalByCorretor('leads', corretorName)}
                   />
             </div>
             
@@ -1433,6 +1545,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 data={sortedChartsData.sortedMeetingsData} 
                 config={chartConfigs.meetingsConfig}
                 style={chartStyle}
+                onBarClick={(corretorName) => openModalByCorretor('reunioes', corretorName)}
                   />
             </div>
             
@@ -1443,13 +1556,14 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 data={sortedChartsData.sortedSalesData} 
                 config={chartConfigs.salesConfig}
                 style={chartStyle}
+                onBarClick={(corretorName) => openModalByCorretor('vendas', corretorName)}
                   />
             </div>
           </>
         ) : salesData?.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
           <>
             <div className="card card-full">
-              <div className="card-title">Leads por Corretor</div>
+              <div className="card-title">Leads criados no período</div>
               <CompactChart 
                 type="bar" 
                 data={chartData.leadsData} 
