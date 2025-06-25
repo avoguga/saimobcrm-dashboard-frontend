@@ -602,7 +602,7 @@ function Dashboard() {
       <div className="dashboard-header">
         <div className="brand">
           <h1>SA IMOB</h1>
-          <span className="subtitle">Kommo CRM Dashboard</span>
+          <span className="subtitle">SA IMOB - Dashboard</span>
           {isLoadingFilters && (
             <div className="filter-loading-indicator">
               <span className="loading-icon">⏳</span>
