@@ -654,11 +654,14 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               itemStyle: { color: config.color },
               barWidth: isMobile ? '50%' : '70%',
               label: {
-                show: isMobile ? true : false,
+                show: true,
                 position: 'top',
-                fontSize: isMobile ? 10 : 12,
+                fontSize: isMobile ? 12 : 14,
                 fontWeight: 'bold',
-                color: '#333',
+                color: '#2d3748',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                padding: [2, 6],
+                borderRadius: 4,
                 formatter: function(params) {
                   return params.value;
                 }
@@ -729,11 +732,14 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             name: config.name || 'Data', // Use name for navigation
             data: data.map(item => item[config.yKey]),
             label: {
-              show: isMobile ? true : false,
+              show: true,
               position: 'top',
-              fontSize: isMobile ? 10 : 12,
+              fontSize: isMobile ? 12 : 14,
               fontWeight: 'bold',
-              color: '#333',
+              color: '#2d3748',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              padding: [2, 6],
+              borderRadius: 4,
               formatter: function(params) {
                 return params.value;
               }
