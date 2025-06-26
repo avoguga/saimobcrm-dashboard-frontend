@@ -26,6 +26,8 @@ function Dashboard() {
   const [corretores, setCorretores] = useState([]);
   const [selectedCorretor, setSelectedCorretor] = useState('');
   const [selectedSource, setSelectedSource] = useState('');
+  const [pendingCorretor, setPendingCorretor] = useState('');
+  const [pendingSource, setPendingSource] = useState('');
   const [sourceOptions, setSourceOptions] = useState([{ value: '', label: 'Todas as Fontes' }]);
   
 
@@ -329,12 +331,18 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period, selectedCorretor, selectedSource]); // Adicionado filtros de volta para trigger re-fetch
+  }, [period]); // Removido filtros para não trigger automático - agora só com botão Apply
   
   // Reset da flag de primeira carga quando o período muda (não os filtros)
   useEffect(() => {
     setIsInitialSalesLoad(true);
   }, [period]);
+
+  // Sincronizar filtros pendentes com os aplicados na inicialização
+  useEffect(() => {
+    setPendingCorretor(selectedCorretor);
+    setPendingSource(selectedSource);
+  }, []);
 
   // Atualizar dados (só executa se período for válido)
   const refreshData = async (forceRefresh = false) => {
@@ -544,6 +552,57 @@ function Dashboard() {
     }
   };
 
+  // Função para aplicar filtros pendentes
+  const applyFilters = async () => {
+    setSelectedCorretor(pendingCorretor);
+    setSelectedSource(pendingSource);
+    
+    if (!isPeriodValid()) {
+      return;
+    }
+
+    // Mostrar loading para aplicação de filtros
+    setIsUpdatingSales(true);
+    setError(null);
+    
+    try {
+      const days = calculateDays();
+      const params = { days };
+      
+      // Se for período customizado ou mês atual, enviar datas específicas
+      let customDates = null;
+      if (period === 'current_month') {
+        const defaultPeriod = getDefaultPeriod();
+        params.start_date = defaultPeriod.startDate;
+        params.end_date = defaultPeriod.endDate;
+        customDates = {
+          start_date: defaultPeriod.startDate,
+          end_date: defaultPeriod.endDate
+        };
+      } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+        params.start_date = customPeriod.startDate;
+        params.end_date = customPeriod.endDate;
+        customDates = {
+          start_date: customPeriod.startDate,
+          end_date: customPeriod.endDate
+        };
+      }
+      
+      // Usar filtros pendentes ao invés dos aplicados
+      const salesResult = await GranularAPI.loadSalesDashboard(days, pendingCorretor, pendingSource, customDates);
+      setSalesData(salesResult);
+    } catch (error) {
+      setError(`Falha ao carregar dados de vendas: ${error.message}`);
+    } finally {
+      setIsUpdatingSales(false);
+    }
+  };
+
+  // Função para verificar se existem filtros pendentes
+  const hasPendingFilters = () => {
+    return pendingCorretor !== selectedCorretor || pendingSource !== selectedSource;
+  };
+
   return (
     <div className="dashboard-optimized">
       <div className="dashboard-header">
@@ -646,6 +705,12 @@ function Dashboard() {
           setSelectedCorretor={setSelectedCorretor}
           selectedSource={selectedSource}
           setSelectedSource={setSelectedSource}
+          pendingCorretor={pendingCorretor}
+          setPendingCorretor={setPendingCorretor}
+          pendingSource={pendingSource}
+          setPendingSource={setPendingSource}
+          applyFilters={applyFilters}
+          hasPendingFilters={hasPendingFilters}
           sourceOptions={sourceOptions}
           data={salesData}
           isLoading={isLoadingSales}

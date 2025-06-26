@@ -451,7 +451,7 @@ const MultiSelectFilter = ({ label, options, selectedValues, onChange, placehold
   );
 };
 
-const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
+const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, pendingCorretor, setPendingCorretor, pendingSource, setPendingSource, applyFilters, hasPendingFilters, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
   
   const [rawSalesData, setRawSalesData] = useState(data); // Dados originais sem filtro
   const [salesData, setSalesData] = useState(data); // Dados filtrados
@@ -749,13 +749,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       // Ordenar por total de leads (value) - decrescente
       // Filtrar corretores válidos
       sortedLeadsData: [...salesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB' && user.name !== 'Desconhecido')
+        .filter(user => user.name !== 'SA IMOB' )
         .sort((a, b) => (b.value || 0) - (a.value || 0)),
         
       // Ordenar por reuniões - decrescente  
       // Filtrar corretores válidos
       sortedMeetingsData: [...salesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB' && user.name !== 'Desconhecido')
+        .filter(user => user.name !== 'SA IMOB' )
         .map(user => ({
           ...user,
           meetingsHeld: user.meetingsHeld || user.meetings || 0
@@ -765,7 +765,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       // Ordenar por vendas - decrescente
       // Filtrar corretores válidos
       sortedSalesData: [...salesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB' && user.name !== 'Desconhecido')
+        .filter(user => user.name !== 'SA IMOB' )
         .sort((a, b) => (b.sales || 0) - (a.sales || 0))
     };
   }, [salesData?.leadsByUser]);
@@ -1643,18 +1643,30 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   value: corretor.name,
                   label: corretor.name
                 }))}
-                selectedValues={selectedCorretor ? (selectedCorretor.includes(',') ? selectedCorretor.split(',') : [selectedCorretor]) : []}
-                onChange={(values) => setSelectedCorretor(values.length === 0 ? '' : values.join(','))}
+                selectedValues={pendingCorretor ? (pendingCorretor.includes(',') ? pendingCorretor.split(',') : [pendingCorretor]) : []}
+                onChange={(values) => setPendingCorretor(values.length === 0 ? '' : values.join(','))}
                 placeholder="Todos os Corretores"
               />
               
               <MultiSelectFilter 
                 label="Fonte"
                 options={sourceOptions}
-                selectedValues={selectedSource ? (selectedSource.includes(',') ? selectedSource.split(',') : [selectedSource]) : []}
-                onChange={(values) => setSelectedSource(values.length === 0 ? '' : values.join(','))}
+                selectedValues={pendingSource ? (pendingSource.includes(',') ? pendingSource.split(',') : [pendingSource]) : []}
+                onChange={(values) => setPendingSource(values.length === 0 ? '' : values.join(','))}
                 placeholder="Todas as Fontes"
               />
+
+              {/* Botão para aplicar filtros */}
+              {hasPendingFilters() && (
+                <button 
+                  className="apply-filters-btn"
+                  onClick={applyFilters}
+                  disabled={isUpdating}
+                  title="Aplicar filtros selecionados"
+                >
+                  {isUpdating ? 'Aplicando...' : 'Aplicar Filtros'}
+                </button>
+              )}
 
               {/* Indicador de filtros ativos */}
               {(selectedCorretor || selectedSource) && (
@@ -1666,6 +1678,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                     onClick={() => {
                       setSelectedCorretor('');
                       setSelectedSource('');
+                      setPendingCorretor('');
+                      setPendingSource('');
                     }}
                     title="Limpar todos os filtros"
                   >
