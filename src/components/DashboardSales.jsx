@@ -475,47 +475,12 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   const isSmallMobile = useMemo(() => windowSize.width < 480, [windowSize.width]);
 
 
-  // Função para filtrar dados no frontend (INSTANTÂNEO)
+  // Função para filtrar dados no frontend - REMOVIDO pois filtros agora são aplicados no backend
   const filterSalesData = useMemo(() => {
-    if (!rawSalesData) return null;
-
-    // Se não há filtros selecionados, retorna dados originais
-    if (!selectedCorretor && !selectedSource) {
-      return rawSalesData;
-    }
-
-    const filteredData = { ...rawSalesData };
-
-    // Filtrar leadsByUser por corretor selecionado
-    if (selectedCorretor && filteredData.leadsByUser) {
-      const selectedCorretores = selectedCorretor.includes(',') 
-        ? selectedCorretor.split(',').map(c => c.trim())
-        : [selectedCorretor.trim()];
-
-      filteredData.leadsByUser = filteredData.leadsByUser.filter(user => 
-        selectedCorretores.includes(user.name)
-      );
-    }
-
-    // Filtro por fonte será implementado conforme estrutura dos dados
-    // Para agora, manter todas as fontes pois filtragem de fonte será feita
-    // principalmente nas tabelas detalhadas e análises específicas
-
-    // Recalcular KPIs baseados nos dados filtrados
-    if (filteredData.leadsByUser && filteredData.leadsByUser.length > 0) {
-      // Recalcular totais baseados nos corretores filtrados
-      const filteredTotalLeads = filteredData.leadsByUser.reduce((sum, user) => sum + (user.value || 0), 0);
-      const filteredTotalMeetings = filteredData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || user.meetings || 0), 0);
-      const filteredTotalSales = filteredData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0);
-
-      // Atualizar KPIs filtrados
-      filteredData.totalLeads = filteredTotalLeads;
-      filteredData.activeLeads = filteredTotalLeads; // Assumindo que leads ativos = total leads para simplificar
-      filteredData.wonLeads = filteredTotalSales;
-    }
-
-    return filteredData;
-  }, [rawSalesData, selectedCorretor, selectedSource]);
+    // Retorna os dados direto do backend sem filtragem adicional
+    // Os filtros já foram aplicados na API
+    return rawSalesData;
+  }, [rawSalesData]);
 
   // Atualizar dados quando recebidos do cache
   useEffect(() => {
@@ -599,8 +564,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.days = periodToDays[period] || 30;
       }
 
-      // Usar o corretor específico clicado, sem filtros de backend (dados já filtrados no frontend)
-      const tablesData = await KommoAPI.getDetailedTables(corretorName, '', extraParams);
+      // Usar o corretor específico clicado e o filtro de fonte selecionado
+      const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource || '', extraParams);
       
       const dataMap = {
         'leads': tablesData.leadsDetalhes || [], // Usar leadsDetalhes direto do backend
@@ -1970,7 +1935,19 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         ) : (
           <div className="card card-full">
             <div className="error-message">
-              Não há dados de desempenho por corretor disponíveis
+              {salesData?.totalLeads > 0 ? (
+                <>
+                  <p>Foram encontrados {salesData.totalLeads} leads com as fontes selecionadas: <strong>{selectedSource}</strong></p>
+                  <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
+                    Porém, não há dados de desempenho por corretor disponíveis para estas fontes específicas.
+                  </p>
+                  <p style={{ marginTop: '10px', fontSize: '13px', color: '#888' }}>
+                    Isso pode ocorrer quando os leads não possuem corretor atribuído ou os corretores não têm atividade no período.
+                  </p>
+                </>
+              ) : (
+                'Não há dados de desempenho por corretor disponíveis'
+              )}
             </div>
           </div>
         )}

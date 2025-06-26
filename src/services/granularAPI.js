@@ -83,6 +83,23 @@ export class GranularAPI {
         // Suporta múltiplas seleções separadas por vírgula
         if (corretor) params.append('corretor', corretor);
         if (fonte) params.append('fonte', fonte);
+        
+        // Adicionar timestamp para evitar cache do browser
+        params.append('_t', Date.now().toString());
+
+        // DEBUG: Log what's being sent to API
+        console.log('🔍 Sales API Params:', {
+          corretor,
+          fonte,
+          paramsString: params.toString(),
+          decodedParams: decodeURIComponent(params.toString()),
+          fullUrls: [
+            `${API_URL}/api/v2/sales/kpis?${params}`,
+            `${API_URL}/api/v2/charts/leads-by-user?${params}`,
+            `${API_URL}/api/v2/sales/conversion-rates?${params}`,
+            `${API_URL}/api/v2/sales/pipeline-status?${params}`
+          ]
+        });
 
         const [kpis, leadsByUser, conversionRates, pipelineStatus] = await Promise.all([
           fetch(`${API_URL}/api/v2/sales/kpis?${params}`).then(r => r.json()),
@@ -92,6 +109,19 @@ export class GranularAPI {
         ]);
 
         console.timeEnd('Sales Dashboard V2 Load');
+        
+        // DEBUG: Log API responses
+        console.log('📊 Sales API Responses:', {
+          kpis,
+          leadsByUser,
+          fonte: fonte || 'none',
+          totalLeads: kpis.totalLeads,
+          userCount: leadsByUser.leadsByUser?.length,
+          metadata: {
+            kpisMetadata: kpis._metadata,
+            leadsByUserMetadata: leadsByUser._metadata
+          }
+        });
         
 
         return {
@@ -146,6 +176,14 @@ export class GranularAPI {
         
         if (fonte) params.append('fonte', fonte);
 
+        // DEBUG: Log marketing params before adding campaign filters
+        console.log('🔍 Marketing API Base Params:', {
+          fonte,
+          days,
+          customDates,
+          paramsString: params.toString()
+        });
+
         // Adicionar filtros de campanhas Facebook
         if (campaignFilters.campaignIds && campaignFilters.campaignIds.length > 0) {
           campaignFilters.campaignIds.forEach(id => {
@@ -168,6 +206,9 @@ export class GranularAPI {
         if (campaignFilters.searchTerm) {
           params.append('campaign_search', campaignFilters.searchTerm);
         }
+
+        // DEBUG: Log final marketing API call
+        console.log('🔍 Marketing API Final URL:', `${API_URL}/dashboard/marketing-complete?${params}`);
 
         // Usar endpoint completo de marketing
         const marketingData = await fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json());

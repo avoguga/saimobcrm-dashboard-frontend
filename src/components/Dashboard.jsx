@@ -34,6 +34,8 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMarketing, setIsLoadingMarketing] = useState(false);
   const [isLoadingSales, setIsLoadingSales] = useState(false);
+  const [isInitialSalesLoad, setIsInitialSalesLoad] = useState(true);
+  const [isUpdatingSales, setIsUpdatingSales] = useState(false);
   // Removido isLoadingFilters - filtragem agora é instantânea no frontend
   const [error, setError] = useState(null);
   const [marketingData, setMarketingData] = useState(null);
@@ -239,8 +241,8 @@ function Dashboard() {
             const marketingResult = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
             setMarketingData(marketingResult);
           } else {
-            // Carregar dados sem filtros (filtragem será feita no frontend)
-            const salesResult = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
+            // Carregar dados com filtros aplicados no backend
+            const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
             setSalesData(salesResult);
           }
           
@@ -275,7 +277,13 @@ function Dashboard() {
     // Debounce de 300ms para evitar múltiplas chamadas
     const timeoutId = setTimeout(() => {
       const fetchSalesData = async () => {
-        setIsLoadingSales(true);
+        // Só mostrar loading na primeira carga
+        // Mudanças de filtro mostram indicador sutil (como auto-refresh)
+        if (isInitialSalesLoad) {
+          setIsLoadingSales(true);
+        } else {
+          setIsUpdatingSales(true);
+        }
         setError(null);
         
         try {
@@ -303,15 +311,17 @@ function Dashboard() {
           
           
           // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO!
-          // Carregar dados sem filtros (filtragem será feita no frontend)
-          const salesResult = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
+          // Carregar dados com filtros aplicados no backend
+          const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
           
           setSalesData(salesResult);
         } catch (error) {
           setError(`Falha ao carregar dados de vendas: ${error.message}`);
         } finally {
           setIsLoadingSales(false);
+          setIsUpdatingSales(false);
           setIsLoading(false); // Loading geral só para primeira carga
+          setIsInitialSalesLoad(false); // Marcar que primeira carga foi concluída
         }
       };
       
@@ -319,7 +329,12 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period]); // REMOVIDO: selectedCorretor, selectedSource - filtragem agora é apenas no frontend
+  }, [period, selectedCorretor, selectedSource]); // Adicionado filtros de volta para trigger re-fetch
+  
+  // Reset da flag de primeira carga quando o período muda (não os filtros)
+  useEffect(() => {
+    setIsInitialSalesLoad(true);
+  }, [period]);
 
   // Atualizar dados (só executa se período for válido)
   const refreshData = async (forceRefresh = false) => {
@@ -367,8 +382,8 @@ function Dashboard() {
         // Limpar cache da API granular também
         GranularAPI.clearCache();
         
-        // Carregar dados sem filtros (filtragem será feita no frontend)
-        const salesResponse = await GranularAPI.loadSalesDashboard(days, null, null, customDates);
+        // Carregar dados com filtros aplicados no backend
+        const salesResponse = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
         setSalesData(salesResponse);
       }
     } catch (error) {
@@ -634,7 +649,7 @@ function Dashboard() {
           sourceOptions={sourceOptions}
           data={salesData}
           isLoading={isLoadingSales}
-          isUpdating={false}
+          isUpdating={isUpdatingSales}
           customPeriod={customPeriod}
           setCustomPeriod={setCustomPeriod}
           showCustomPeriod={showCustomPeriod}
