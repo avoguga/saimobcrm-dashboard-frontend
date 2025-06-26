@@ -228,7 +228,6 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
                         <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Status</th>
                       </>
                     )}
                     {type === 'reunioes' && (
@@ -270,7 +269,6 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                          <td style={{ padding: '12px' }}>{item['Status']}</td>
                         </>
                       )}
                       {type === 'reunioes' && (
