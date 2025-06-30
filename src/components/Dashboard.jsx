@@ -6,6 +6,59 @@ import DashboardSales from './DashboardSales';
 import LoadingSpinner from './LoadingSpinner';
 import './Dashboard.css';
 
+// Função helper para carregar dados do período anterior
+const loadPreviousPeriodData = async (period, originalDays, customPeriod, corretor, fonte) => {
+  let previousDays;
+  let previousCustomDates;
+  
+  if (period === 'current_month') {
+    // Para mês atual, buscar mês anterior completo
+    const now = new Date();
+    const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    
+    previousCustomDates = {
+      start_date: firstDayPreviousMonth.toISOString().split('T')[0],
+      end_date: lastDayPreviousMonth.toISOString().split('T')[0]
+    };
+  } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+    // Para período customizado, calcular mesmo número de dias anteriores
+    const startDate = new Date(customPeriod.startDate);
+    const endDate = new Date(customPeriod.endDate);
+    const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+    
+    const previousEndDate = new Date(startDate);
+    previousEndDate.setDate(startDate.getDate() - 1);
+    const previousStartDate = new Date(previousEndDate);
+    previousStartDate.setDate(previousEndDate.getDate() - duration + 1);
+    
+    previousCustomDates = {
+      start_date: previousStartDate.toISOString().split('T')[0],
+      end_date: previousEndDate.toISOString().split('T')[0]
+    };
+  } else {
+    // Para períodos predefinidos (7d, 30d, 60d, 90d), usar o mesmo número de dias
+    previousDays = originalDays;
+    
+    // Calcular as datas do período anterior
+    const today = new Date();
+    const currentStartDate = new Date(today);
+    currentStartDate.setDate(today.getDate() - originalDays + 1);
+    
+    const previousEndDate = new Date(currentStartDate);
+    previousEndDate.setDate(currentStartDate.getDate() - 1);
+    const previousStartDate = new Date(previousEndDate);
+    previousStartDate.setDate(previousEndDate.getDate() - originalDays + 1);
+    
+    previousCustomDates = {
+      start_date: previousStartDate.toISOString().split('T')[0],
+      end_date: previousEndDate.toISOString().split('T')[0]
+    };
+  }
+  
+  return await GranularAPI.loadSalesDashboard(previousDays, corretor, fonte, previousCustomDates);
+};
+
 // Dashboard principal otimizado
 function Dashboard() {
   // Função para calcular o período padrão (do dia 1 do mês atual até hoje)
@@ -316,6 +369,16 @@ function Dashboard() {
           // Carregar dados com filtros aplicados no backend
           const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
           
+          // Buscar dados do período anterior para comparação (2ª requisição)
+          try {
+            const previousPeriodData = await loadPreviousPeriodData(period, days, customPeriod, selectedCorretor, selectedSource);
+            if (previousPeriodData) {
+              salesResult.previousPeriodData = previousPeriodData;
+            }
+          } catch (error) {
+            console.warn('Erro ao buscar dados do período anterior:', error);
+          }
+          
           setSalesData(salesResult);
         } catch (error) {
           setError(`Falha ao carregar dados de vendas: ${error.message}`);
@@ -590,6 +653,17 @@ function Dashboard() {
       
       // Usar filtros pendentes ao invés dos aplicados
       const salesResult = await GranularAPI.loadSalesDashboard(days, pendingCorretor, pendingSource, customDates);
+      
+      // Buscar dados do período anterior para comparação (2ª requisição)
+      try {
+        const previousPeriodData = await loadPreviousPeriodData(period, days, customPeriod, pendingCorretor, pendingSource);
+        if (previousPeriodData) {
+          salesResult.previousPeriodData = previousPeriodData;
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar dados do período anterior:', error);
+      }
+      
       setSalesData(salesResult);
     } catch (error) {
       setError(`Falha ao carregar dados de vendas: ${error.message}`);

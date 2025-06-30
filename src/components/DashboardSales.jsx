@@ -492,9 +492,20 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     setSalesData(filterSalesData);
   }, [filterSalesData]);
 
-  // Criar dados de comparação usando os campos V2 que já vêm nos KPIs
+  // Criar dados de comparação usando os dados reais dos dois períodos
   useEffect(() => {
     if (salesData) {
+      // Dados do período atual
+      const currentMeetings = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
+      const currentProposals = salesData?.proposalStats?.total || 0;
+      const currentSales = salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0);
+      
+      // Dados do período anterior (da 2ª requisição)
+      const previousData = salesData?.previousPeriodData;
+      const previousMeetings = previousData?.leadsByUser ? previousData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
+      const previousProposals = previousData?.proposalStats?.total || 0;
+      const previousSales = previousData?.wonLeads || (previousData?.leadsByUser ? previousData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0);
+      
       const comparison = {
         currentPeriod: {
           totalLeads: salesData?.totalLeads || 0,
@@ -502,16 +513,23 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           winRate: salesData?.winRate || 0,
           averageDealSize: salesData?.averageDealSize || 0,
           totalRevenue: salesData?.totalRevenue || 0,
-          conversionRates: salesData?.conversionRates || { meetings: 0, prospects: 0, sales: 0 }
+          conversionRates: salesData?.conversionRates || { meetings: 0, prospects: 0, sales: 0 },
+          totalMeetings: currentMeetings,
+          totalProposals: currentProposals,
+          totalSales: currentSales
         },
         previousPeriod: {
-          totalLeads: salesData?.previousTotalLeads || 0,
-          activeLeads: salesData?.previousActiveLeads || 0,
-          winRate: salesData?.previousWinRate || 0,
-          averageDealSize: salesData?.previousAverageDealSize || 0,
-          totalRevenue: 0, // Não disponível nos V2 ainda
-          wonLeads: salesData?.previousWonLeads || 0,
-          conversionRates: { meetings: 0, prospects: 0, sales: 0 } // Não disponível nos V2 ainda
+          // Usar dados da 2ª requisição se disponíveis, senão usar campos de fallback
+          totalLeads: previousData?.totalLeads || salesData?.previousTotalLeads || 0,
+          activeLeads: previousData?.activeLeads || salesData?.previousActiveLeads || 0,
+          winRate: previousData?.winRate || salesData?.previousWinRate || 0,
+          averageDealSize: previousData?.averageDealSize || salesData?.previousAverageDealSize || 0,
+          totalRevenue: previousData?.totalRevenue || 0,
+          wonLeads: previousData?.wonLeads || salesData?.previousWonLeads || 0,
+          conversionRates: previousData?.conversionRates || { meetings: 0, prospects: 0, sales: 0 },
+          totalMeetings: previousMeetings,
+          totalProposals: previousProposals,
+          totalSales: previousSales
         }
       };
       
@@ -1750,8 +1768,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </div>
                 <TrendIndicator value={(() => {
                   const current = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
-                  // Simular valor anterior baseado em uma redução de 20%
-                  const previous = Math.floor(current / 0.8);
+                  const previous = comparisonData?.previousPeriod?.totalMeetings || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
@@ -1783,8 +1800,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </div>
                 <TrendIndicator value={(() => {
                   const current = salesData?.proposalStats?.total || 0;
-                  // Simular valor anterior baseado em uma melhoria de 15%
-                  const previous = Math.floor(current / 1.15);
+                  const previous = comparisonData?.previousPeriod?.totalProposals || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
@@ -1821,7 +1837,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </div>
                 <TrendIndicator value={(() => {
                   const current = salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0);
-                  const previous = salesData?.previousWonLeads || 0;
+                  const previous = comparisonData?.previousPeriod?.totalSales || salesData?.previousWonLeads || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
@@ -1845,7 +1861,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </div>
                 <TrendIndicator value={(() => {
                   const current = salesData?.averageDealSize || 0;
-                  const previous = salesData?.previousAverageDealSize || 0;
+                  const previous = comparisonData?.previousPeriod?.averageDealSize || salesData?.previousAverageDealSize || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
@@ -1858,7 +1874,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </div>
                 <TrendIndicator value={(() => {
                   const current = salesData?.totalRevenue || 0;
-                  const previous = (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
+                  const previous = comparisonData?.previousPeriod?.totalRevenue || (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
