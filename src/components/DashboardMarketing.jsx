@@ -710,8 +710,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       
     }, [data, type, config]);
 
-    // Removed loading sync - using dynamic updates without loading animations
-
     // Cleanup
     useEffect(() => {
       return () => {
@@ -788,6 +786,474 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   return (
     <div className={`dashboard-content ${isUpdating ? 'updating' : ''}`}>
+      {/* CSS para os novos estilos de filtros e botões de período */}
+      <style>{`
+        /* Estilos para o indicador de tendência */
+        .trend-indicator {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          margin-left: 8px;
+        }
+        
+        .trend-indicator.positive {
+          background-color: rgba(0, 200, 83, 0.15);
+          color: #00c853;
+        }
+        
+        .trend-indicator.negative {
+          background-color: rgba(255, 82, 82, 0.15);
+          color: #ff5252;
+        }
+        
+        .trend-indicator.neutral {
+          background-color: rgba(158, 158, 158, 0.15);
+          color: #9e9e9e;
+        }
+        
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        .trend-tag-square:hover {
+          transform: scale(1.1);
+          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .trend-tag-square {
+          cursor: default;
+          user-select: none;
+          flex-shrink: 0;
+        }
+        
+        .trend-indicator-square {
+          background-color: rgba(255, 82, 82, 0.15);
+          color: #ff3a5e;
+          border-radius: 8px;
+          padding: 4px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          display: inline-block;
+          text-align: center;
+        }
+
+        /* Estilização moderna dos controles de período */
+        .period-controls {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          align-items: flex-end;
+          position: relative;
+        }
+
+        .period-selector {
+          display: flex;
+          gap: 4px;
+          background: rgba(255, 255, 255, 0.9);
+          padding: 6px;
+          border-radius: 12px;
+          border: 1px solid #e0e6ed;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          backdrop-filter: blur(10px);
+        }
+
+        .period-selector button {
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          background: transparent;
+          color: #64748b;
+          font-weight: 500;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          white-space: nowrap;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .period-selector button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+          transition: left 0.5s ease;
+        }
+
+        .period-selector button:hover::before {
+          left: 100%;
+        }
+
+        .period-selector button:hover {
+          background: rgba(78, 88, 89, 0.1);
+          color: #4E5859;
+          transform: translateY(-1px);
+        }
+
+        .period-selector button.active {
+          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
+          color: white;
+          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
+          transform: translateY(-1px);
+        }
+
+        .period-selector button.active:hover {
+          background: linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%);
+          transform: translateY(-2px);
+        }
+
+        /* Estilos para MultiSelectFilter */
+        .multi-select-container {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          position: relative;
+          min-width: 200px;
+        }
+
+        .multi-select-wrapper {
+          position: relative;
+        }
+
+        .multi-select-button {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 10px 12px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 14px;
+          color: #2d3748;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-height: 42px;
+        }
+
+        .multi-select-button:hover {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+        }
+
+        .multi-select-button:focus {
+          outline: none;
+          border-color: #4E5859;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
+        }
+
+        .multi-select-text {
+          flex: 1;
+          text-align: left;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .multi-select-arrow {
+          margin-left: 8px;
+          font-size: 12px;
+          transition: transform 0.2s ease;
+          transform-origin: center;
+        }
+
+        .multi-select-arrow.open {
+          transform: rotate(180deg);
+        }
+
+        .multi-select-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+          max-height: 250px;
+          overflow-y: auto;
+          margin-top: 2px;
+        }
+
+        .multi-select-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          cursor: pointer;
+          transition: background-color 0.15s ease;
+          font-size: 14px;
+        }
+
+        .multi-select-option:hover {
+          background-color: #f7fafc;
+        }
+
+        .multi-select-option.selected {
+          background-color: rgba(78, 88, 89, 0.1);
+          color: #4E5859;
+          font-weight: 500;
+        }
+
+        .multi-select-option.select-all {
+          background-color: #f8f9fa;
+          font-weight: 600;
+          color: #4E5859;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .multi-select-option.select-all:hover {
+          background-color: #e9ecef;
+        }
+
+        .multi-select-divider {
+          height: 1px;
+          background-color: #e2e8f0;
+          margin: 0;
+        }
+
+        .multi-select-option input[type="checkbox"] {
+          margin: 0;
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .multi-select-option span {
+          flex: 1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* Estilos para filtro de campanha */
+        .campaign-filter-button {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 10px 12px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 14px;
+          color: #2d3748;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-height: 42px;
+        }
+
+        .campaign-filter-button:hover {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+        }
+
+        .dropdown-arrow {
+          margin-left: 8px;
+          font-size: 12px;
+          transition: transform 0.2s ease;
+        }
+
+        .dropdown-arrow.open {
+          transform: rotate(180deg);
+        }
+
+        .campaign-dropdown {
+          position: absolute; !important
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+          max-height: 0;
+          overflow: hidden;
+          opacity: 0;
+          transition: max-height 0.3s ease, opacity 0.2s ease, margin-top 0.2s ease;
+          margin-top: 0;
+          transform: none; !important
+        }
+
+        .campaign-dropdown.show {
+          max-height: 350px;
+          overflow-y: auto;
+          opacity: 1;
+          margin-top: 2px;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+          .period-selector {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          
+          .period-selector button {
+            padding: 8px 12px;
+            font-size: 13px;
+          }
+          
+          .multi-select-container {
+            min-width: 150px;
+          }
+          
+          .multi-select-button {
+            padding: 8px 10px;
+            font-size: 13px;
+            min-height: 38px;
+          }
+          
+          .multi-select-option {
+            padding: 8px 10px;
+            font-size: 13px;
+          }
+          
+          .multi-select-dropdown {
+            max-height: 200px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .filters-group {
+            flex-direction: column;
+            gap: 12px;
+          }
+          
+          .multi-select-container {
+            min-width: unset;
+          }
+          
+          .period-selector {
+            width: 100%;
+          }
+        }
+
+        /* Estilos para o modal de período customizado */
+        .custom-period-backdrop {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .custom-period-modal {
+          background-color: white;
+          border-radius: 12px;
+          padding: 24px;
+          width: 90%;
+          max-width: 500px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .custom-period-modal h3 {
+          margin-top: 0;
+          color: #4E5859;
+          font-size: 18px;
+          margin-bottom: 20px;
+          text-align: center;
+        }
+
+        .date-inputs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .date-inputs label {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 14px;
+          color: #4a5568;
+          font-weight: 500;
+        }
+
+        .date-inputs input {
+          padding: 12px;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+
+        .date-inputs input:focus {
+          outline: none;
+          border-color: #4E5859;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+
+        .modal-actions button {
+          padding: 10px 20px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .modal-actions button:first-child {
+          background-color: #f7fafc;
+          color: #4a5568;
+          border: 2px solid #e2e8f0;
+        }
+
+        .modal-actions button:first-child:hover {
+          background-color: #edf2f7;
+        }
+
+        .modal-actions button:last-child {
+          background-color: #4E5859;
+          color: white;
+          border: none;
+        }
+
+        .modal-actions button:last-child:hover {
+          background-color: #3a4344;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
+        }
+
+        @media (max-width: 480px) {
+          .date-inputs {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+          
+          .modal-actions {
+            flex-direction: column;
+            gap: 8px;
+          }
+          
+          .modal-actions button {
+            width: 100%;
+          }
+        }
+      `}</style>
+
       <div className="dashboard-row row-header">
         <div className="section-title">
           <h2>Dashboard de Marketing</h2>
@@ -822,89 +1288,91 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                           <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
                         </button>
                         
-                        <div className={`campaign-dropdown ${showDropdown ? 'show' : ''}`}>
-                          <div className="campaign-search">
-                            <input
-                              type="text"
-                              placeholder="Buscar campanhas..."
-                              value={campaignFilters.searchTerm}
-                              onChange={(e) => setCampaignFilters({
-                                ...campaignFilters,
-                                searchTerm: e.target.value
-                              })}
-                              className="campaign-search-input"
-                            />
-                          </div>
-                          
-                          <div className="campaign-actions">
-                            <button 
-                              className="select-all-btn"
-                              onClick={() => {
-                                if (selectedCampaigns.length === campaigns.length) {
-                                  // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
+                        {showDropdown && (
+                          <div className="campaign-dropdown show">
+                            <div className="campaign-search">
+                              <input
+                                type="text"
+                                placeholder="Buscar campanhas..."
+                                value={campaignFilters.searchTerm}
+                                onChange={(e) => setCampaignFilters({
+                                  ...campaignFilters,
+                                  searchTerm: e.target.value
+                                })}
+                                className="campaign-search-input"
+                              />
+                            </div>
+                            
+                            <div className="campaign-actions">
+                              <button 
+                                className="select-all-btn"
+                                onClick={() => {
+                                  if (selectedCampaigns.length === campaigns.length) {
+                                    // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
+                                    setSelectedCampaigns([]);
+                                    setCampaignFilters({
+                                      ...campaignFilters,
+                                      campaignIds: []
+                                    });
+                                    setCampaignInsights(null); // Limpar insights apenas
+                                  } else {
+                                    // Se nem todas estão selecionadas, selecionar todas
+                                    const allCampaignIds = campaigns.map(c => c.id);
+                                    setSelectedCampaigns(allCampaignIds);
+                                    handleCampaignFilterChange({
+                                      ...campaignFilters,
+                                      campaignIds: allCampaignIds
+                                    });
+                                  }
+                                }}
+                              >
+                                {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                              </button>
+                              <button 
+                                className="clear-all-btn"
+                                onClick={() => {
+                                  // Limpar sem recarregar dados
                                   setSelectedCampaigns([]);
                                   setCampaignFilters({
                                     ...campaignFilters,
                                     campaignIds: []
                                   });
                                   setCampaignInsights(null); // Limpar insights apenas
-                                } else {
-                                  // Se nem todas estão selecionadas, selecionar todas
-                                  const allCampaignIds = campaigns.map(c => c.id);
-                                  setSelectedCampaigns(allCampaignIds);
-                                  handleCampaignFilterChange({
-                                    ...campaignFilters,
-                                    campaignIds: allCampaignIds
-                                  });
-                                }
-                              }}
-                            >
-                              {selectedCampaigns.length === campaigns.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
-                            </button>
-                            <button 
-                              className="clear-all-btn"
-                              onClick={() => {
-                                // Limpar sem recarregar dados
-                                setSelectedCampaigns([]);
-                                setCampaignFilters({
-                                  ...campaignFilters,
-                                  campaignIds: []
-                                });
-                                setCampaignInsights(null); // Limpar insights apenas
-                              }}
-                            >
-                              Limpar
-                            </button>
+                                }}
+                              >
+                                Limpar
+                              </button>
+                            </div>
+                            
+                            <div className="campaign-list">
+                              {campaigns
+                                .filter(campaign => 
+                                  !campaignFilters.searchTerm || 
+                                  campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
+                                )
+                                .map(campaign => (
+                                  <label key={campaign.id} className="campaign-item">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedCampaigns.includes(campaign.id)}
+                                      onChange={() => handleCampaignSelect(campaign.id)}
+                                    />
+                                    <span className="campaign-name">{campaign.name}</span>
+                                    <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
+                                      {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
+                                    </span>
+                                  </label>
+                                ))}
+                            </div>
                           </div>
-                          
-                          <div className="campaign-list">
-                            {campaigns
-                              .filter(campaign => 
-                                !campaignFilters.searchTerm || 
-                                campaign.name.toLowerCase().includes(campaignFilters.searchTerm.toLowerCase())
-                              )
-                              .map(campaign => (
-                                <label key={campaign.id} className="campaign-item">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedCampaigns.includes(campaign.id)}
-                                    onChange={() => handleCampaignSelect(campaign.id)}
-                                  />
-                                  <span className="campaign-name">{campaign.name}</span>
-                                  <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
-                                    {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
-                                  </span>
-                                </label>
-                              ))}
-                          </div>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
               )}
             </div>
-            <div className="period-controls" style={{ position: 'relative' }}>
+            <div className="period-controls">
               <div className="period-selector">
                 <button 
                   className={period === 'current_month' ? 'active' : ''} 
@@ -1157,8 +1625,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             />
           </div>
         )}
-        
-      
       </div>
 
       {/* Linha 7: Demografia - Gênero */}
