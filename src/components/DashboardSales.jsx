@@ -2097,7 +2097,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div>
                 {new Date(customPeriod.startDate).toLocaleDateString('pt-BR')} até {' '}
                 {new Date(customPeriod.endDate).toLocaleDateString('pt-BR')}
-                {' '}({Math.ceil((new Date(customPeriod.endDate) - new Date(customPeriod.startDate)) / (1000 * 60 * 60 * 24))} dias)
+                {' '}({Math.ceil((new Date(customPeriod.endDate) - new Date(customPeriod.startDate)) / (1000 * 60 * 60 * 24)) + 1} dias)
               </div>
             </div>
           )}
