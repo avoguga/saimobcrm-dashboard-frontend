@@ -521,8 +521,8 @@ function Dashboard() {
       }
       
       // Validar se data final é maior que inicial
-      const startDate = new Date(dataToUse.startDate);
-      const endDate = new Date(dataToUse.endDate);
+      const startDate = new Date(dataToUse.startDate + 'T12:00:00');
+      const endDate = new Date(dataToUse.endDate + 'T12:00:00');
       
       if (endDate <= startDate) {
         alert('Data final deve ser posterior à data inicial');
@@ -532,8 +532,8 @@ function Dashboard() {
       // Fechar o modal
       setShowCustomPeriod(false);
       
-      // Carregar dados silenciosamente (sem loading) usando os dados corretos
-      await loadCustomPeriodDataSilent(dataToUse);
+      // Carregar dados com loading usando os dados corretos
+      await loadCustomPeriodDataWithPeriod(dataToUse);
     } else {
       alert('Por favor, selecione ambas as datas');
     }

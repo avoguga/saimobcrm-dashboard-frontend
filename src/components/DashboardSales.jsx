@@ -1023,7 +1023,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
   // Se está carregando, mostrar loading spinner
   if (isLoading) {
-    return <LoadingSpinner message="Carregando dados de vendas..." />;
+    return <LoadingSpinner message="🔄 Atualizando dados de vendas..." />;
   }
 
   // Se não tem dados E não está carregando, mostrar erro
@@ -2095,9 +2095,9 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <span>📊</span> Período Selecionado
               </div>
               <div>
-                {new Date(customPeriod.startDate).toLocaleDateString('pt-BR')} até {' '}
-                {new Date(customPeriod.endDate).toLocaleDateString('pt-BR')}
-                {' '}({Math.ceil((new Date(customPeriod.endDate) - new Date(customPeriod.startDate)) / (1000 * 60 * 60 * 24)) + 1} dias)
+                {new Date(customPeriod.startDate + 'T12:00:00').toLocaleDateString('pt-BR')} até {' '}
+                {new Date(customPeriod.endDate + 'T12:00:00').toLocaleDateString('pt-BR')}
+                {' '}({Math.ceil((new Date(customPeriod.endDate + 'T12:00:00') - new Date(customPeriod.startDate + 'T12:00:00')) / (1000 * 60 * 60 * 24)) + 1} dias)
               </div>
             </div>
           )}
@@ -2135,8 +2135,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   return;
                 }
                 
-                const startDate = new Date(customPeriod.startDate);
-                const endDate = new Date(customPeriod.endDate);
+                const startDate = new Date(customPeriod.startDate + 'T12:00:00');
+                const endDate = new Date(customPeriod.endDate + 'T12:00:00');
                 
                 if (endDate <= startDate) {
                   alert('Data final deve ser posterior à data inicial');

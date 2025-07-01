@@ -727,7 +727,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   // Se está carregando E não tem dados, mostrar loading spinner
   if (isLoading && !marketingData) {
-    return <LoadingSpinner message="Carregando dados de marketing..." />;
+    return <LoadingSpinner message="🔄 Atualizando dados de marketing..." />;
   }
 
   // Se não tem dados E não está carregando, mostrar erro
