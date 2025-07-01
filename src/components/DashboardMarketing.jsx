@@ -107,7 +107,7 @@ const MultiSelectFilter = ({ label, options, selectedValues, onChange, placehold
   );
 };
 
-function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, salesData, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
+function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, salesData, salesData, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
   const [marketingData, setMarketingData] = useState(data);
   const [filteredData, setFilteredData] = useState(data);
   
@@ -126,13 +126,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
-  
-  // Estados para dados demográficos
-  const [demographicData, setDemographicData] = useState({
-    genderData: [],
-    cityData: []
-  });
-  const [loadingDemographics, setLoadingDemographics] = useState(false);
 
   // Constantes de responsividade
   const isMobile = windowSize.width < 768;
@@ -184,6 +177,64 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       setFilteredData(data);
     }
   }, [data]);
+
+  // Effect para atualizar insights quando o período muda (se há campanhas selecionadas)
+  useEffect(() => {
+    // Só executar se há campanhas selecionadas e o período mudou
+    if (selectedCampaigns.length > 0 && period) {
+      console.log('📅 Período mudou, atualizando insights das campanhas selecionadas:', { 
+        period, 
+        customPeriod, 
+        selectedCampaigns: selectedCampaigns.length 
+      });
+      
+      // Função assíncrona para atualizar insights sem mostrar loading
+      const updateInsightsSilently = async () => {
+        try {
+          // Preparar range de datas baseado no período selecionado
+          let dateRange;
+          if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+            dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+          } else {
+            // Calcular datas baseado no período
+            const endDate = new Date();
+            const startDate = new Date();
+            
+            switch (period) {
+              case '7d':
+                startDate.setDate(endDate.getDate() - 7);
+                break;
+              case '30d':
+                startDate.setDate(endDate.getDate() - 30);
+                break;
+              case '60d':
+                startDate.setDate(endDate.getDate() - 60);
+                break;
+              case '90d':
+                startDate.setDate(endDate.getDate() - 90);
+                break;
+              default:
+                startDate.setDate(endDate.getDate() - 30);
+            }
+            
+            dateRange = {
+              start: startDate.toISOString().split('T')[0],
+              end: endDate.toISOString().split('T')[0]
+            };
+          }
+          
+          // Carregar insights sem mostrar loading (similar ao auto-refresh)
+          const insights = await GranularAPI.getFacebookCampaignInsights(selectedCampaigns, dateRange);
+          setCampaignInsights(insights);
+          console.log('✅ Insights de campanhas atualizados silenciosamente:', insights);
+        } catch (error) {
+          console.error('Erro ao atualizar insights de campanhas:', error);
+        }
+      };
+      
+      updateInsightsSilently();
+    }
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]); // Monitorar mudanças no período
 
   // Effect para atualizar insights quando o período muda (se há campanhas selecionadas)
   useEffect(() => {
@@ -1601,36 +1652,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         </div>
       </div>
 
-      {/* QUADRO 1: Métricas Principais */}
-      <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group">
-          <div className="card-title">Métricas Principais</div>
-          <div className="metrics-group">
-            <MiniMetricCardWithTrend
-              title="TOTAL DE LEADS"
-              value={filteredData.totalLeads || 0}
-              trendValue={25.8}
-              color={COLORS.primary}
-            />
-            <MiniMetricCardWithTrend
-              title="TOTAL DE VISITAS AO PERFIL"
-              value="2.847" // MOCKADO - Dado não disponível na API
-              trendValue={18.5}
-              color={COLORS.secondary}
-              subtitle="Mockado"
-            />
-            <MiniMetricCardWithTrend
-              title="CONVERSAS PELO WHATSAPP"
-              value="387" // MOCKADO - Dado não disponível na API
-              trendValue={12.3}
-              color={COLORS.success}
-              subtitle="Mockado"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* QUADRO 2: Métricas de Performance */}
+     {/* Linha 1: Facebook Ads sozinho */}
       <div className="dashboard-row row-compact">
         <div className="card card-metrics-group wide">
           <div className="card-title">
@@ -1682,38 +1704,55 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               trendValue={22.7}
               color={COLORS.primary}
             />
-            <MiniMetricCardWithTrend
-              title="VALOR INVESTIDO"
-              value={`R$ ${(facebookMetrics.spend || 0).toFixed(2)}`}
-              trendValue={-3.2}
-              color={COLORS.secondary}
-            />
+            {(facebookMetrics.inlineLinkClicks || 0) > 0 && (
+              <MiniMetricCardWithTrend
+                title="Link Clicks"
+                value={(facebookMetrics.inlineLinkClicks || 0).toLocaleString()}
+                current={facebookMetrics.inlineLinkClicks || 0}
+                previous={filteredData.previousFacebookMetrics?.inlineLinkClicks || 0}
+                color={COLORS.success}
+              />
+            )}
+            {campaignInsights && selectedCampaigns.length > 0 && (
+              <>
+                <MiniMetricCardWithTrend
+                  title="Engajamento Página"
+                  value={(facebookMetrics.engagement.pageEngagement || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.pageEngagement || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.pageEngagement || 0}
+                  color={COLORS.primary}
+                />
+                <MiniMetricCardWithTrend
+                  title="Reações"
+                  value={(facebookMetrics.engagement.likes || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.likes || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.likes || 0}
+                  color={COLORS.success}
+                />
+                <MiniMetricCardWithTrend
+                  title="Comentários"
+                  value={(facebookMetrics.engagement.comments || 0).toLocaleString()}
+                  current={facebookMetrics.engagement.comments || 0}
+                  previous={filteredData.previousFacebookMetrics?.engagement?.comments || 0}
+                  color={COLORS.warning}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* QUADRO 3: Métricas de Engajamento */}
+      {/* Linha 2: Status dos Leads de Marketing */}
       <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group">
-          <div className="card-title">Métricas de Engajamento</div>
+        <div className="card card-metrics-group wide">
+          <div className="card-title">Status dos Leads de Marketing</div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
-              title="ENGAJAMENTO COM A PÁGINA"
-              value={(facebookMetrics.engagement?.pageEngagement || 0).toLocaleString()}
-              trendValue={14.3}
+              title="Total de Leads"
+              value={filteredData.totalLeads || 0}
+              current={filteredData.totalLeads || 0}
+              previous={filteredData.previousPeriodLeads || 0}
               color={COLORS.primary}
-            />
-            <MiniMetricCardWithTrend
-              title="REAÇÕES"
-              value={(facebookMetrics.engagement?.likes || 0).toLocaleString()}
-              trendValue={9.6}
-              color={COLORS.success}
-            />
-            <MiniMetricCardWithTrend
-              title="COMENTÁRIOS"
-              value={(facebookMetrics.engagement?.comments || 0).toLocaleString()}
-              trendValue={-2.1}
-              color={COLORS.warning}
             />
           </div>
         </div>
@@ -1780,23 +1819,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         </div>
       )}
 
-      {/* Linha 5: Leads por Corretor */}
-      {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && (
-        <div className="dashboard-row">
-          <div className="card card-full">
-            <div className="card-title">Leads criados no período</div>
-            <CompactChart 
-              type="bar" 
-              data={salesData.leadsByUser.sort((a, b) => (b.value || 0) - (a.value || 0))} 
-              config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
-              style={{ height: getChartHeight('medium') }}
-              loading={false}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Linha 6: Tendência e métricas do Facebook */}
+      {/* Linha 5: Tendência e métricas do Facebook */}
       <div className="dashboard-row">
         {filteredData.metricsTrend && filteredData.metricsTrend.length > 0 && (
           <div className="card card-lg">
@@ -1810,30 +1833,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             />
           </div>
         )}
-      </div>
-
-      {/* Linha 7: Demografia - Gênero */}
-      <div className="dashboard-row">
-        <div className="card card-lg">
-          <div className="card-title">
-            Leads por Gênero
-            {loadingDemographics && <span className="loading-indicator"> - Carregando...</span>}
-          </div>
-          <CompactChart 
-            type="pie" 
-            data={demographicData.genderData.length > 0 ? demographicData.genderData : [
-              { name: 'Sem dados', value: 1 }
-            ]} 
-            config={{ 
-              name: 'Leads por Gênero',
-              colors: demographicData.genderData.length > 0 ? 
-                [COLORS.primary, COLORS.secondary, COLORS.light] : 
-                [COLORS.light]
-            }}
-            style={{ height: getChartHeight('medium') }}
-            loading={loadingDemographics}
-          />
-        </div>
+        
+      
       </div>
       
       {/* Modal de período customizado */}
