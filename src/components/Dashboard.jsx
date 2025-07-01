@@ -564,11 +564,21 @@ function Dashboard() {
       };
       
       
-      // Carregar dados em paralelo (sem filtros - filtragem será feita no frontend)
+      // Carregar dados em paralelo (COM filtros aplicados)
       const [marketingResult, salesResult] = await Promise.all([
         GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
-        GranularAPI.loadSalesDashboard(days, null, null, customDates)
+        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
       ]);
+      
+      // Buscar dados do período anterior para comparação
+      try {
+        const previousPeriodData = await loadPreviousPeriodData('custom', days, periodData, selectedCorretor, selectedSource);
+        if (previousPeriodData) {
+          salesResult.previousPeriodData = previousPeriodData;
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar dados do período anterior:', error);
+      }
       
       setMarketingData(marketingResult);
       setSalesData(salesResult);
@@ -600,11 +610,21 @@ function Dashboard() {
       };
       
       
-      // Carregar dados em paralelo (silenciosamente, sem filtros - filtragem será feita no frontend)
+      // Carregar dados em paralelo (silenciosamente, COM filtros aplicados)
       const [marketingResult, salesResult] = await Promise.all([
         GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
-        GranularAPI.loadSalesDashboard(days, null, null, customDates)
+        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
       ]);
+      
+      // Buscar dados do período anterior para comparação (silenciosamente)
+      try {
+        const previousPeriodData = await loadPreviousPeriodData('custom', days, periodData, selectedCorretor, selectedSource);
+        if (previousPeriodData) {
+          salesResult.previousPeriodData = previousPeriodData;
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar dados do período anterior:', error);
+      }
       
       // Atualizar dados sem mostrar loading
       setMarketingData(marketingResult);
