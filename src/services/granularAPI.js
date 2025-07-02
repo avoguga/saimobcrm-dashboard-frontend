@@ -9,7 +9,7 @@
 
 import { MockDataService } from './mockDataService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohenrique.dev';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 // Flags HONESTAS por módulo
 const USE_MOCK_SALES = false; // ✅ VENDAS: Endpoints V2 implementados!
@@ -226,6 +226,62 @@ export class GranularAPI {
     }
   }
 
+  /**
+   * 🚀 BUSCAR ESTATÍSTICAS DE WHATSAPP
+   * Busca dados reais de conversas do WhatsApp
+   * @param {Object} dateRange - Objeto com datas de início e fim {start, end} ou {days}
+   * @returns {Promise} - Dados de conversas de WhatsApp e tendência
+   */
+  static async getWhatsAppStats(dateRange) {
+    const cacheKey = `whatsapp_stats_${JSON.stringify(dateRange)}`;
+    const cached = this.getCached(cacheKey);
+    
+    if (cached) {
+      console.log('📱 Usando cache do WhatsApp stats');
+      return cached;
+    }
+
+    console.log('📱 Buscando estatísticas de WhatsApp da API');
+    
+    try {
+      let url = `${API_URL}/dashboard/whatsapp-stats`;
+      let params = new URLSearchParams();
+      
+      if (dateRange) {
+        if (dateRange.start && dateRange.end) {
+          params.append('start_date', dateRange.start);
+          params.append('end_date', dateRange.end);
+        } else if (dateRange.days) {
+          params.append('days', dateRange.days);
+        }
+      }
+      
+      // Adicionar timestamp para evitar cache do browser
+      params.append('_t', Date.now().toString());
+      
+      // DEBUG: Log params
+      console.log('🔍 WhatsApp API Params:', {
+        dateRange,
+        url: `${url}?${params}`
+      });
+      
+      const response = await fetch(`${url}?${params}`);
+      const data = await response.json();
+      
+      // Salvar no cache
+      this.setCache(cacheKey, data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar estatísticas de WhatsApp:', error);
+      // Retornar dados mockados como fallback em caso de erro
+      return {
+        totalConversations: 387,
+        trend: 12.3,
+        _metadata: { fallback: true, error: error.message }
+      };
+    }
+  }
 
   /**
    * 🚀 BUSCAR INSIGHTS DE CAMPANHAS ESPECÍFICAS

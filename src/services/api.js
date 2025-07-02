@@ -1,5 +1,5 @@
 // src/services/api.js
-const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohenrique.dev';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 /**
  * Serviço para comunicação com a API do Kommo Dashboard
