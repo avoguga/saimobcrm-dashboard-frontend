@@ -72,7 +72,7 @@ function Dashboard() {
     };
   };
 
-  const [activeTab, setActiveTab] = useState('marketing');
+  const [activeTab, setActiveTab] = useState('sales');
   const [period, setPeriod] = useState('current_month');
   const [customPeriod, setCustomPeriod] = useState(getDefaultPeriod());
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
@@ -91,6 +91,7 @@ function Dashboard() {
   const [isLoadingSales, setIsLoadingSales] = useState(false);
   const [isInitialSalesLoad, setIsInitialSalesLoad] = useState(true);
   const [isUpdatingSales, setIsUpdatingSales] = useState(false);
+  const [isUpdatingDateFilter, setIsUpdatingDateFilter] = useState(false);
   // Removido isLoadingFilters - filtragem agora é instantânea no frontend
   const [error, setError] = useState(null);
   const [marketingData, setMarketingData] = useState(null);
@@ -189,10 +190,10 @@ function Dashboard() {
     return Boolean(period && period !== 'custom');
   };
 
-  // Carregar dados de marketing (só quando period está válido) com debounce
+  // Carregar dados de marketing (só quando period está válido E aba marketing ativa) com debounce
   useEffect(() => {
-    if (!isPeriodValid()) {
-      return; // Não faz nada se o período não estiver válido
+    if (!isPeriodValid() || activeTab !== 'marketing') {
+      return; // Não faz nada se o período não estiver válido OU se não estiver na aba marketing
     }
 
     // Debounce de 300ms para evitar múltiplas chamadas
@@ -263,7 +264,7 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period]); // REMOVIDO: customPeriod.startDate, customPeriod.endDate - filtragem apenas no Aplicar
+  }, [period, activeTab]); // REMOVIDO: customPeriod.startDate, customPeriod.endDate - filtragem apenas no Aplicar
 
   // Hook para atualização automática
   useEffect(() => {
@@ -323,10 +324,10 @@ function Dashboard() {
     }
   }, [activeTab, marketingData, salesData]);
 
-  // Carregar dados de vendas (quando period está válido OU selectedCorretor muda) com debounce
+  // Carregar dados de vendas (quando period está válido E aba sales ativa) com debounce
   useEffect(() => {
-    if (!isPeriodValid()) {
-      return; // Não faz nada se o período não estiver válido
+    if (!isPeriodValid() || activeTab !== 'sales') {
+      return; // Não faz nada se o período não estiver válido OU se não estiver na aba sales
     }
 
     // Debounce de 300ms para evitar múltiplas chamadas
@@ -394,12 +395,14 @@ function Dashboard() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [period]); // Removido filtros para não trigger automático - agora só com botão Apply
+  }, [period, activeTab]); // Removido filtros para não trigger automático - agora só com botão Apply
   
-  // Reset da flag de primeira carga quando o período muda (não os filtros)
+  // Reset da flag de primeira carga quando o período muda (só na aba sales)
   useEffect(() => {
-    setIsInitialSalesLoad(true);
-  }, [period]);
+    if (activeTab === 'sales') {
+      setIsInitialSalesLoad(true);
+    }
+  }, [period, activeTab]);
 
   // Sincronizar filtros pendentes com os aplicados na inicialização
   useEffect(() => {
@@ -547,6 +550,7 @@ function Dashboard() {
   // Função para carregar dados usando período específico (com loading)
   const loadCustomPeriodDataWithPeriod = async (periodData) => {
     
+    setIsUpdatingDateFilter(true);
     setIsLoadingMarketing(true);
     setIsLoadingSales(true);
     setError(null);
@@ -586,61 +590,20 @@ function Dashboard() {
     } catch (error) {
       setError(`Falha ao carregar dados: ${error.message}`);
     } finally {
+      setIsUpdatingDateFilter(false);
       setIsLoadingMarketing(false);
       setIsLoadingSales(false);
-      setIsLoadingFilters(false);
-    }
-  };
-
-  // Função para carregar dados silenciosamente (sem loading) - similar ao auto-refresh
-  const loadCustomPeriodDataSilent = async (periodData) => {
-    
-    // NÃO mostrar loading - atualização silenciosa como auto-refresh
-    
-    try {
-      // Calcular dias baseado no período específico
-      const startDate = new Date(periodData.startDate);
-      const endDate = new Date(periodData.endDate);
-      const days = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-      
-      // Preparar datas customizadas
-      const customDates = {
-        start_date: periodData.startDate,
-        end_date: periodData.endDate
-      };
-      
-      
-      // Carregar dados em paralelo (silenciosamente, COM filtros aplicados)
-      const [marketingResult, salesResult] = await Promise.all([
-        GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
-        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
-      ]);
-      
-      // Buscar dados do período anterior para comparação (silenciosamente)
-      try {
-        const previousPeriodData = await loadPreviousPeriodData('custom', days, periodData, selectedCorretor, selectedSource);
-        if (previousPeriodData) {
-          salesResult.previousPeriodData = previousPeriodData;
-        }
-      } catch (error) {
-        console.warn('Erro ao buscar dados do período anterior:', error);
-      }
-      
-      // Atualizar dados sem mostrar loading
-      setMarketingData(marketingResult);
-      setSalesData(salesResult);
-      
-    } catch (error) {
-      // Não mostrar erro em loading silencioso
     }
   };
 
   // Função para aplicar filtros pendentes
   const applyFilters = async () => {
+    console.log('🔍 APLICANDO FILTROS:', { pendingCorretor, pendingSource });
     setSelectedCorretor(pendingCorretor);
     setSelectedSource(pendingSource);
     
     if (!isPeriodValid()) {
+      console.log('❌ Período inválido, cancelando aplicação de filtros');
       return;
     }
 
@@ -672,7 +635,9 @@ function Dashboard() {
       }
       
       // Usar filtros pendentes ao invés dos aplicados
+      console.log('📡 CHAMANDO API com filtros:', { days, pendingCorretor, pendingSource, customDates });
       const salesResult = await GranularAPI.loadSalesDashboard(days, pendingCorretor, pendingSource, customDates);
+      console.log('📊 RESULTADO DA API:', salesResult);
       
       // Buscar dados do período anterior para comparação (2ª requisição)
       try {
@@ -779,7 +744,7 @@ function Dashboard() {
           sourceOptions={sourceOptions}
           data={marketingData}
           salesData={salesData}
-          isLoading={isLoadingMarketing}
+          isLoading={isLoadingMarketing || isUpdatingDateFilter}
           isUpdating={false}
           customPeriod={customPeriod}
           setCustomPeriod={setCustomPeriod}
@@ -807,7 +772,7 @@ function Dashboard() {
           hasPendingFilters={hasPendingFilters}
           sourceOptions={sourceOptions}
           data={salesData}
-          isLoading={isLoadingSales}
+          isLoading={isLoadingSales || isUpdatingDateFilter}
           isUpdating={isUpdatingSales}
           customPeriod={customPeriod}
           setCustomPeriod={setCustomPeriod}
