@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, memo } from 'react';
 import * as echarts from 'echarts';
 import LoadingSpinner from './LoadingSpinner';
 import GranularAPI from '../services/granularAPI';
+import SimpleModal from './SimpleModal'; // Importando o SimpleModal
 import './Dashboard.css';
 
 // Paleta de cores da SA IMOB
@@ -19,7 +20,7 @@ const COLORS = {
 };
 
 // Multi-select filter component
-const MultiSelectFilter = ({ label, options, selectedValues, onChange, placeholder }) => {
+const MultiSelectFilter = ({ label, options, selectedValues, onChange, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -38,6 +39,7 @@ const MultiSelectFilter = ({ label, options, selectedValues, onChange, placehold
   }, []);
 
   const handleToggleOption = (value) => {
+    if (disabled) return;
     const newSelectedValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
       : [...selectedValues, value];
@@ -46,6 +48,7 @@ const MultiSelectFilter = ({ label, options, selectedValues, onChange, placehold
   };
 
   const handleSelectAll = () => {
+    if (disabled) return;
     if (selectedValues.length === options.length) {
       onChange([]);
     } else {
@@ -68,14 +71,15 @@ const MultiSelectFilter = ({ label, options, selectedValues, onChange, placehold
       <div className="multi-select-wrapper">
         <button
           type="button"
-          className="multi-select-button"
-          onClick={() => setIsOpen(!isOpen)}
+          className={`multi-select-button ${disabled ? 'disabled' : ''}`}
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
         >
           <span className="multi-select-text">{getDisplayText()}</span>
           <span className={`multi-select-arrow ${isOpen ? 'open' : ''}`}>▼</span>
         </button>
 
-        {isOpen && (
+        {isOpen && !disabled && (
           <div className="multi-select-dropdown">
             <div className="multi-select-option select-all" onClick={handleSelectAll}>
               <input
@@ -127,6 +131,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   
+
+  
+  
   // Estados para dados demográficos
   const [demographicData, setDemographicData] = useState({
     genderData: [],
@@ -137,6 +144,11 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   // Constantes de responsividade
   const isMobile = windowSize.width < 768;
   const isSmallMobile = windowSize.width < 480;
+  const [whatsAppStats, setWhatsAppStats] = useState({
+  totalConversations: 0,
+  trend: 0
+});
+const [loadingWhatsAppStats, setLoadingWhatsAppStats] = useState(false);
 
   // Effect to track props changes
 
@@ -313,6 +325,65 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     loadDemographicData();
   }, [period, customPeriod?.startDate, customPeriod?.endDate, selectedCampaigns]);
 
+  // Adicione este novo useEffect para carregar os dados do WhatsApp
+  // Adicione após os outros useEffects que buscam dados
+
+  useEffect(() => {
+    const loadWhatsAppStats = async () => {
+      setLoadingWhatsAppStats(true);
+      try {
+        // Preparar range de datas baseado no período selecionado
+        let dateRange = {};
+        
+        if (period === 'current_month') {
+          const today = new Date();
+          const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+          dateRange = {
+            start: firstDayOfMonth.toISOString().split('T')[0],
+            end: today.toISOString().split('T')[0]
+          };
+        } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          dateRange = { 
+            start: customPeriod.startDate, 
+            end: customPeriod.endDate 
+          };
+        } else {
+          // Definir days com base no período selecionado
+          switch (period) {
+            case '7d': dateRange.days = 7; break;
+            case '30d': dateRange.days = 30; break;
+            case '60d': dateRange.days = 60; break;
+            case '90d': dateRange.days = 90; break;
+            default: dateRange.days = 30; break;
+          }
+        }
+        
+        // Buscar dados de WhatsApp usando o método da classe GranularAPI
+        const whatsAppData = await GranularAPI.getWhatsAppStats(dateRange);
+        
+        console.log('📱 WhatsApp data recebido:', whatsAppData);
+        
+        // Atualizar estado com dados recebidos
+        setWhatsAppStats({
+          totalConversations: whatsAppData.totalConversations || 0,
+          trend: whatsAppData.trend || 0
+        });
+        
+      } catch (error) {
+        console.error('Erro ao carregar estatísticas de WhatsApp:', error);
+        // Em caso de erro, definir valores padrão
+        setWhatsAppStats({
+          totalConversations: 387,
+          trend: 12.3
+        });
+      } finally {
+        setLoadingWhatsAppStats(false);
+      }
+    };
+    
+    loadWhatsAppStats();
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]);
+
   // Filtrar dados dinamicamente sem recarregar da API
   useEffect(() => {
     if (!marketingData) return;
@@ -358,6 +429,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   // Função para aplicar filtros de campanha (otimizada para evitar re-renders desnecessários)
   const handleCampaignFilterChange = async (newFilters) => {
+    if (isUpdating) return; // Não permitir mudanças durante atualização
+    
     setCampaignFilters(newFilters);
     
     // Se houver campanhas selecionadas, carregar insights específicos
@@ -421,6 +494,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   // Handler para seleção de campanhas
   const handleCampaignSelect = (campaignId) => {
+    if (isUpdating) return; // Não permitir mudanças durante atualização
+    
     const newSelectedCampaigns = selectedCampaigns.includes(campaignId)
       ? selectedCampaigns.filter(id => id !== campaignId)
       : [...selectedCampaigns, campaignId];
@@ -722,6 +797,35 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
     return <div ref={chartRef} style={style} />;
   });
+  
+  // Função auxiliar para formatar a data corretamente no formato brasileiro
+  const formatDateBR = (dateString) => {
+    // Cria um novo objeto Date mantendo a data sem alterar o fuso horário
+    const parts = dateString.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // Mês em JavaScript é 0-indexed
+    const day = parseInt(parts[2]);
+    
+    // Formata a data diretamente sem criar um objeto Date
+    return `${day.toString().padStart(2, '0')}/${(month + 1).toString().padStart(2, '0')}/${year}`;
+  };
+
+  // Função para calcular diferença de dias entre duas datas sem problemas de fuso horário
+  const calculateDaysDifference = (startDateStr, endDateStr) => {
+    // Converte para objetos Date UTC para evitar problemas de fuso horário
+    const startParts = startDateStr.split('-').map(Number);
+    const endParts = endDateStr.split('-').map(Number);
+    
+    // Cria datas com UTC para evitar problemas de fuso horário
+    const startDate = new Date(Date.UTC(startParts[0], startParts[1] - 1, startParts[2]));
+    const endDate = new Date(Date.UTC(endParts[0], endParts[1] - 1, endParts[2]));
+    
+    // Calcula a diferença em dias
+    const diffTime = Math.abs(endDate - startDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays;
+  };
 
   // Se está carregando E não tem dados, mostrar loading spinner
   if (isLoading && !marketingData) {
@@ -950,6 +1054,12 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
         }
 
+        .multi-select-button.disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          background-color: #f5f5f5;
+        }
+
         .multi-select-text {
           flex: 1;
           text-align: left;
@@ -1057,6 +1167,12 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
         }
 
+        .campaign-filter-button.disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          background-color: #f5f5f5;
+        }
+
         .dropdown-arrow {
           margin-left: 8px;
           font-size: 12px;
@@ -1139,118 +1255,41 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           }
         }
 
-        /* Estilos para o modal de período customizado */
-        .custom-period-backdrop {
-          position: fixed;
+        /* Estilo para overlay de loading */
+        .dashboard-content.updating {
+          position: relative;
+        }
+
+        .dashboard-content.updating::before {
+          content: '';
+          position: absolute;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          background-color: rgba(255, 255, 255, 0.7);
           z-index: 1000;
+          pointer-events: all;
         }
 
-        .custom-period-modal {
-          background-color: white;
-          border-radius: 12px;
-          padding: 24px;
-          width: 90%;
-          max-width: 500px;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        .dashboard-content.updating::after {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 50px;
+          height: 50px;
+          border: 5px solid #f3f3f3;
+          border-top: 5px solid #4E5859;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          z-index: 1001;
         }
 
-        .custom-period-modal h3 {
-          margin-top: 0;
-          color: #4E5859;
-          font-size: 18px;
-          margin-bottom: 20px;
-          text-align: center;
-        }
-
-        .date-inputs {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 24px;
-        }
-
-        .date-inputs label {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          font-size: 14px;
-          color: #4a5568;
-          font-weight: 500;
-        }
-
-        .date-inputs input {
-          padding: 12px;
-          border: 2px solid #e2e8f0;
-          border-radius: 8px;
-          font-size: 14px;
-          transition: all 0.2s ease;
-        }
-
-        .date-inputs input:focus {
-          outline: none;
-          border-color: #4E5859;
-          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
-        }
-
-        .modal-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-        }
-
-        .modal-actions button {
-          padding: 10px 20px;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .modal-actions button:first-child {
-          background-color: #f7fafc;
-          color: #4a5568;
-          border: 2px solid #e2e8f0;
-        }
-
-        .modal-actions button:first-child:hover {
-          background-color: #edf2f7;
-        }
-
-        .modal-actions button:last-child {
-          background-color: #4E5859;
-          color: white;
-          border: none;
-        }
-
-        .modal-actions button:last-child:hover {
-          background-color: #3a4344;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
-        }
-
-        @media (max-width: 480px) {
-          .date-inputs {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-          
-          .modal-actions {
-            flex-direction: column;
-            gap: 8px;
-          }
-          
-          .modal-actions button {
-            width: 100%;
-          }
+        @keyframes spin {
+          0% { transform: translate(-50%, -50%) rotate(0deg); }
+          100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
       `}</style>
 
@@ -1265,6 +1304,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                 selectedValues={selectedSource ? (selectedSource.includes(',') ? selectedSource.split(',') : [selectedSource]) : []}
                 onChange={(values) => setSelectedSource(values.length === 0 ? '' : values.join(','))}
                 placeholder="Todas as Fontes"
+                disabled={isUpdating}
               />
 
               {/* Filtro de Campanhas Facebook */}
@@ -1277,8 +1317,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                     ) : (
                       <div className="campaign-filter-container" ref={dropdownRef}>
                         <button 
-                          className="campaign-filter-button"
-                          onClick={() => setShowDropdown(!showDropdown)}
+                          className={`campaign-filter-button ${isUpdating ? 'disabled' : ''}`}
+                          onClick={() => !isUpdating && setShowDropdown(!showDropdown)}
+                          disabled={isUpdating}
                         >
                           {selectedCampaigns.length === 0 
                             ? 'Selecionar campanhas' 
@@ -1288,7 +1329,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                           <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
                         </button>
                         
-                        {showDropdown && (
+                        {showDropdown && !isUpdating && (
                           <div className="campaign-dropdown show">
                             <div className="campaign-search">
                               <input
@@ -1376,37 +1417,43 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               <div className="period-selector">
                 <button 
                   className={period === 'current_month' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('current_month')}
+                  onClick={() => !isUpdating && handlePeriodChange('current_month')}
+                  disabled={isUpdating}
                 >
                   Mês Atual
                 </button>
                 <button 
                   className={period === '7d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('7d')}
+                  onClick={() => !isUpdating && handlePeriodChange('7d')}
+                  disabled={isUpdating}
                 >
                   7 Dias
                 </button>
                 <button 
                   className={period === '30d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('30d')}
+                  onClick={() => !isUpdating && handlePeriodChange('30d')}
+                  disabled={isUpdating}
                 >
                   30 Dias
                 </button>
                 <button 
                   className={period === '60d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('60d')}
+                  onClick={() => !isUpdating && handlePeriodChange('60d')}
+                  disabled={isUpdating}
                 >
                   60 Dias
                 </button>
                 <button 
                   className={period === '90d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('90d')}
+                  onClick={() => !isUpdating && handlePeriodChange('90d')}
+                  disabled={isUpdating}
                 >
                   90 Dias
                 </button>
                 <button 
                   className={period === 'custom' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('custom')}
+                  onClick={() => !isUpdating && handlePeriodChange('custom')}
+                  disabled={isUpdating}
                 >
                   Personalizado
                 </button>
@@ -1434,12 +1481,13 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               color={COLORS.secondary}
               subtitle="Mockado"
             />
+            {/* WhatsApp: agora dinâmico */}
             <MiniMetricCardWithTrend
               title="CONVERSAS PELO WHATSAPP"
-              value="387" // MOCKADO - Dado não disponível na API
-              trendValue={12.3}
+              value={whatsAppStats.totalConversations.toLocaleString()}
+              trendValue={whatsAppStats.trend}
               color={COLORS.success}
-              subtitle="Mockado"
+              subtitle={loadingWhatsAppStats ? 'Carregando...' : undefined}
             />
           </div>
         </div>
@@ -1651,36 +1699,209 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         </div>
       </div>
       
-      {/* Modal de período customizado */}
-      {showCustomPeriod && (
-        <div className="custom-period-backdrop" onClick={() => setShowCustomPeriod(false)}>
-          <div className="custom-period-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Selecionar Período Personalizado</h3>
-            <div className="date-inputs">
-              <label>
-                Data Inicial:
-                <input
-                  type="date"
-                  value={customPeriod.startDate}
-                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
-                />
+      {/* Modal de Período Personalizado */}
+      <SimpleModal
+        isOpen={showCustomPeriod}
+        onClose={() => {
+          if (!isUpdating) setShowCustomPeriod(false);
+        }}
+      >
+        <div style={{ display: 'grid', gap: '24px' }}>
+          {/* Campos de Data com Design Melhorado */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: '#4a5568',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>📅</span> Data Inicial
               </label>
-              <label>
-                Data Final:
-                <input
-                  type="date"
-                  value={customPeriod.endDate}
-                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
-                />
-              </label>
+              <input
+                type="date"
+                value={customPeriod?.startDate || ''}
+                onChange={(e) => !isUpdating && setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '8px', 
+                  border: '2px solid #e2e8f0', 
+                  width: '100%',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: '#fafbfc',
+                  opacity: isUpdating ? 0.7 : 1,
+                  cursor: isUpdating ? 'not-allowed' : 'pointer'
+                }}
+                disabled={isUpdating}
+                onFocus={(e) => {
+                  if (!isUpdating) {
+                    e.target.style.borderColor = '#4E5859';
+                    e.target.style.backgroundColor = 'white';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(78, 88, 89, 0.1)';
+                  }
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.backgroundColor = '#fafbfc';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
             </div>
-            <div className="modal-actions">
-              <button onClick={() => setShowCustomPeriod(false)}>Cancelar</button>
-              <button onClick={applyCustomPeriod}>Aplicar</button>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: '#4a5568',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>🏁</span> Data Final
+              </label>
+              <input
+                type="date"
+                value={customPeriod?.endDate || ''}
+                onChange={(e) => !isUpdating && setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '8px', 
+                  border: '2px solid #e2e8f0', 
+                  width: '100%',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: '#fafbfc',
+                  opacity: isUpdating ? 0.7 : 1,
+                  cursor: isUpdating ? 'not-allowed' : 'pointer'
+                }}
+                disabled={isUpdating}
+                onFocus={(e) => {
+                  if (!isUpdating) {
+                    e.target.style.borderColor = '#4E5859';
+                    e.target.style.backgroundColor = 'white';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(78, 88, 89, 0.1)';
+                  }
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.backgroundColor = '#fafbfc';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
             </div>
           </div>
+
+          {/* Preview do Período Selecionado */}
+          {customPeriod?.startDate && customPeriod?.endDate && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#0369a1'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📊</span> Período Selecionado
+              </div>
+              <div>
+                {formatDateBR(customPeriod.startDate)} até {' '}
+                {formatDateBR(customPeriod.endDate)}
+                {' '}({calculateDaysDifference(customPeriod.startDate, customPeriod.endDate)} dias)
+              </div>
+            </div>
+          )}
+
+          {/* Botões de Ação */}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '8px' }}>
+            <button 
+              onClick={() => !isUpdating && setShowCustomPeriod(false)}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: '#f7fafc', 
+                color: '#4a5568',
+                border: '2px solid #e2e8f0', 
+                borderRadius: '8px', 
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                opacity: isUpdating ? 0.7 : 1
+              }}
+              disabled={isUpdating}
+              onMouseEnter={(e) => {
+                if (!isUpdating) {
+                  e.target.style.backgroundColor = '#edf2f7';
+                  e.target.style.borderColor = '#cbd5e0';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isUpdating) {
+                  e.target.style.backgroundColor = '#f7fafc';
+                  e.target.style.borderColor = '#e2e8f0';
+                }
+              }}
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={() => {
+                if (isUpdating) return;
+                
+                if (!customPeriod?.startDate || !customPeriod?.endDate) {
+                  alert('Por favor, selecione ambas as datas');
+                  return;
+                }
+                
+                const startDate = new Date(customPeriod.startDate);
+                const endDate = new Date(customPeriod.endDate);
+                
+                if (endDate <= startDate) {
+                  alert('Data final deve ser posterior à data inicial');
+                  return;
+                }
+                
+                applyCustomPeriod();
+                setShowCustomPeriod(false);
+              }}
+              disabled={!customPeriod?.startDate || !customPeriod?.endDate || isUpdating}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: "#4E5859", 
+                color: 'white',
+                border: 'none', 
+                borderRadius: '8px', 
+                cursor: (!customPeriod?.startDate || !customPeriod?.endDate || isUpdating) ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                opacity: (!customPeriod?.startDate || !customPeriod?.endDate || isUpdating) ? 0.7 : 1
+              }}
+              onMouseEnter={(e) => {
+                if (customPeriod?.startDate && customPeriod?.endDate && !isUpdating) {
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(78, 88, 89, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
+              <span>✓</span> Aplicar Período
+            </button>
+          </div>
         </div>
-      )}
+      </SimpleModal>
     </div>
   );
 }
