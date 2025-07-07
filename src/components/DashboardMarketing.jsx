@@ -162,6 +162,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   });
   const [loadingDemographics, setLoadingDemographics] = useState(false);
 
+  // Estados para dados de vendas específicos do período
+  const [periodSalesData, setPeriodSalesData] = useState(null);
+  const [loadingPeriodSales, setLoadingPeriodSales] = useState(false);
+
+  // Estados para modal de detalhes
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailModalData, setDetailModalData] = useState(null);
+  const [detailModalType, setDetailModalType] = useState('');
+  const [detailModalCorretor, setDetailModalCorretor] = useState('');
+  const [loadingDetailModal, setLoadingDetailModal] = useState(false);
+
   // Estados para dados geográficos
   const [geographicData, setGeographicData] = useState({
     cities: [],
@@ -432,10 +443,178 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     }
   }, [period, customPeriod?.startDate, customPeriod?.endDate]);
 
+  // ✅ FUNÇÃO HELPER: Carregar dados de vendas para o período
+  const loadPeriodSalesData = useCallback(async () => {
+    setLoadingPeriodSales(true);
+    
+    try {
+      console.log('📊 Carregando dados de vendas para o período:', { period, customPeriod });
+      
+      // Criar objeto de customDates baseado no período
+      let customDates = null;
+      let days = 30; // Padrão
+      
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        customDates = {
+          start_date: customPeriod.startDate,
+          end_date: customPeriod.endDate
+        };
+      } else if (period === 'current_month') {
+        // Para mês atual, usar do dia 1 do mês até hoje
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        customDates = {
+          start_date: firstDayOfMonth.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        };
+      } else if (period && period !== 'custom') {
+        // Para outros períodos, usar dias
+        const periodToDays = {
+          '7d': 7,
+          '30d': 30,
+          '60d': 60,
+          '90d': 90
+        };
+        days = periodToDays[period] || 30;
+      }
+      
+      // Buscar dados de vendas com o período correto
+      // IMPORTANTE: Para comparação correta com dashboard de vendas, 
+      // não aplicar filtro de fonte nos dados de leads por corretor
+      const salesData = await GranularAPI.loadSalesDashboard(
+        days,
+        null, // Não filtrar por fonte para manter consistência com dashboard de vendas
+        null, // Corretor (não usado no marketing)
+        customDates
+      );
+      
+      console.log('📊 Parâmetros enviados para API de vendas:', {
+        days,
+        fonte: null, // Removido filtro de fonte
+        corretor: null,
+        customDates,
+        periodo: period
+      });
+      
+      setPeriodSalesData(salesData);
+      
+      console.log('✅ Dados de vendas carregados para o período:', {
+        period,
+        totalLeads: salesData.totalLeads,
+        leadsByUserCount: salesData.leadsByUser?.length,
+        leadsByUserSample: salesData.leadsByUser?.slice(0, 2), // Mostrar primeiros 2 para debug
+        days,
+        customDates
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados de vendas para o período:', error);
+      setPeriodSalesData(null);
+    } finally {
+      setLoadingPeriodSales(false);
+    }
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]); // Removido selectedSource das dependencies
+
+  // ✅ HELPER: Processar dados de vendas para gráficos (similar ao DashboardSales)
+  const sortedSalesChartsData = useMemo(() => {
+    if (!periodSalesData?.leadsByUser || periodSalesData.leadsByUser.length === 0) {
+      return {
+        sortedLeadsData: [],
+        sortedMeetingsData: []
+      };
+    }
+
+    console.log('🔄 Processando dados de vendas para gráficos (MARKETING):', {
+      originalData: periodSalesData.leadsByUser,
+      totalUsers: periodSalesData.leadsByUser.length,
+      sampleUser: periodSalesData.leadsByUser[0],
+      periodo: period,
+      customPeriod: customPeriod,
+      fonte: selectedSource
+    });
+
+    return {
+      // Ordenar por total de leads (value) - decrescente
+      sortedLeadsData: [...periodSalesData.leadsByUser]
+        .filter(user => user.name !== 'SA IMOB')
+        .sort((a, b) => (b.value || 0) - (a.value || 0)),
+        
+      // Ordenar por reuniões - decrescente  
+      sortedMeetingsData: [...periodSalesData.leadsByUser]
+        .filter(user => user.name !== 'SA IMOB')
+        .map(user => ({
+          ...user,
+          meetingsHeld: user.meetingsHeld || user.meetings || 0
+        }))
+        .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0))
+    };
+  }, [periodSalesData?.leadsByUser]);
+
+  // ✅ FUNÇÃO: Abrir modal de detalhes por corretor (similar ao DashboardSales)
+  const openModalByCorretor = useCallback(async (type, corretorName) => {
+    console.log('🔍 Abrindo modal detalhado:', { type, corretorName, period, customPeriod });
+    
+    // Set modal states immediately
+    setDetailModalType(type);
+    setDetailModalCorretor(corretorName);
+    setShowDetailModal(true);
+    setLoadingDetailModal(true);
+    setDetailModalData(null);
+    
+    try {
+      // Preparar parâmetros extras para incluir período
+      let extraParams = {};
+      
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        extraParams.start_date = customPeriod.startDate;
+        extraParams.end_date = customPeriod.endDate;
+      } else if (period && period !== 'custom') {
+        const periodToDays = {
+          '7d': 7,
+          '30d': 30,
+          '60d': 60,
+          '90d': 90,
+          'current_month': 30
+        };
+        extraParams.days = periodToDays[period] || 30;
+      }
+      
+      console.log('📊 Parâmetros para modal detalhado:', {
+        corretor: corretorName,
+        fonte: '',
+        extraParams,
+        type
+      });
+      
+      // Buscar dados detalhados usando a mesma API do dashboard de vendas
+      const tablesData = await KommoAPI.getDetailedTables(corretorName, '', extraParams);
+      
+      console.log('✅ Dados detalhados carregados:', {
+        type,
+        corretor: corretorName,
+        tablesData
+      });
+      
+      setDetailModalData(tablesData);
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados detalhados:', error);
+      setDetailModalData({ error: 'Erro ao carregar dados detalhados' });
+    } finally {
+      setLoadingDetailModal(false);
+    }
+  }, [period, customPeriod]);
+
   // ✅ Effect para carregar dados geográficos - TEMPORARIAMENTE DESABILITADO
   // useEffect(() => {
   //   loadGeographicData();
   // }, [loadGeographicData]);
+
+  // ✅ Effect para carregar dados de vendas quando período mudar
+  useEffect(() => {
+    loadPeriodSalesData();
+  }, [loadPeriodSalesData]);
 
   // Atualizar dados quando recebidos do cache
   useEffect(() => {
@@ -1037,7 +1216,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   );
 
   // Enhanced Compact Chart Component with Dynamic Updates (ECharts Strategy)
-  const CompactChart = memo(({ data, type, config, style, loading = false }) => {
+  const CompactChart = memo(({ data, type, config, style, loading = false, onBarClick = null }) => {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
 
@@ -1254,6 +1433,27 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       
     }, [data, type, config]);
 
+    // Add click event handler for bar charts when onBarClick is provided
+    useEffect(() => {
+      if (!chartInstance.current || !onBarClick || type !== 'bar') return;
+      
+      // Remove existing click handler
+      chartInstance.current.off('click');
+      
+      // Add click handler
+      chartInstance.current.on('click', function (params) {
+        console.log('🔍 Bar clicked:', params);
+        onBarClick(params.name, params.value, params);
+      });
+      
+      // Cleanup
+      return () => {
+        if (chartInstance.current) {
+          chartInstance.current.off('click');
+        }
+      };
+    }, [onBarClick, type]);
+
     // Cleanup
     useEffect(() => {
       return () => {
@@ -1309,7 +1509,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       comments: campaignInsights.totalComments || 0,
       shares: 0, // Não disponível na estrutura atual
       videoViews: 0, // Não disponível na estrutura atual
-      profileVisits: 0,
+      profileVisits: filteredData?.profileVisits || 0,
       pageEngagement: campaignInsights.totalPageEngagement || 0,
       postEngagement: campaignInsights.totalPostEngagement || 0
     }
@@ -1330,7 +1530,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       comments: 0,
       shares: 0,
       videoViews: 0,
-      profileVisits: 0,
+      profileVisits: filteredData?.profileVisits || 0,
       pageEngagement: 0,
       postEngagement: 0
     }
@@ -1339,6 +1539,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   // Debug: Log das métricas finais
   console.log('📊 Métricas finais para exibição:', {
     source: campaignInsights && selectedCampaigns.length > 0 ? 'insights filtrados' : 'dados gerais',
+    whatsappConversations: filteredData?.whatsappConversations,
+    profileVisits: filteredData?.profileVisits,
+    facebookMetricsProfileVisits: filteredData?.facebookMetrics?.profileVisits,
     metrics: {
       reach: facebookMetrics.reach,
       impressions: facebookMetrics.impressions,
@@ -2262,7 +2465,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       `}</style>
 
       {/* Indicador de Status Geral */}
-      {(isLoading || isUpdating || loadingInsights || loadingCampaigns || loadingAdsets || loadingAds) && (
+      {(isLoading || isUpdating || loadingInsights || loadingCampaigns || loadingAdsets || loadingAds || loadingPeriodSales) && (
         <div className="global-status-indicator">
           <div className="status-content">
             <span className="status-icon">🔄</span>
@@ -2272,7 +2475,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                loadingInsights ? 'Aplicando filtros de campanhas...' :
                loadingCampaigns ? 'Carregando campanhas...' :
                loadingAdsets ? 'Carregando conjuntos de anúncios...' :
-               loadingAds ? 'Carregando anúncios...' : 'Atualizando...'}
+               loadingAds ? 'Carregando anúncios...' :
+               loadingPeriodSales ? 'Carregando dados de vendas do período...' : 'Atualizando...'}
             </span>
           </div>
         </div>
@@ -2584,7 +2788,10 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                 </button>
                 <button 
                   className={period === 'custom' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('custom')}
+                  onClick={() => {
+                    console.log('🔍 Clicando em Personalizado no dashboard de marketing');
+                    handlePeriodChange('custom');
+                  }}
                 >
                   Personalizado
                 </button>
@@ -2607,17 +2814,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             />
             <MiniMetricCardWithTrend
               title="TOTAL DE VISITAS AO PERFIL"
-              value="2.847" // MOCKADO - Dado não disponível na API
-              trendValue={18.5}
+              value={filteredData?.profileVisits?.toLocaleString() || "0"}
+              trendValue={null} // Trend não disponível ainda
               color={COLORS.secondary}
-              subtitle="Mockado"
+              subtitle="Dados reais"
             />
             <MiniMetricCardWithTrend
               title="CONVERSAS PELO WHATSAPP"
-              value="387" // MOCKADO - Dado não disponível na API
-              trendValue={12.3}
+              value={filteredData?.whatsappConversations?.toLocaleString() || "0"}
+              trendValue={null} // Trend não disponível ainda
               color={COLORS.success}
-              subtitle="Mockado"
+              subtitle="Dados reais"
             />
           </div>
         </div>
@@ -2640,7 +2847,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   <>, {selectedAds.length} Anúncio(s)</>
                 )}
                 {' '}Filtrada(s)
-                <span className="filtered-badge">📊 FILTRADO</span>
               </>
             ) : (
               <>
@@ -2736,7 +2942,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         <div className="card card-lg">
           <div className="card-title">
             Status dos Leads CRM
-            <span className="corrected-badge">✅ CORRIGIDO</span>
           </div>
           <CompactChart 
             type="pie" 
@@ -2838,39 +3043,40 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       )}
 
       {/* Linha 5: Leads por Corretor */}
-      {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && (
+      {((sortedSalesChartsData.sortedLeadsData && sortedSalesChartsData.sortedLeadsData.length > 0) || loadingPeriodSales) && (
         <div className="dashboard-row">
           <div className="card card-full">
-            <div className="card-title">Leads criados no período</div>
+            <div className="card-title">
+              Leads criados no período
+              {loadingPeriodSales && <span className="loading-indicator"> - Carregando...</span>}
+            </div>
             <CompactChart 
               type="bar" 
-              data={salesData.leadsByUser.sort((a, b) => (b.value || 0) - (a.value || 0))} 
+              data={sortedSalesChartsData.sortedLeadsData || []} 
               config={{ xKey: 'name', yKey: 'value', color: COLORS.primary }}
               style={{ height: getChartHeight('medium') }}
-              loading={false}
+              loading={loadingPeriodSales}
+              onBarClick={(corretorName) => openModalByCorretor('leads', corretorName)}
             />
           </div>
         </div>
       )}
 
       {/* Linha 6: Rank Corretores - Reuniões */}
-      {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && (
+      {((sortedSalesChartsData.sortedMeetingsData && sortedSalesChartsData.sortedMeetingsData.length > 0) || loadingPeriodSales) && (
         <div className="dashboard-row">
           <div className="card card-full">
-            <div className="card-title">Rank Corretores - Reunião</div>
+            <div className="card-title">
+              Rank Corretores - Reunião
+              {loadingPeriodSales && <span className="loading-indicator"> - Carregando...</span>}
+            </div>
             <CompactChart 
               type="bar" 
-              data={[...salesData.leadsByUser]
-                .filter(user => user.name !== 'SA IMOB')
-                .map(user => ({
-                  ...user,
-                  meetingsHeld: user.meetingsHeld || user.meetings || 0
-                }))
-                .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0))
-              } 
+              data={sortedSalesChartsData.sortedMeetingsData || []} 
               config={{ xKey: 'name', yKey: 'meetingsHeld', color: COLORS.secondary }}
               style={{ height: getChartHeight('medium') }}
-              loading={false}
+              loading={loadingPeriodSales}
+              onBarClick={(corretorName) => openModalByCorretor('meetings', corretorName)}
             />
           </div>
         </div>
@@ -2917,15 +3123,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       </div>
 
       {/* Linha 8: Top Cidades - TEMPORARIAMENTE DESABILITADO */}
-      {/* <div className="dashboard-row">
+      {/* 
+      <div className="dashboard-row">
         <div className="card card-lg">
           <div className="card-title">
             Top Cidades por Leads
-            {loadingGeographics && <span className="loading-indicator"> - Carregando...</span>}
+            Loading indicator here...
           </div>
           <CityChart />
         </div>
-      </div> */}
+      </div> 
+      */}
       
       {/* ✅ Modal de Período Personalizado - CORRIGIDO */}
       {/* Agora usa SimpleModal (igual ao dashboard de vendas) ao invés do modal customizado */}
@@ -3152,6 +3360,194 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               Aplicar Período
             </button>
           </div>
+        </div>
+      </SimpleModal>
+
+      {/* ✅ Modal de Detalhes por Corretor */}
+      <SimpleModal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setDetailModalData(null);
+          setDetailModalType('');
+          setDetailModalCorretor('');
+        }}
+      >
+        <div style={{ display: 'grid', gap: '24px', minWidth: '600px', maxWidth: '90vw' }}>
+          {/* Header do Modal */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px',
+            paddingBottom: '16px',
+            borderBottom: '2px solid #e2e8f0'
+          }}>
+            <span style={{ fontSize: '24px' }}>
+              {detailModalType === 'leads' ? '📊' : '🤝'}
+            </span>
+            <div>
+              <h3 style={{ 
+                margin: 0, 
+                fontSize: '20px', 
+                fontWeight: '700',
+                color: '#2d3748'
+              }}>
+                {detailModalType === 'leads' ? 'Detalhes de Leads' : 'Detalhes de Reuniões'}
+              </h3>
+              <p style={{ 
+                margin: '4px 0 0 0', 
+                fontSize: '14px', 
+                color: '#718096'
+              }}>
+                Corretor: <strong>{detailModalCorretor}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Conteúdo do Modal */}
+          {loadingDetailModal ? (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              padding: '40px 0',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>🔄</span>
+              <span style={{ fontSize: '16px', color: '#718096' }}>Carregando dados detalhados...</span>
+            </div>
+          ) : detailModalData?.error ? (
+            <div style={{ 
+              padding: '20px',
+              backgroundColor: '#fed7d7',
+              border: '1px solid #fc8181',
+              borderRadius: '8px',
+              color: '#c53030',
+              textAlign: 'center'
+            }}>
+              {detailModalData.error}
+            </div>
+          ) : detailModalData ? (
+            <div style={{ 
+              display: 'grid', 
+              gap: '16px',
+              maxHeight: '60vh',
+              overflow: 'auto'
+            }}>
+              {/* Mostrar dados conforme o tipo */}
+              {detailModalType === 'leads' && detailModalData.reunioesDetalhes && (
+                <div>
+                  <h4 style={{ margin: '0 0 12px 0', color: '#4a5568' }}>
+                    Reuniões Realizadas ({detailModalData.reunioesDetalhes.length})
+                  </h4>
+                  <div style={{ 
+                    display: 'grid', 
+                    gap: '8px',
+                    backgroundColor: '#f7fafc',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    maxHeight: '200px',
+                    overflow: 'auto'
+                  }}>
+                    {detailModalData.reunioesDetalhes.slice(0, 10).map((reuniao, index) => (
+                      <div key={index} style={{ 
+                        padding: '8px 12px',
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '14px'
+                      }}>
+                        <strong>{reuniao.nome_lead || 'Lead não informado'}</strong>
+                        {reuniao.data_reuniao && (
+                          <span style={{ color: '#718096', marginLeft: '8px' }}>
+                            - {new Date(reuniao.data_reuniao).toLocaleDateString('pt-BR')}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {detailModalData.reunioesDetalhes.length > 10 && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '8px',
+                        color: '#718096',
+                        fontStyle: 'italic'
+                      }}>
+                        ... e mais {detailModalData.reunioesDetalhes.length - 10} reuniões
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {detailModalType === 'meetings' && detailModalData.reunioesDetalhes && (
+                <div>
+                  <h4 style={{ margin: '0 0 12px 0', color: '#4a5568' }}>
+                    Reuniões Realizadas ({detailModalData.reunioesDetalhes.length})
+                  </h4>
+                  <div style={{ 
+                    display: 'grid', 
+                    gap: '8px',
+                    backgroundColor: '#f7fafc',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    maxHeight: '300px',
+                    overflow: 'auto'
+                  }}>
+                    {detailModalData.reunioesDetalhes.map((reuniao, index) => (
+                      <div key={index} style={{ 
+                        padding: '12px',
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                          {reuniao.nome_lead || 'Lead não informado'}
+                        </div>
+                        {reuniao.data_reuniao && (
+                          <div style={{ fontSize: '14px', color: '#718096' }}>
+                            Data: {new Date(reuniao.data_reuniao).toLocaleDateString('pt-BR')}
+                          </div>
+                        )}
+                        {reuniao.observacoes && (
+                          <div style={{ fontSize: '14px', color: '#4a5568', marginTop: '4px' }}>
+                            {reuniao.observacoes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Resumo */}
+              {detailModalData.summary && (
+                <div style={{ 
+                  padding: '16px',
+                  backgroundColor: '#edf2f7',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e0'
+                }}>
+                  <h4 style={{ margin: '0 0 12px 0', color: '#4a5568' }}>Resumo</h4>
+                  <div style={{ display: 'grid', gap: '4px', fontSize: '14px' }}>
+                    <div>Total de Reuniões: <strong>{detailModalData.summary.total_reunioes || 0}</strong></div>
+                    <div>Total de Propostas: <strong>{detailModalData.summary.total_propostas || 0}</strong></div>
+                    <div>Total de Vendas: <strong>{detailModalData.summary.total_vendas || 0}</strong></div>
+                    {detailModalData.summary.valor_total_vendas > 0 && (
+                      <div>Valor Total: <strong>R$ {detailModalData.summary.valor_total_vendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px 0',
+              color: '#718096'
+            }}>
+              Nenhum dado encontrado
+            </div>
+          )}
         </div>
       </SimpleModal>
     </div>

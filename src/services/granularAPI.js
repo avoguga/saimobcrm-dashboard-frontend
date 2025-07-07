@@ -210,15 +210,43 @@ export class GranularAPI {
         // DEBUG: Log final marketing API call
         console.log('🔍 Marketing API Final URL:', `${API_URL}/dashboard/marketing-complete?${params}`);
 
-        // Usar endpoint completo de marketing
-        const marketingData = await fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json());
+        // Buscar dados de marketing em paralelo
+        const [marketingData, whatsappMetrics] = await Promise.all([
+          fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json()),
+          this.getWhatsAppAndProfileMetrics(customDates)
+        ]);
 
         console.timeEnd('Marketing Dashboard Load');
 
-        return {
+        // Combinar dados de marketing com métricas específicas
+        const enhancedData = {
           ...marketingData,
-          _metadata: { realAPI: true, granular: true, singleEndpoint: true, ...marketingData._metadata }
+          // Sobrescrever dados mock com dados reais extraídos
+          whatsappConversations: whatsappMetrics.whatsappConversations,
+          profileVisits: whatsappMetrics.profileVisits,
+          // Manter dados existentes e adicionar novos
+          facebookMetrics: {
+            ...marketingData.facebookMetrics,
+            whatsappConversations: whatsappMetrics.whatsappConversations,
+            profileVisits: whatsappMetrics.profileVisits
+          },
+          _metadata: { 
+            realAPI: true, 
+            granular: true, 
+            singleEndpoint: true, 
+            enhancedWithRealMetrics: true,
+            whatsappSource: 'facebook_insights',
+            ...marketingData._metadata 
+          }
         };
+
+        console.log('✅ Marketing dashboard carregado com métricas reais:', {
+          whatsappConversations: whatsappMetrics.whatsappConversations,
+          profileVisits: whatsappMetrics.profileVisits,
+          originalProfileVisits: marketingData.profileVisits
+        });
+
+        return enhancedData;
       }
     } catch (error) {
       console.error('❌ Erro no carregamento do dashboard de marketing:', error);
@@ -226,21 +254,146 @@ export class GranularAPI {
     }
   }
 
-
   /**
-   * 🚀 BUSCAR INSIGHTS DE CAMPANHAS ESPECÍFICAS
-   * Implementação conforme recomendação do backend
+   * 📱 BUSCAR MÉTRICAS DE WHATSAPP E PERFIL
+   * Extrai métricas específicas dos insights do Facebook
    */
-  static async getFacebookCampaignInsights(campaignIds, dateRange = null) {
+  static async getWhatsAppAndProfileMetrics(dateRange = null) {
     try {
       const since = dateRange?.start || '2025-06-01';
       const until = dateRange?.end || '2025-06-09';
       
+      const cacheKey = `whatsapp_profile_metrics_${since}_${until}`;
+      const cached = this.getCached(cacheKey);
+      
+      if (cached) {
+        console.log('🎯 Usando métricas WhatsApp/Perfil do cache');
+        return cached;
+      }
+
+      console.log('📱 Buscando métricas WhatsApp e perfil dos insights...');
+
+      // Buscar insights padrão
+      const params = new URLSearchParams({
+        since,
+        until,
+        date_preset: 'last_30d'
+      });
+
+      const response = await fetch(`${API_URL}/facebook-ads/insights/summary?${params}`);
+      const data = await response.json();
+
+      // Inicializar métricas
+      let whatsappConversations = 0;
+      let whatsappBlocks = 0;
+      let profileVisits = 0;
+
+      // Processar actions para extrair métricas específicas
+      if (data.data && Array.isArray(data.data)) {
+        data.data.forEach(insight => {
+          if (insight.actions && Array.isArray(insight.actions)) {
+            insight.actions.forEach(action => {
+              // WhatsApp Conversations
+              if (action.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                  action.action_type === 'messaging_conversation_started_7d') {
+                whatsappConversations += parseInt(action.value || 0);
+              }
+              
+              // WhatsApp Blocks
+              if (action.action_type === 'onsite_conversion.messaging_block' ||
+                  action.action_type === 'messaging_block') {
+                whatsappBlocks += parseInt(action.value || 0);
+              }
+              
+              // Profile Visits
+              if (action.action_type === 'onsite_conversion.view_content' ||
+                  action.action_type === 'page_engagement' ||
+                  action.action_type === 'landing_page_view') {
+                profileVisits += parseInt(action.value || 0);
+              }
+            });
+          }
+        });
+      }
+
+      const result = {
+        whatsappConversations,
+        whatsappBlocks,
+        profileVisits,
+        _metadata: {
+          source: 'facebook_insights',
+          dateRange: { since, until },
+          processedFrom: 'actions'
+        }
+      };
+
+      // Cache por 5 minutos
+      this.setCache(cacheKey, result);
+
+      console.log('✅ Métricas WhatsApp/Perfil extraídas:', result);
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ Erro ao buscar métricas WhatsApp/Perfil:', error);
+      
+      // Retornar zeros ao invés de mock para não mascarar problemas
+      return {
+        whatsappConversations: 0,
+        whatsappBlocks: 0,
+        profileVisits: 0,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 🚀 BUSCAR INSIGHTS DE CAMPANHAS ESPECÍFICAS
+   * Implementação conforme recomendação do backend
+   * @param {Array} campaignIds - IDs das campanhas
+   * @param {Object} dateRange - Range de datas {start, end}
+   * @param {Array} adsetIds - IDs dos conjuntos de anúncios (opcional)
+   * @param {Array} adIds - IDs dos anúncios (opcional)
+   */
+  static async getFacebookCampaignInsights(campaignIds, dateRange = null, adsetIds = [], adIds = []) {
+    try {
+      const since = dateRange?.start || '2025-06-01';
+      const until = dateRange?.end || '2025-06-09';
+      
+      // Log dos filtros recebidos
+      console.log('📊 getFacebookCampaignInsights chamado com:', {
+        campaignIds,
+        dateRange,
+        adsetIds,
+        adIds
+      });
+      
+      // Se há filtros de adsets ou ads, tentar endpoint direto primeiro
+      if (adsetIds.length > 0 || adIds.length > 0) {
+        console.log('🎯 Detectados filtros de adsets/ads, tentando endpoint direto...');
+        const directResult = await this.getFacebookInsightsWithFilters(campaignIds, adsetIds, adIds, dateRange);
+        if (directResult) {
+          console.log('✅ Endpoint direto funcionou, retornando resultado filtrado');
+          return directResult;
+        }
+      }
+      
+      // Construir parâmetros de filtro para método padrão
+      const filterParams = new URLSearchParams();
+      if (adsetIds.length > 0) {
+        filterParams.append('adset_ids', adsetIds.join(','));
+      }
+      if (adIds.length > 0) {
+        filterParams.append('ad_ids', adIds.join(','));
+      }
+      const filterQuery = filterParams.toString() ? `&${filterParams.toString()}` : '';
+      
+      console.log('🔗 Query de filtros (método padrão):', filterQuery);
       
       // Buscar insights de cada campanha em paralelo (conforme recomendação do backend)
       const campaignInsights = await Promise.all(
         campaignIds.map(async (id) => {
-          const cacheKey = `campaign_insight_${id}_${since}_${until}`;
+          const cacheKey = `campaign_insight_${id}_${since}_${until}_${filterQuery}`;
           const cached = this.getCached(cacheKey);
           
           if (cached) {
@@ -248,7 +401,9 @@ export class GranularAPI {
           }
 
           try {
-            const response = await fetch(`${API_URL}/facebook-ads/campaigns/${id}/insights?since=${since}&until=${until}`);
+            const url = `${API_URL}/facebook-ads/campaigns/${id}/insights?since=${since}&until=${until}${filterQuery}`;
+            console.log('🚀 Fazendo requisição para:', url);
+            const response = await fetch(url);
             const insightData = await response.json();
             
             this.setCache(cacheKey, insightData);
@@ -636,6 +791,270 @@ export class GranularAPI {
       return campaigns;
     } catch (error) {
       // Retornar array vazio em caso de erro
+      return [];
+    }
+  }
+
+  /**
+   * 🚀 BUSCAR CONJUNTOS DE ANÚNCIOS (ADSETS)
+   * Endpoint para conjuntos de anúncios do Facebook
+   */
+  static async getFacebookAdsets() {
+    const cacheKey = 'facebook-adsets';
+    const cached = this.getCached(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/facebook-ads/adsets`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Se já é um array, retornar direto. Se não, pegar data.data
+      const adsets = Array.isArray(data) ? data : (data.data || []);
+      
+      this.setCache(cacheKey, adsets);
+      return adsets;
+    } catch (error) {
+      console.error('Erro ao buscar adsets:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 🚀 BUSCAR ANÚNCIOS (ADS)
+   * Endpoint para anúncios do Facebook
+   */
+  static async getFacebookAds() {
+    const cacheKey = 'facebook-ads';
+    const cached = this.getCached(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/facebook-ads/ads`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Se já é um array, retornar direto. Se não, pegar data.data
+      const ads = Array.isArray(data) ? data : (data.data || []);
+      
+      this.setCache(cacheKey, ads);
+      return ads;
+    } catch (error) {
+      console.error('Erro ao buscar ads:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 🚀 BUSCAR INSIGHTS ESPECÍFICOS (ENDPOINT ALTERNATIVO)
+   * Tenta usar endpoint direto para insights com filtros
+   */
+  static async getFacebookInsightsWithFilters(campaignIds = [], adsetIds = [], adIds = [], dateRange = null) {
+    try {
+      const since = dateRange?.start || '2025-06-01';
+      const until = dateRange?.end || '2025-06-09';
+      
+      console.log('🔍 Tentando endpoint direto de insights com filtros:', {
+        campaignIds, adsetIds, adIds, dateRange
+      });
+      
+      // Construir parâmetros
+      const params = new URLSearchParams({
+        since,
+        until
+      });
+      
+      if (campaignIds.length > 0) {
+        params.append('campaign_ids', campaignIds.join(','));
+      }
+      if (adsetIds.length > 0) {
+        params.append('adset_ids', adsetIds.join(','));
+      }
+      if (adIds.length > 0) {
+        params.append('ad_ids', adIds.join(','));
+      }
+      
+      const url = `${API_URL}/facebook-ads/insights?${params.toString()}`;
+      console.log('🚀 URL alternativa:', url);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📦 Resposta do endpoint direto:', data);
+      
+      return data;
+    } catch (error) {
+      console.warn('⚠️ Endpoint direto não disponível, usando método padrão');
+      return null;
+    }
+  }
+
+  /**
+   * 🌍 BUSCAR DADOS GEOGRÁFICOS COM BREAKDOWN (OTIMIZADO)
+   * Usa uma única requisição ao invés de múltiplas para evitar rate limit
+   */
+  static async getFacebookGeographicInsights(breakdown = 'city', dateRange = null) {
+    try {
+      const since = dateRange?.start || '2025-06-01';
+      const until = dateRange?.end || '2025-06-09';
+      
+      const cacheKey = `geographic_insights_${breakdown}_${since}_${until}`;
+      const cached = this.getCached(cacheKey);
+      
+      if (cached) {
+        console.log('🎯 Usando dados geográficos do cache para:', breakdown);
+        return cached;
+      }
+
+      console.log('🌍 Buscando dados geográficos via API única para:', breakdown);
+
+      // OTIMIZAÇÃO: Usar endpoint geral ao invés de breakdown específico
+      // Para evitar múltiplas requisições que causam rate limit
+      const params = new URLSearchParams({
+        level: 'account', // Level mais alto para uma única requisição
+        breakdowns: breakdown,
+        since,
+        until,
+        limit: 100 // Limitar resultados
+      });
+
+      const response = await fetch(`${API_URL}/facebook-ads/insights?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Cache por 10 minutos para evitar requisições repetidas
+      this.setCache(cacheKey, data);
+      
+      console.log('✅ Dados geográficos obtidos:', {
+        breakdown,
+        totalItems: data.data?.length || 0,
+        cached: true
+      });
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados geográficos:', error);
+      
+      // Retornar dados mock em caso de erro para não quebrar a UI
+      return { 
+        data: [],
+        error: error.message,
+        fallback: true
+      };
+    }
+  }
+
+  /**
+   * 🌍 PROCESSAR DADOS GEOGRÁFICOS
+   * Extrai localizações únicas e processa leads
+   */
+  static processGeographicData(data, field) {
+    const locationMap = new Map();
+    
+    if (data && Array.isArray(data)) {
+      data.forEach(item => {
+        if (item[field]) {
+          // Extrair leads das actions
+          let leads = 0;
+          if (item.actions) {
+            const leadAction = item.actions.find(a => a.action_type === 'lead');
+            if (leadAction) {
+              leads = parseInt(leadAction.value || 0);
+            }
+          }
+          
+          // Mapear nome da localização
+          const locationName = item[field];
+          
+          // Agregar dados por localização
+          const current = locationMap.get(locationName) || { 
+            name: locationName,
+            value: 0,
+            impressions: 0,
+            spend: 0,
+            clicks: 0
+          };
+          
+          current.value += leads;
+          current.impressions += parseInt(item.impressions || 0);
+          current.spend += parseFloat(item.spend || 0);
+          current.clicks += parseInt(item.clicks || 0);
+          
+          locationMap.set(locationName, current);
+        }
+      });
+    }
+    
+    // Converter para array e ordenar por leads
+    return Array.from(locationMap.values())
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Top 10 localizações
+  }
+
+  /**
+   * 🌍 BUSCAR DADOS DE CIDADES
+   * Método específico para dados de cidades
+   */
+  static async getCitiesData(dateRange = null) {
+    try {
+      const geographicData = await this.getFacebookGeographicInsights('city', dateRange);
+      const citiesData = this.processGeographicData(geographicData.data, 'city');
+      
+      return {
+        cities: citiesData,
+        totalCities: citiesData.length,
+        totalLeads: citiesData.reduce((sum, city) => sum + city.value, 0)
+      };
+    } catch (error) {
+      console.error('Erro ao buscar dados de cidades:', error);
+      return { cities: [], totalCities: 0, totalLeads: 0 };
+    }
+  }
+
+  /**
+   * 🌍 BUSCAR LOCALIZAÇÕES DISPONÍVEIS
+   * Retorna lista de localizações únicas para filtros
+   */
+  static async getAvailableLocations(breakdown = 'city', dateRange = null) {
+    try {
+      const geographicData = await this.getFacebookGeographicInsights(breakdown, dateRange);
+      const locations = new Set();
+      
+      if (geographicData.data && Array.isArray(geographicData.data)) {
+        geographicData.data.forEach(item => {
+          if (item[breakdown]) {
+            locations.add(item[breakdown]);
+          }
+        });
+      }
+      
+      return Array.from(locations).sort().map(name => ({
+        name,
+        value: name,
+        label: name
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar localizações disponíveis:', error);
       return [];
     }
   }
