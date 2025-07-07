@@ -2817,14 +2817,12 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               value={filteredData?.profileVisits?.toLocaleString() || "0"}
               trendValue={null} // Trend não disponível ainda
               color={COLORS.secondary}
-              subtitle="Dados reais"
             />
             <MiniMetricCardWithTrend
               title="CONVERSAS PELO WHATSAPP"
               value={filteredData?.whatsappConversations?.toLocaleString() || "0"}
               trendValue={null} // Trend não disponível ainda
               color={COLORS.success}
-              subtitle="Dados reais"
             />
           </div>
         </div>
