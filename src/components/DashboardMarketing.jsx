@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, memo, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import * as echarts from 'echarts';
 import LoadingSpinner from './LoadingSpinner';
 import SimpleModal from './SimpleModal';
+import { KommoAPI } from '../services/api';
 import GranularAPI from '../services/granularAPI';
 import './Dashboard.css';
 
@@ -18,6 +20,204 @@ const COLORS = {
   danger: '#ff3a5e',
   lightBg: '#f8f9fa'
 };
+
+// ✅ COMPONENTE DETAILMODAL - IDÊNTICO AO DASHBOARD DE VENDAS
+const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error }) => {
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000
+      }}
+      onClick={onClose}
+    >
+      <div 
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '24px',
+          maxWidth: '90vw',
+          maxHeight: '80vh',
+          width: '800px',
+          overflowY: 'auto',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header do modal */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '20px',
+          borderBottom: `2px solid ${COLORS.primary}`,
+          paddingBottom: '12px'
+        }}>
+          <h3 style={{ margin: 0, color: COLORS.primary }}>{title}</h3>
+          <button 
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: COLORS.tertiary,
+              padding: '0',
+              width: '30px',
+              height: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Conteúdo do modal */}
+        <div>
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
+              <div>Carregando dados...</div>
+            </div>
+          ) : error ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: COLORS.danger }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
+              <div><strong>Erro ao carregar dados</strong></div>
+              <div style={{ fontSize: '14px', marginTop: '8px' }}>{error}</div>
+            </div>
+          ) : data.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: COLORS.tertiary }}>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>
+                {type === 'reunioes' || type === 'leads' ? '📊' : 
+                 type === 'propostas' ? '📋' : '💰'}
+              </div>
+              <div><strong>Nenhum registro encontrado</strong></div>
+              <div style={{ fontSize: '14px', marginTop: '8px' }}>
+                Não há {type} no período selecionado.
+              </div>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ 
+                width: '100%', 
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: COLORS.lightBg }}>
+                    {type === 'leads' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data de Criação</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                      </>
+                    )}
+                    {type === 'reunioes' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                      </>
+                    )}
+                    {type === 'propostas' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Proposta</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                      </>
+                    )}
+                    {type === 'vendas' && (
+                      <>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Venda</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Valor da Venda</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((item, index) => (
+                    <tr key={index} style={{ 
+                      backgroundColor: index % 2 === 0 ? 'white' : COLORS.lightBg,
+                      borderBottom: `1px solid ${COLORS.light}`
+                    }}>
+                      {type === 'leads' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data de Criação']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                        </>
+                      )}
+                      {type === 'reunioes' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                        </>
+                      )}
+                      {type === 'propostas' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data da Proposta']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                        </>
+                      )}
+                      {type === 'vendas' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Data da Venda']}</td>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
+                            {item['Valor da Venda']}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {/* Footer com total */}
+              <div style={{ 
+                marginTop: '16px', 
+                padding: '12px',
+                backgroundColor: COLORS.lightBg,
+                borderRadius: '4px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                color: COLORS.primary
+              }}>
+                Total: {data.length} {type}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+});
 
 // Multi-select filter component
 const MultiSelectFilter = ({ label, options, selectedValues, onChange, placeholder }) => {
@@ -166,12 +366,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   const [periodSalesData, setPeriodSalesData] = useState(null);
   const [loadingPeriodSales, setLoadingPeriodSales] = useState(false);
 
-  // Estados para modal de detalhes
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [detailModalData, setDetailModalData] = useState(null);
-  const [detailModalType, setDetailModalType] = useState('');
-  const [detailModalCorretor, setDetailModalCorretor] = useState('');
-  const [loadingDetailModal, setLoadingDetailModal] = useState(false);
+  // ✅ Estado do modal usando ref (igual ao DashboardSales)
+  const modalStateRef = useRef({
+    isOpen: false,
+    type: '',
+    title: '',
+    isLoading: false,
+    data: [],
+    error: null
+  });
+  
+  const [modalForceUpdate, setModalForceUpdate] = useState(0);
 
   // Estados para dados geográficos
   const [geographicData, setGeographicData] = useState({
@@ -551,17 +756,25 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     };
   }, [periodSalesData?.leadsByUser]);
 
-  // ✅ FUNÇÃO: Abrir modal de detalhes por corretor (similar ao DashboardSales)
-  const openModalByCorretor = useCallback(async (type, corretorName) => {
-    console.log('🔍 Abrindo modal detalhado:', { type, corretorName, period, customPeriod });
+  // ✅ FUNÇÃO: Abrir modal de detalhes por corretor (IDÊNTICA ao DashboardSales)
+  const openModalByCorretor = async (type, corretorName) => {
+    const titles = {
+      'leads': `Leads de ${corretorName}`,
+      'reunioes': `Reuniões de ${corretorName}`,
+      'vendas': `Vendas de ${corretorName}`
+    };
+
+    modalStateRef.current = {
+      isOpen: true,
+      type,
+      title: titles[type] || `Dados de ${corretorName}`,
+      isLoading: true,
+      data: [],
+      error: null
+    };
     
-    // Set modal states immediately
-    setDetailModalType(type);
-    setDetailModalCorretor(corretorName);
-    setShowDetailModal(true);
-    setLoadingDetailModal(true);
-    setDetailModalData(null);
-    
+    setModalForceUpdate(prev => prev + 1);
+
     try {
       // Preparar parâmetros extras para incluir período
       let extraParams = {};
@@ -569,42 +782,63 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
         extraParams.start_date = customPeriod.startDate;
         extraParams.end_date = customPeriod.endDate;
+      } else if (period === 'current_month') {
+        // Para mês atual, usar do dia 1 do mês até hoje
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        extraParams.start_date = firstDayOfMonth.toISOString().split('T')[0];
+        extraParams.end_date = today.toISOString().split('T')[0];
       } else if (period && period !== 'custom') {
         const periodToDays = {
           '7d': 7,
           '30d': 30,
           '60d': 60,
-          '90d': 90,
-          'current_month': 30
+          '90d': 90
         };
         extraParams.days = periodToDays[period] || 30;
       }
+
+      // Usar o corretor específico clicado e o filtro de fonte selecionado
+      const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource || '', extraParams);
       
-      console.log('📊 Parâmetros para modal detalhado:', {
-        corretor: corretorName,
-        fonte: '',
-        extraParams,
-        type
-      });
+      const dataMap = {
+        'leads': tablesData.leadsDetalhes || [], // Usar leadsDetalhes direto do backend
+        'reunioes': tablesData.reunioesDetalhes || [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
+
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        data: dataMap[type]
+      };
       
-      // Buscar dados detalhados usando a mesma API do dashboard de vendas
-      const tablesData = await KommoAPI.getDetailedTables(corretorName, '', extraParams);
-      
-      console.log('✅ Dados detalhados carregados:', {
-        type,
-        corretor: corretorName,
-        tablesData
-      });
-      
-      setDetailModalData(tablesData);
-      
+      setModalForceUpdate(prev => prev + 1);
     } catch (error) {
-      console.error('❌ Erro ao carregar dados detalhados:', error);
-      setDetailModalData({ error: 'Erro ao carregar dados detalhados' });
-    } finally {
-      setLoadingDetailModal(false);
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        error: error.message
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
     }
-  }, [period, customPeriod]);
+  };
+
+  // Função para fechar modal (igual ao DashboardSales)
+  const closeModal = () => {
+    modalStateRef.current = {
+      isOpen: false,
+      type: '',
+      title: '',
+      isLoading: false,
+      data: [],
+      error: null
+    };
+    
+    setModalForceUpdate(prev => prev + 1);
+  };
 
   // ✅ Effect para carregar dados geográficos - TEMPORARIAMENTE DESABILITADO
   // useEffect(() => {
@@ -2940,6 +3174,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         <div className="card card-lg">
           <div className="card-title">
             Status dos Leads CRM
+            {loadingPeriodSales && <span className="loading-indicator"> - Carregando...</span>}
           </div>
           <CompactChart 
             type="pie" 
@@ -2955,18 +3190,20 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               // - Soma múltiplos stages: "Lead Novo" + "Contato Feito" + "Acompanhamento"
               // - Dados reais esperados: ~87 leads em remarketing
               
-              // 1. Leads em Negociação (já correto)
-              const leadsEmNegociacao = salesData?.activeLeads || 
-                (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0);
+              // ✅ USAR DADOS DO PERÍODO: Trocar salesData por periodSalesData para respeitar filtro de período
               
-              // 2. ✅ CORREÇÃO: Leads em Remarketing - usar função helper
-              const leadsEmRemarketing = getLeadsEmRemarketing(salesData?.pipelineStatus);
+              // 1. Leads em Negociação (usar dados do período)
+              const leadsEmNegociacao = periodSalesData?.activeLeads || 
+                (periodSalesData?.leadsByUser ? periodSalesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0);
+              
+              // 2. ✅ CORREÇÃO: Leads em Remarketing - usar dados do período
+              const leadsEmRemarketing = getLeadsEmRemarketing(periodSalesData?.pipelineStatus);
               
               // 3. Leads Reativados (manter como 0 por enquanto)
               const leadsReativados = 0;
               
               // Debug: Comparação antes/depois da correção
-              const antesCorrecao = salesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0;
+              const antesCorrecao = periodSalesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0;
               
               console.log('🎯 Correção CRM Leads - ANTES vs DEPOIS:', {
                 antes: {
@@ -2980,8 +3217,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   metodo: 'Soma stages: Lead Novo + Contato Feito + Acompanhamento'
                 },
                 detalhes: {
-                  stagesDisponiveis: salesData?.pipelineStatus?.map(s => `${s.name}: ${s.value}`) || [],
-                  stagesUsados: salesData?.pipelineStatus?.filter(stage => ["Lead Novo", "Contato Feito", "Acompanhamento"].includes(stage.name))?.map(s => `${s.name}: ${s.value}`) || [],
+                  stagesDisponiveis: periodSalesData?.pipelineStatus?.map(s => `${s.name}: ${s.value}`) || [],
+                  stagesUsados: periodSalesData?.pipelineStatus?.filter(stage => ["Lead Novo", "Contato Feito", "Acompanhamento"].includes(stage.name))?.map(s => `${s.name}: ${s.value}`) || [],
                   diferencaEncontrada: leadsEmRemarketing - antesCorrecao
                 }
               });
@@ -3006,7 +3243,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               colors: [COLORS.primary, COLORS.secondary, COLORS.success]
             }}
             style={{ height: getChartHeight('medium') }}
-            loading={false}
+            loading={loadingPeriodSales}
           />
         </div>
 
@@ -3361,193 +3598,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         </div>
       </SimpleModal>
 
-      {/* ✅ Modal de Detalhes por Corretor */}
-      <SimpleModal
-        isOpen={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setDetailModalData(null);
-          setDetailModalType('');
-          setDetailModalCorretor('');
-        }}
-      >
-        <div style={{ display: 'grid', gap: '24px', minWidth: '600px', maxWidth: '90vw' }}>
-          {/* Header do Modal */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '12px',
-            paddingBottom: '16px',
-            borderBottom: '2px solid #e2e8f0'
-          }}>
-            <span style={{ fontSize: '24px' }}>
-              {detailModalType === 'leads' ? '📊' : '🤝'}
-            </span>
-            <div>
-              <h3 style={{ 
-                margin: 0, 
-                fontSize: '20px', 
-                fontWeight: '700',
-                color: '#2d3748'
-              }}>
-                {detailModalType === 'leads' ? 'Detalhes de Leads' : 'Detalhes de Reuniões'}
-              </h3>
-              <p style={{ 
-                margin: '4px 0 0 0', 
-                fontSize: '14px', 
-                color: '#718096'
-              }}>
-                Corretor: <strong>{detailModalCorretor}</strong>
-              </p>
-            </div>
-          </div>
-
-          {/* Conteúdo do Modal */}
-          {loadingDetailModal ? (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              padding: '40px 0',
-              gap: '12px'
-            }}>
-              <span style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>🔄</span>
-              <span style={{ fontSize: '16px', color: '#718096' }}>Carregando dados detalhados...</span>
-            </div>
-          ) : detailModalData?.error ? (
-            <div style={{ 
-              padding: '20px',
-              backgroundColor: '#fed7d7',
-              border: '1px solid #fc8181',
-              borderRadius: '8px',
-              color: '#c53030',
-              textAlign: 'center'
-            }}>
-              {detailModalData.error}
-            </div>
-          ) : detailModalData ? (
-            <div style={{ 
-              display: 'grid', 
-              gap: '16px',
-              maxHeight: '60vh',
-              overflow: 'auto'
-            }}>
-              {/* Mostrar dados conforme o tipo */}
-              {detailModalType === 'leads' && detailModalData.reunioesDetalhes && (
-                <div>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#4a5568' }}>
-                    Reuniões Realizadas ({detailModalData.reunioesDetalhes.length})
-                  </h4>
-                  <div style={{ 
-                    display: 'grid', 
-                    gap: '8px',
-                    backgroundColor: '#f7fafc',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    maxHeight: '200px',
-                    overflow: 'auto'
-                  }}>
-                    {detailModalData.reunioesDetalhes.slice(0, 10).map((reuniao, index) => (
-                      <div key={index} style={{ 
-                        padding: '8px 12px',
-                        backgroundColor: 'white',
-                        borderRadius: '6px',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '14px'
-                      }}>
-                        <strong>{reuniao.nome_lead || 'Lead não informado'}</strong>
-                        {reuniao.data_reuniao && (
-                          <span style={{ color: '#718096', marginLeft: '8px' }}>
-                            - {new Date(reuniao.data_reuniao).toLocaleDateString('pt-BR')}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                    {detailModalData.reunioesDetalhes.length > 10 && (
-                      <div style={{ 
-                        textAlign: 'center', 
-                        padding: '8px',
-                        color: '#718096',
-                        fontStyle: 'italic'
-                      }}>
-                        ... e mais {detailModalData.reunioesDetalhes.length - 10} reuniões
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {detailModalType === 'meetings' && detailModalData.reunioesDetalhes && (
-                <div>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#4a5568' }}>
-                    Reuniões Realizadas ({detailModalData.reunioesDetalhes.length})
-                  </h4>
-                  <div style={{ 
-                    display: 'grid', 
-                    gap: '8px',
-                    backgroundColor: '#f7fafc',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    maxHeight: '300px',
-                    overflow: 'auto'
-                  }}>
-                    {detailModalData.reunioesDetalhes.map((reuniao, index) => (
-                      <div key={index} style={{ 
-                        padding: '12px',
-                        backgroundColor: 'white',
-                        borderRadius: '6px',
-                        border: '1px solid #e2e8f0'
-                      }}>
-                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                          {reuniao.nome_lead || 'Lead não informado'}
-                        </div>
-                        {reuniao.data_reuniao && (
-                          <div style={{ fontSize: '14px', color: '#718096' }}>
-                            Data: {new Date(reuniao.data_reuniao).toLocaleDateString('pt-BR')}
-                          </div>
-                        )}
-                        {reuniao.observacoes && (
-                          <div style={{ fontSize: '14px', color: '#4a5568', marginTop: '4px' }}>
-                            {reuniao.observacoes}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Resumo */}
-              {detailModalData.summary && (
-                <div style={{ 
-                  padding: '16px',
-                  backgroundColor: '#edf2f7',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e0'
-                }}>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#4a5568' }}>Resumo</h4>
-                  <div style={{ display: 'grid', gap: '4px', fontSize: '14px' }}>
-                    <div>Total de Reuniões: <strong>{detailModalData.summary.total_reunioes || 0}</strong></div>
-                    <div>Total de Propostas: <strong>{detailModalData.summary.total_propostas || 0}</strong></div>
-                    <div>Total de Vendas: <strong>{detailModalData.summary.total_vendas || 0}</strong></div>
-                    {detailModalData.summary.valor_total_vendas > 0 && (
-                      <div>Valor Total: <strong>R$ {detailModalData.summary.valor_total_vendas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '40px 0',
-              color: '#718096'
-            }}>
-              Nenhum dado encontrado
-            </div>
-          )}
-        </div>
-      </SimpleModal>
+      {/* ✅ Modal para tabelas detalhadas - IDÊNTICO ao DashboardSales */}
+      <DetailModal
+        isOpen={modalStateRef.current.isOpen}
+        onClose={closeModal}
+        type={modalStateRef.current.type}
+        title={modalStateRef.current.title}
+        isLoading={modalStateRef.current.isLoading}
+        data={modalStateRef.current.data}
+        error={modalStateRef.current.error}
+      />
     </div>
   );
 }
