@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useCallback, useMemo } from 'react';
 import * as echarts from 'echarts';
 import LoadingSpinner from './LoadingSpinner';
+import SimpleModal from './SimpleModal';
 import GranularAPI from '../services/granularAPI';
 import './Dashboard.css';
 
@@ -114,18 +115,45 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   // Estados para filtros de campanhas Facebook
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState([]);
+  
+  // Estados para conjuntos de anúncios (adsets)
+  const [adsets, setAdsets] = useState([]);
+  const [selectedAdsets, setSelectedAdsets] = useState([]);
+  const [loadingAdsets, setLoadingAdsets] = useState(false);
+  
+  // Estados para anúncios (ads)
+  const [ads, setAds] = useState([]);
+  const [selectedAds, setSelectedAds] = useState([]);
+  const [loadingAds, setLoadingAds] = useState(false);
+  
+  // Estados dos filtros combinados
   const [campaignFilters, setCampaignFilters] = useState({
     campaignIds: [],
+    adsetIds: [],
+    adIds: [],
     status: [],
     objective: [],
     searchTerm: ''
   });
+  
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [showCampaignFilter, setShowCampaignFilter] = useState(false);
   const [campaignInsights, setCampaignInsights] = useState(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  
+  // Estados para controlar dropdowns
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showAdsetDropdown, setShowAdsetDropdown] = useState(false);
+  const [showAdDropdown, setShowAdDropdown] = useState(false);
+  
   const dropdownRef = useRef(null);
+  const adsetDropdownRef = useRef(null);
+  const adDropdownRef = useRef(null);
+  
+  // Ref para controlar requisições em andamento
+  const abortControllerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
+  const initialDataLoadedRef = useRef(false);
   
   // Estados para dados demográficos
   const [demographicData, setDemographicData] = useState({
@@ -134,27 +162,91 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   });
   const [loadingDemographics, setLoadingDemographics] = useState(false);
 
+  // Estados para dados geográficos
+  const [geographicData, setGeographicData] = useState({
+    cities: [],
+    regions: [],
+    countries: [],
+    selectedFilters: {
+      city: null,
+      region: null,
+      country: null
+    }
+  });
+  const [loadingGeographics, setLoadingGeographics] = useState(false);
+
   // Constantes de responsividade
   const isMobile = windowSize.width < 768;
   const isSmallMobile = windowSize.width < 480;
+
+  // Filtros em cascata (opcional)
+  const getFilteredAdsets = useMemo(() => {
+    // Se não há campanhas selecionadas, mostrar todos os adsets
+    if (selectedCampaigns.length === 0) return adsets;
+    
+    // Filtrar adsets pelas campanhas selecionadas
+    return adsets.filter(adset => 
+      selectedCampaigns.includes(adset.campaign_id)
+    );
+  }, [adsets, selectedCampaigns]);
+
+  const getFilteredAds = useMemo(() => {
+    // Se não há filtros, mostrar todos os ads
+    if (selectedCampaigns.length === 0 && selectedAdsets.length === 0) return ads;
+    
+    return ads.filter(ad => {
+      // Filtrar por adset primeiro (mais específico)
+      if (selectedAdsets.length > 0) {
+        return selectedAdsets.includes(ad.adset_id);
+      }
+      
+      // Se não há adsets selecionados, filtrar por campanha
+      if (selectedCampaigns.length > 0) {
+        // Encontrar os adsets das campanhas selecionadas
+        const campaignAdsets = adsets
+          .filter(adset => selectedCampaigns.includes(adset.campaign_id))
+          .map(adset => adset.id);
+        
+        return campaignAdsets.includes(ad.adset_id);
+      }
+      
+      return true;
+    });
+  }, [ads, adsets, selectedCampaigns, selectedAdsets]);
 
   // Effect to track props changes
 
   // Usar dados que vêm do componente pai (Dashboard.jsx)
   useEffect(() => {
+    console.log('🔍 Effect data mudou:', {
+      hasData: !!data,
+      hasFacebookCampaigns: !!(data && data.facebookCampaigns),
+      campaignsCount: data?.facebookCampaigns?.length || 0,
+      currentSelectedCampaigns: selectedCampaigns.length,
+      period
+    });
+    
     if (data && data.facebookCampaigns) {
       setCampaigns(data.facebookCampaigns);
       
-      // Selecionar TODAS as campanhas por padrão
-      const allCampaignIds = data.facebookCampaigns.map(campaign => campaign.id);
-      setSelectedCampaigns(allCampaignIds);
-      
-      setCampaignFilters({
-        campaignIds: allCampaignIds,
-        status: [],
-        objective: [],
-        searchTerm: ''
-      });
+      // ✅ PROTEÇÃO: Só resetar seleções se não há campanhas selecionadas
+      // Isso evita que o período personalizado resete os dropdowns
+      if (selectedCampaigns.length === 0) {
+        console.log('🔧 Resetando seleções de campanhas (primeira carga)');
+        const allCampaignIds = data.facebookCampaigns.map(campaign => campaign.id);
+        setSelectedCampaigns(allCampaignIds);
+        
+        setCampaignFilters({
+          campaignIds: allCampaignIds,
+          adsetIds: [],
+          adIds: [],
+          status: [],
+          objective: [],
+          searchTerm: ''
+        });
+      } else {
+        console.log('🔒 Mantendo seleções existentes para evitar reset');
+      }
       
       // Mostrar filtro de campanhas sempre que houver campanhas
       setShowCampaignFilter(true);
@@ -162,8 +254,113 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     
     if (data && data.campaignInsights) {
       setCampaignInsights(data.campaignInsights);
+      // Marcar que os dados iniciais foram carregados
+      initialDataLoadedRef.current = true;
     }
-  }, [data]);
+  }, [data]); // Removido selectedCampaigns da dependência para evitar loop
+  
+  // Carregar dados de adsets e ads ao montar o componente
+  useEffect(() => {
+    console.log('🔍 Effect carregar adsets/ads:', {
+      hasAdsets: adsets.length > 0,
+      hasAds: ads.length > 0,
+      loadingAdsets,
+      loadingAds
+    });
+    
+    // ✅ PROTEÇÃO: Só carregar se ainda não tem dados
+    if (adsets.length === 0 && ads.length === 0 && !loadingAdsets && !loadingAds) {
+      const loadAdditionalData = async () => {
+        try {
+          console.log('📦 Carregando adsets e ads pela primeira vez...');
+          
+          // Carregar conjuntos de anúncios
+          setLoadingAdsets(true);
+          const adsetsResponse = await GranularAPI.getFacebookAdsets();
+          setAdsets(adsetsResponse || []);
+          setLoadingAdsets(false);
+          
+          // Carregar anúncios
+          setLoadingAds(true);
+          const adsResponse = await GranularAPI.getFacebookAds();
+          setAds(adsResponse || []);
+          setLoadingAds(false);
+          
+          console.log('✅ Adsets e ads carregados:', {
+            adsetsCount: adsetsResponse?.length || 0,
+            adsCount: adsResponse?.length || 0
+          });
+          
+        } catch (error) {
+          console.error('❌ Erro ao carregar dados adicionais:', error);
+          setLoadingAdsets(false);
+          setLoadingAds(false);
+        }
+      };
+      
+      loadAdditionalData();
+    } else {
+      console.log('🔒 Dados já carregados, evitando recarregamento desnecessário');
+    }
+  }, []);
+
+  // ✅ FUNÇÃO HELPER: Preservar seleções dos dropdowns
+  const preserveDropdownSelections = useCallback(() => {
+    const currentSelections = {
+      campaigns: selectedCampaigns,
+      adsets: selectedAdsets,
+      ads: selectedAds
+    };
+    
+    console.log('💾 Preservando seleções dos dropdowns:', currentSelections);
+    
+    // Salvar no sessionStorage para recuperar caso os dados sejam recarregados
+    sessionStorage.setItem('marketing_dropdown_selections', JSON.stringify(currentSelections));
+    
+    return currentSelections;
+  }, [selectedCampaigns, selectedAdsets, selectedAds]);
+
+  // ✅ FUNÇÃO HELPER: Restaurar seleções dos dropdowns
+  const restoreDropdownSelections = useCallback(() => {
+    try {
+      const saved = sessionStorage.getItem('marketing_dropdown_selections');
+      if (saved) {
+        const selections = JSON.parse(saved);
+        console.log('🔄 Restaurando seleções dos dropdowns:', selections);
+        
+        if (selections.campaigns && selections.campaigns.length > 0) {
+          setSelectedCampaigns(selections.campaigns);
+        }
+        if (selections.adsets && selections.adsets.length > 0) {
+          setSelectedAdsets(selections.adsets);
+        }
+        if (selections.ads && selections.ads.length > 0) {
+          setSelectedAds(selections.ads);
+        }
+        
+        return selections;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao restaurar seleções:', error);
+    }
+    return null;
+  }, []);
+
+  // ✅ Effect para restaurar seleções após recarregamento de dados
+  useEffect(() => {
+    // Se temos campanhas mas não temos seleções, tentar restaurar
+    if (campaigns.length > 0 && selectedCampaigns.length === 0) {
+      console.log('🔄 Detectado recarregamento de campanhas, tentando restaurar seleções...');
+      const restored = restoreDropdownSelections();
+      
+      // Se não conseguiu restaurar, usar todas as campanhas como padrão
+      if (!restored || !restored.campaigns || restored.campaigns.length === 0) {
+        console.log('📝 Usando todas as campanhas como padrão');
+        const allCampaignIds = campaigns.map(campaign => campaign.id);
+        setSelectedCampaigns(allCampaignIds);
+      }
+    }
+  }, [campaigns.length, selectedCampaigns.length, restoreDropdownSelections]);
 
   // Effect para fechar dropdown quando clicar fora
   useEffect(() => {
@@ -179,6 +376,67 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     };
   }, []);
 
+  // Cleanup em unmount para cancelar requests e timers
+  useEffect(() => {
+    return () => {
+      // Cancelar requests em andamento
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Cancelar timers de debounce
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ✅ FUNÇÃO HELPER: Carregar dados geográficos
+  const loadGeographicData = useCallback(async () => {
+    setLoadingGeographics(true);
+    
+    try {
+      console.log('🌍 Carregando dados geográficos...');
+      
+      // Criar objeto de range de data baseado no período
+      let dateRange = null;
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+      }
+      
+      // Usar endpoints paralelos para melhor performance
+      const [citiesRes, regionsRes, countriesRes] = await Promise.all([
+        GranularAPI.getAvailableLocations('city', dateRange),
+        GranularAPI.getAvailableLocations('region', dateRange),
+        GranularAPI.getAvailableLocations('country', dateRange)
+      ]);
+      
+      setGeographicData(prev => ({
+        ...prev,
+        cities: citiesRes,
+        regions: regionsRes,
+        countries: countriesRes
+      }));
+      
+      console.log('✅ Dados geográficos carregados:', {
+        cities: citiesRes.length,
+        regions: regionsRes.length,
+        countries: countriesRes.length,
+        dateRange
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados geográficos:', error);
+    } finally {
+      setLoadingGeographics(false);
+    }
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]);
+
+  // ✅ Effect para carregar dados geográficos - TEMPORARIAMENTE DESABILITADO
+  // useEffect(() => {
+  //   loadGeographicData();
+  // }, [loadGeographicData]);
+
   // Atualizar dados quando recebidos do cache
   useEffect(() => {
     if (data) {
@@ -189,8 +447,27 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   // Effect para atualizar insights quando o período muda (se há campanhas selecionadas)
   useEffect(() => {
+    console.log('🔍 Effect período mudou:', {
+      initialDataLoaded: initialDataLoadedRef.current,
+      period,
+      customPeriod,
+      selectedCampaignsCount: selectedCampaigns.length,
+      willExecute: initialDataLoadedRef.current && selectedCampaigns.length > 0 && period
+    });
+    
+    // Skip se os dados iniciais ainda não foram carregados para evitar requisição duplicada
+    if (!initialDataLoadedRef.current) return;
+    
     // Só executar se há campanhas selecionadas e o período mudou
     if (selectedCampaigns.length > 0 && period) {
+      // Cancelar requisição anterior se existir
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Criar novo AbortController
+      abortControllerRef.current = new AbortController();
+      
       // Função assíncrona para atualizar insights sem mostrar loading
       const updateInsightsSilently = async () => {
         try {
@@ -233,9 +510,31 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             };
           }
           
+          // Filtrar adsets selecionados pelas campanhas selecionadas
+          const validAdsets = selectedAdsets.filter(adsetId => {
+            const adset = adsets.find(a => a.id === adsetId);
+            return adset && selectedCampaigns.includes(adset.campaign_id);
+          });
+          
+          console.log('🎯 Insights: usando adsets filtrados para campanhas selecionadas:', {
+            selectedCampaigns,
+            selectedAdsets,
+            validAdsets,
+            selectedAds
+          });
+          
           // Carregar insights sem mostrar loading (similar ao auto-refresh)
-          const insights = await GranularAPI.getFacebookCampaignInsights(selectedCampaigns, dateRange);
-          setCampaignInsights(insights);
+          const insights = await GranularAPI.getFacebookCampaignInsights(
+            selectedCampaigns, 
+            dateRange, 
+            validAdsets, 
+            selectedAds
+          );
+          
+          // Verificar se a requisição não foi cancelada
+          if (!abortControllerRef.current.signal.aborted) {
+            setCampaignInsights(insights);
+          }
         } catch (error) {
           // Error handled silently
         }
@@ -243,10 +542,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       
       updateInsightsSilently();
     }
-  }, [period, customPeriod?.startDate, customPeriod?.endDate]); // Monitorar mudanças no período
+  }, [period, customPeriod?.startDate, customPeriod?.endDate, selectedCampaigns, selectedAdsets, selectedAds, adsets]); // Monitorar mudanças no período e filtros
   
   // Effect para carregar dados demográficos
   useEffect(() => {
+    // Skip se não há campanhas selecionadas
+    if (selectedCampaigns.length === 0) {
+      setDemographicData({ genderData: [], cityData: [] });
+      return;
+    }
+    
     const loadDemographicData = async () => {
       setLoadingDemographics(true);
       try {
@@ -289,7 +594,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         
         // Buscar dados demográficos (gênero real, cidade mockada)
         const demographics = await GranularAPI.getFacebookInsightsWithBreakdowns(
-          selectedCampaigns.length > 0 ? selectedCampaigns : [],
+          selectedCampaigns,
           dateRange
         );
         
@@ -357,11 +662,19 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   };
 
   // Função para aplicar filtros de campanha (otimizada para evitar re-renders desnecessários)
-  const handleCampaignFilterChange = async (newFilters) => {
+  const handleCampaignFilterChange = useCallback(async (newFilters) => {
     setCampaignFilters(newFilters);
+    
+    // Cancelar requisição anterior se existir
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     
     // Se houver campanhas selecionadas, carregar insights específicos
     if (newFilters.campaignIds.length > 0) {
+      // Criar novo AbortController
+      abortControllerRef.current = new AbortController();
+      
       setLoadingInsights(true);
       try {
         // Preparar range de datas baseado no período selecionado
@@ -403,37 +716,268 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           };
         }
         
-        const insights = await GranularAPI.getFacebookCampaignInsights(newFilters.campaignIds, dateRange);
-        setCampaignInsights(insights);
+        // Filtrar adsets selecionados pelas campanhas selecionadas
+        const validAdsets = newFilters.adsetIds.filter(adsetId => {
+          const adset = adsets.find(a => a.id === adsetId);
+          return adset && newFilters.campaignIds.includes(adset.campaign_id);
+        });
+        
+        console.log('🎯 handleCampaignFilterChange: enviando requisição para API:', {
+          campaignIds: newFilters.campaignIds,
+          requestedAdsets: newFilters.adsetIds,
+          validAdsets,
+          adIds: newFilters.adIds,
+          dateRange,
+          url: `${import.meta.env.VITE_API_URL}/facebook-ads/campaigns/insights`
+        });
+        
+        const insights = await GranularAPI.getFacebookCampaignInsights(
+          newFilters.campaignIds, 
+          dateRange, 
+          validAdsets, 
+          newFilters.adIds
+        );
+        
+        console.log('📊 Resposta da API recebida:', {
+          hasData: !!insights,
+          structure: insights ? Object.keys(insights) : null,
+          totalLeads: insights?.totalLeads || 0,
+          totalSpend: insights?.totalSpend || 0,
+          totalImpressions: insights?.totalImpressions || 0,
+          campaignsCount: insights?.campaigns?.length || 0
+        });
+        
+        // Verificar se a requisição não foi cancelada
+        if (!abortControllerRef.current.signal.aborted) {
+          setCampaignInsights(insights);
+        }
         
         // REMOVIDO: onDataRefresh para evitar re-render desnecessário
         // Os insights já são suficientes para mostrar os dados filtrados
       } catch (error) {
-        setCampaignInsights(null);
+        console.error('❌ Erro ao buscar insights das campanhas:', {
+          error: error.message,
+          filters: newFilters,
+          wasAborted: abortControllerRef.current?.signal?.aborted
+        });
+        
+        if (!abortControllerRef.current.signal.aborted) {
+          setCampaignInsights(null);
+          // Relançar o erro para que seja capturado pelo handleApplyFilters
+          throw error;
+        }
       } finally {
-        setLoadingInsights(false);
+        if (!abortControllerRef.current.signal.aborted) {
+          setLoadingInsights(false);
+        }
       }
     } else {
       // Se não há campanhas selecionadas, apenas limpar insights
       setCampaignInsights(null);
     }
-  };
+  }, [period, customPeriod]);
 
-  // Handler para seleção de campanhas
-  const handleCampaignSelect = (campaignId) => {
+  // Handler para seleção de campanhas (apenas atualiza estado, não aplica filtro)
+  const handleCampaignSelect = useCallback((campaignId) => {
     const newSelectedCampaigns = selectedCampaigns.includes(campaignId)
       ? selectedCampaigns.filter(id => id !== campaignId)
       : [...selectedCampaigns, campaignId];
     
     setSelectedCampaigns(newSelectedCampaigns);
     
+    // Se uma campanha foi deselecionada, remover adsets que pertencem a ela
+    let newSelectedAdsets = selectedAdsets;
+    if (selectedCampaigns.includes(campaignId) && !newSelectedCampaigns.includes(campaignId)) {
+      // Campanha foi deselecionada, remover adsets que pertencem a ela
+      newSelectedAdsets = selectedAdsets.filter(adsetId => {
+        const adset = adsets.find(a => a.id === adsetId);
+        return adset && adset.campaign_id !== campaignId;
+      });
+      setSelectedAdsets(newSelectedAdsets);
+      
+      console.log('🎯 Campanha deselecionada, removendo adsets:', {
+        campaignId,
+        removedAdsets: selectedAdsets.filter(adsetId => {
+          const adset = adsets.find(a => a.id === adsetId);
+          return adset && adset.campaign_id === campaignId;
+        }),
+        newSelectedAdsets
+      });
+    }
+  }, [selectedCampaigns, selectedAdsets, adsets]);
+
+  // Handler para seleção de conjuntos de anúncios (apenas atualiza estado)
+  const handleAdsetSelect = useCallback((adsetId) => {
+    const newSelectedAdsets = selectedAdsets.includes(adsetId)
+      ? selectedAdsets.filter(id => id !== adsetId)
+      : [...selectedAdsets, adsetId];
+    
+    setSelectedAdsets(newSelectedAdsets);
+    
+    // Verificar se o adset pertence às campanhas selecionadas
+    const adset = adsets.find(a => a.id === adsetId);
+    const validSelection = adset && selectedCampaigns.includes(adset.campaign_id);
+    
+    console.log('🎯 Adset selecionado:', {
+      adsetId,
+      belongsToCampaign: adset?.campaign_id,
+      selectedCampaigns,
+      validSelection,
+      newSelectedAdsets
+    });
+  }, [selectedAdsets, selectedCampaigns, adsets]);
+
+  // Handler para seleção de anúncios (apenas atualiza estado)
+  const handleAdSelect = useCallback((adId) => {
+    const newSelectedAds = selectedAds.includes(adId)
+      ? selectedAds.filter(id => id !== adId)
+      : [...selectedAds, adId];
+    
+    setSelectedAds(newSelectedAds);
+  }, [selectedAds]);
+
+  // ✅ FUNÇÃO HELPER: Calcular leads em remarketing corretamente
+  const getLeadsEmRemarketing = useCallback((pipelineStatus) => {
+    if (!pipelineStatus || !Array.isArray(pipelineStatus)) {
+      console.warn('⚠️ pipelineStatus inválido:', pipelineStatus);
+      return 0;
+    }
+    
+    const remarketingStages = ["Lead Novo", "Contato Feito", "Acompanhamento"];
+    const result = pipelineStatus
+      .filter(stage => remarketingStages.includes(stage.name))
+      .reduce((sum, stage) => sum + (stage.value || 0), 0);
+    
+    console.log('📊 getLeadsEmRemarketing calculado:', {
+      totalStages: pipelineStatus.length,
+      remarketingStagesEncontrados: pipelineStatus.filter(stage => remarketingStages.includes(stage.name)),
+      resultado: result
+    });
+    
+    return result;
+  }, []);
+
+  // ✅ FUNÇÃO HELPER: Atualizar filtro geográfico
+  const updateGeographicFilter = useCallback((type, value) => {
+    setGeographicData(prev => ({
+      ...prev,
+      selectedFilters: {
+        ...prev.selectedFilters,
+        [type]: value
+      }
+    }));
+    
+    console.log('🌍 Filtro geográfico atualizado:', { type, value });
+  }, []);
+
+  // ✅ FUNÇÃO HELPER: Buscar dados de cidades com filtros
+  const getCitiesData = useCallback(async (filters = {}) => {
+    try {
+      console.log('🏙️ Buscando dados de cidades com filtros:', filters);
+      
+      // Criar objeto de range de data baseado no período
+      let dateRange = null;
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        dateRange = { start: customPeriod.startDate, end: customPeriod.endDate };
+      }
+      
+      const citiesData = await GranularAPI.getCitiesData(dateRange);
+      
+      // Aplicar filtros se houver
+      let filteredCities = citiesData.cities;
+      
+      if (filters.city) {
+        filteredCities = filteredCities.filter(city => city.name === filters.city);
+      }
+      
+      console.log('📊 Dados de cidades processados:', {
+        totalCities: citiesData.cities.length,
+        filteredCities: filteredCities.length,
+        totalLeads: filteredCities.reduce((sum, city) => sum + city.value, 0),
+        dateRange
+      });
+      
+      return {
+        ...citiesData,
+        cities: filteredCities
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados de cidades:', error);
+      return { cities: [], totalCities: 0, totalLeads: 0 };
+    }
+  }, [period, customPeriod?.startDate, customPeriod?.endDate]);
+
+  // Handler para aplicar filtros (botão)
+  const handleApplyFilters = useCallback(async () => {
+    // Verificar se há campanhas selecionadas
+    if (selectedCampaigns.length === 0) {
+      console.warn('⚠️ Nenhuma campanha selecionada para aplicar filtros');
+      alert('Por favor, selecione pelo menos uma campanha antes de aplicar os filtros.');
+      return;
+    }
+
+    // Filtrar adsets selecionados pelas campanhas selecionadas
+    const validAdsets = selectedAdsets.filter(adsetId => {
+      const adset = adsets.find(a => a.id === adsetId);
+      return adset && selectedCampaigns.includes(adset.campaign_id);
+    });
+
+    // Validar se adsets selecionados pertencem às campanhas
+    const invalidAdsets = selectedAdsets.filter(adsetId => {
+      const adset = adsets.find(a => a.id === adsetId);
+      return adset && !selectedCampaigns.includes(adset.campaign_id);
+    });
+
+    if (invalidAdsets.length > 0) {
+      console.warn('⚠️ Alguns adsets selecionados não pertencem às campanhas selecionadas:', invalidAdsets);
+    }
+
     const newFilters = {
       ...campaignFilters,
-      campaignIds: newSelectedCampaigns
+      campaignIds: selectedCampaigns,
+      adsetIds: validAdsets,
+      adIds: selectedAds
     };
-    
-    handleCampaignFilterChange(newFilters);
-  };
+
+    console.log('🎯 Aplicando filtros:', {
+      totalCampaigns: campaigns.length,
+      selectedCampaigns: selectedCampaigns.length,
+      totalAdsets: adsets.length,
+      selectedAdsets: selectedAdsets.length,
+      validAdsets: validAdsets.length,
+      invalidAdsets: invalidAdsets.length,
+      selectedAds: selectedAds.length,
+      geographicFilters: geographicData.selectedFilters,
+      filtersToApply: newFilters
+    });
+
+    // Aplicar filtros imediatamente
+    try {
+      await handleCampaignFilterChange(newFilters);
+      console.log('✅ Filtros aplicados com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao aplicar filtros:', error);
+      alert('Erro ao aplicar filtros. Verifique a conexão e tente novamente.');
+    }
+  }, [selectedCampaigns, selectedAdsets, selectedAds, adsets, campaigns, campaignFilters, handleCampaignFilterChange]);
+
+  // Effect para fechar dropdowns quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (adsetDropdownRef.current && !adsetDropdownRef.current.contains(event.target)) {
+        setShowAdsetDropdown(false);
+      }
+      if (adDropdownRef.current && !adDropdownRef.current.contains(event.target)) {
+        setShowAdDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Componente para exibir indicador de tendência (mesmo do DashboardSales)
   const TrendIndicator = ({ value, showZero = false }) => {
@@ -739,6 +1283,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     );
   }
 
+  // Debug: Log da fonte dos dados
+  console.log('🔍 Fonte dos dados para métricas:', {
+    hasCampaignInsights: !!campaignInsights,
+    selectedCampaignsCount: selectedCampaigns.length,
+    hasFilteredData: !!filteredData?.facebookMetrics,
+    dataSource: campaignInsights && selectedCampaigns.length > 0 ? 'campaignInsights' : 'filteredData.facebookMetrics'
+  });
+
   // Usar insights das campanhas selecionadas se disponível, senão usar dados gerais
   const facebookMetrics = campaignInsights && selectedCampaigns.length > 0 ? {
     costPerLead: campaignInsights.costPerLead || 0,
@@ -783,6 +1335,153 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       postEngagement: 0
     }
   };
+
+  // Debug: Log das métricas finais
+  console.log('📊 Métricas finais para exibição:', {
+    source: campaignInsights && selectedCampaigns.length > 0 ? 'insights filtrados' : 'dados gerais',
+    metrics: {
+      reach: facebookMetrics.reach,
+      impressions: facebookMetrics.impressions,
+      clicks: facebookMetrics.clicks,
+      spend: facebookMetrics.spend,
+      costPerLead: facebookMetrics.costPerLead,
+      cpc: facebookMetrics.cpc,
+      cpm: facebookMetrics.cpm
+    }
+  });
+
+  // ✅ COMPONENTE: Gráfico de Cidades
+  const CityChart = memo(() => {
+    const [citiesData, setCitiesData] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    // Carregar dados de cidades quando filtros mudarem
+    useEffect(() => {
+      const loadCitiesData = async () => {
+        setLoading(true);
+        try {
+          const data = await getCitiesData(geographicData.selectedFilters);
+          setCitiesData(data.cities || []);
+        } catch (error) {
+          console.error('Erro ao carregar dados de cidades:', error);
+          setCitiesData([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadCitiesData();
+    }, [geographicData.selectedFilters, getCitiesData]);
+
+    if (loading) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: getChartHeight('medium'),
+          color: COLORS.secondary 
+        }}>
+          <span>Carregando cidades...</span>
+        </div>
+      );
+    }
+
+    if (citiesData.length === 0) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: getChartHeight('medium'),
+          color: COLORS.light 
+        }}>
+          <span>Nenhum dado de cidade disponível</span>
+        </div>
+      );
+    }
+
+    return (
+      <CompactChart 
+        type="bar" 
+        data={citiesData.slice(0, 8)} // Top 8 cidades
+        config={{ 
+          name: 'Leads por Cidade',
+          color: COLORS.secondary,
+          xKey: 'name',
+          yKey: 'value'
+        }}
+        style={{ height: getChartHeight('medium') }}
+        loading={loading}
+      />
+    );
+  });
+
+  // ✅ COMPONENTE: Filtros Geográficos
+  const GeographicFilters = memo(() => {
+    if (loadingGeographics) {
+      return (
+        <div className="geographic-filters-loading">
+          <span>Carregando localizações...</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="geographic-filters">
+        {/* Filtro por Cidade */}
+        <div className="geographic-filter">
+          <label className="filter-label">Cidade:</label>
+          <select
+            value={geographicData.selectedFilters.city || ''}
+            onChange={(e) => updateGeographicFilter('city', e.target.value || null)}
+            className="geographic-select"
+          >
+            <option value="">Todas as Cidades</option>
+            {geographicData.cities.map((city) => (
+              <option key={city.value} value={city.value}>
+                {city.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro por Região */}
+        <div className="geographic-filter">
+          <label className="filter-label">Região:</label>
+          <select
+            value={geographicData.selectedFilters.region || ''}
+            onChange={(e) => updateGeographicFilter('region', e.target.value || null)}
+            className="geographic-select"
+          >
+            <option value="">Todas as Regiões</option>
+            {geographicData.regions.map((region) => (
+              <option key={region.value} value={region.value}>
+                {region.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro por País */}
+        <div className="geographic-filter">
+          <label className="filter-label">País:</label>
+          <select
+            value={geographicData.selectedFilters.country || ''}
+            onChange={(e) => updateGeographicFilter('country', e.target.value || null)}
+            className="geographic-select"
+          >
+            <option value="">Todos os Países</option>
+            {geographicData.countries.map((country) => (
+              <option key={country.value} value={country.value}>
+                {country.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  });
 
   return (
     <div className={`dashboard-content ${isUpdating ? 'updating' : ''}`}>
@@ -1139,120 +1838,445 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           }
         }
 
-        /* Estilos para o modal de período customizado */
-        .custom-period-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-
-        .custom-period-modal {
-          background-color: white;
-          border-radius: 12px;
-          padding: 24px;
-          width: 90%;
-          max-width: 500px;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        }
-
-        .custom-period-modal h3 {
-          margin-top: 0;
-          color: #4E5859;
-          font-size: 18px;
-          margin-bottom: 20px;
-          text-align: center;
-        }
-
-        .date-inputs {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 24px;
-        }
-
-        .date-inputs label {
+        /* Estilos padronizados para todos os dropdowns do Facebook */
+        .campaign-selector,
+        .adset-selector,
+        .ad-selector {
           display: flex;
           flex-direction: column;
           gap: 8px;
-          font-size: 14px;
-          color: #4a5568;
-          font-weight: 500;
+          min-width: 220px;
         }
 
-        .date-inputs input {
-          padding: 12px;
-          border: 2px solid #e2e8f0;
+        .campaign-filter-container,
+        .adset-filter-container,
+        .ad-filter-container {
+          position: relative;
+        }
+
+        .campaign-filter-button,
+        .adset-filter-button,
+        .ad-filter-button {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          padding: 12px 16px;
+          background-color: #f8f9fa;
+          border: 1px solid #e0e0e0;
           border-radius: 8px;
+          cursor: pointer;
           font-size: 14px;
+          color: #333;
+          min-height: 44px;
           transition: all 0.2s ease;
         }
 
-        .date-inputs input:focus {
+        .campaign-filter-button:hover,
+        .adset-filter-button:hover,
+        .ad-filter-button:hover {
+          background-color: #f0f0f0;
+          border-color: #4E5859;
+        }
+
+        .dropdown-arrow {
+          transition: transform 0.2s;
+          font-size: 12px;
+          color: #666;
+        }
+
+        .dropdown-arrow.open {
+          transform: rotate(180deg);
+        }
+
+        .campaign-dropdown,
+        .adset-dropdown,
+        .ad-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          background-color: white;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+          max-height: 400px;
+          overflow: hidden;
+          display: none;
+          margin-top: 4px;
+        }
+
+        .campaign-dropdown.show,
+        .adset-dropdown.show,
+        .ad-dropdown.show {
+          display: block;
+          animation: slideDown 0.2s ease;
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .campaign-search {
+          padding: 12px;
+          border-bottom: 1px solid #e0e0e0;
+        }
+
+        .campaign-search-input {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #e0e0e0;
+          border-radius: 6px;
+          font-size: 14px;
+        }
+
+        .campaign-search-input:focus {
+          outline: none;
+          border-color: #4E5859;
+        }
+
+        .campaign-actions,
+        .adset-actions,
+        .ad-actions {
+          display: flex;
+          gap: 8px;
+          padding: 12px;
+          border-bottom: 1px solid #e0e0e0;
+          background-color: #f8f9fa;
+        }
+
+        .select-all-btn,
+        .clear-all-btn {
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid #e0e0e0;
+          border-radius: 6px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .select-all-btn:hover {
+          background-color: #4E5859;
+          color: white;
+          border-color: #4E5859;
+        }
+
+        .clear-all-btn:hover {
+          background-color: #ff3a5e;
+          color: white;
+          border-color: #ff3a5e;
+        }
+
+        .campaign-list,
+        .adset-list,
+        .ad-list {
+          max-height: 250px;
+          overflow-y: auto;
+          padding: 8px;
+        }
+
+        .campaign-item,
+        .adset-item,
+        .ad-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          margin-bottom: 4px;
+        }
+
+        .campaign-item:hover,
+        .adset-item:hover,
+        .ad-item:hover {
+          background-color: #f8f9fa;
+        }
+
+        .campaign-item input[type="checkbox"],
+        .adset-item input[type="checkbox"],
+        .ad-item input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .campaign-name,
+        .adset-name,
+        .ad-name {
+          flex: 1;
+          font-size: 14px;
+          color: #333;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .campaign-status,
+        .adset-status,
+        .ad-status {
+          font-size: 12px;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+
+        .campaign-status.active,
+        .adset-status.active,
+        .ad-status.active {
+          background-color: #d4edda;
+          color: #155724;
+        }
+
+        .campaign-status.paused,
+        .adset-status.paused,
+        .ad-status.paused {
+          background-color: #f8d7da;
+          color: #721c24;
+        }
+
+        .campaign-loading,
+        .adset-loading,
+        .ad-loading {
+          padding: 20px;
+          text-align: center;
+          color: #666;
+          font-size: 14px;
+        }
+
+        /* Scrollbar personalizada */
+        .campaign-list::-webkit-scrollbar,
+        .adset-list::-webkit-scrollbar,
+        .ad-list::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .campaign-list::-webkit-scrollbar-thumb,
+        .adset-list::-webkit-scrollbar-thumb,
+        .ad-list::-webkit-scrollbar-thumb {
+          background-color: #ddd;
+          border-radius: 3px;
+        }
+
+        .campaign-list::-webkit-scrollbar-thumb:hover,
+        .adset-list::-webkit-scrollbar-thumb:hover,
+        .ad-list::-webkit-scrollbar-thumb:hover {
+          background-color: #ccc;
+        }
+
+        /* Estilos para o botão Aplicar Filtros */
+        .apply-filters-container {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          margin-top: 16px;
+          padding: 0 16px;
+        }
+
+        .apply-filters-btn {
+          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 12px 24px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(78, 88, 89, 0.2);
+          min-width: 140px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .apply-filters-btn:hover:not(:disabled) {
+          background: linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
+        }
+
+        .apply-filters-btn:active:not(:disabled) {
+          transform: translateY(0);
+          box-shadow: 0 2px 8px rgba(78, 88, 89, 0.2);
+        }
+
+        .apply-filters-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        /* Badges indicadores de status */
+        .filtered-badge, .unfiltered-badge, .corrected-badge {
+          display: inline-block;
+          margin-left: 8px;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
+        .filtered-badge {
+          background-color: rgba(76, 224, 179, 0.15);
+          color: #4ce0b3;
+          border: 1px solid rgba(76, 224, 179, 0.3);
+        }
+
+        .unfiltered-badge {
+          background-color: rgba(150, 133, 111, 0.15);
+          color: #96856F;
+          border: 1px solid rgba(150, 133, 111, 0.3);
+        }
+
+        .corrected-badge {
+          background-color: rgba(0, 200, 83, 0.15);
+          color: #00c853;
+          border: 1px solid rgba(0, 200, 83, 0.3);
+          animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+          from { box-shadow: 0 0 2px rgba(0, 200, 83, 0.3); }
+          to { box-shadow: 0 0 8px rgba(0, 200, 83, 0.6); }
+        }
+
+        .loading-indicator {
+          color: #ff9800;
+          font-weight: 500;
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+
+        /* Indicador de status global */
+        .global-status-indicator {
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 1000;
+          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .status-icon {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+          font-size: 13px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+
+        /* Estilos para Filtros Geográficos */
+        .geographic-filters {
+          display: flex;
+          gap: 16px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .geographic-filter {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 120px;
+        }
+
+        .geographic-select {
+          padding: 8px 12px;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 14px;
+          background-color: white;
+          color: #2d3748;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-height: 42px;
+        }
+
+        .geographic-select:hover {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+        }
+
+        .geographic-select:focus {
           outline: none;
           border-color: #4E5859;
           box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
         }
 
-        .modal-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
+        .geographic-filters-loading {
+          color: #96856F;
+          font-style: italic;
+          padding: 8px 12px;
         }
 
-        .modal-actions button {
-          padding: 10px 20px;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .modal-actions button:first-child {
-          background-color: #f7fafc;
-          color: #4a5568;
-          border: 2px solid #e2e8f0;
-        }
-
-        .modal-actions button:first-child:hover {
-          background-color: #edf2f7;
-        }
-
-        .modal-actions button:last-child {
-          background-color: #4E5859;
-          color: white;
-          border: none;
-        }
-
-        .modal-actions button:last-child:hover {
-          background-color: #3a4344;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
-        }
-
-        @media (max-width: 480px) {
-          .date-inputs {
-            grid-template-columns: 1fr;
+        @media (max-width: 768px) {
+          .geographic-filters {
+            flex-direction: column;
+            align-items: stretch;
             gap: 12px;
           }
           
-          .modal-actions {
-            flex-direction: column;
-            gap: 8px;
-          }
-          
-          .modal-actions button {
-            width: 100%;
+          .geographic-filter {
+            min-width: 100%;
           }
         }
+
+        /* ✅ Modal customizado removido - usando SimpleModal padrão */
       `}</style>
+
+      {/* Indicador de Status Geral */}
+      {(isLoading || isUpdating || loadingInsights || loadingCampaigns || loadingAdsets || loadingAds) && (
+        <div className="global-status-indicator">
+          <div className="status-content">
+            <span className="status-icon">🔄</span>
+            <span className="status-text">
+              {isLoading ? 'Carregando dados do dashboard...' :
+               isUpdating ? 'Atualizando dados gerais...' :
+               loadingInsights ? 'Aplicando filtros de campanhas...' :
+               loadingCampaigns ? 'Carregando campanhas...' :
+               loadingAdsets ? 'Carregando conjuntos de anúncios...' :
+               loadingAds ? 'Carregando anúncios...' : 'Atualizando...'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="dashboard-row row-header">
         <div className="section-title">
@@ -1266,6 +2290,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                 onChange={(values) => setSelectedSource(values.length === 0 ? '' : values.join(','))}
                 placeholder="Todas as Fontes"
               />
+
+              {/* Filtros Geográficos - TEMPORARIAMENTE DESABILITADO */}
+              {/* <GeographicFilters /> */}
 
               {/* Filtro de Campanhas Facebook */}
               {showCampaignFilter && (
@@ -1310,19 +2337,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                                   if (selectedCampaigns.length === campaigns.length) {
                                     // Se todas estão selecionadas, desmarcar todas (SEM recarregar dados)
                                     setSelectedCampaigns([]);
-                                    setCampaignFilters({
+                                    const newFilters = {
                                       ...campaignFilters,
                                       campaignIds: []
-                                    });
+                                    };
+                                    setCampaignFilters(newFilters);
                                     setCampaignInsights(null); // Limpar insights apenas
                                   } else {
                                     // Se nem todas estão selecionadas, selecionar todas
                                     const allCampaignIds = campaigns.map(c => c.id);
                                     setSelectedCampaigns(allCampaignIds);
-                                    handleCampaignFilterChange({
-                                      ...campaignFilters,
-                                      campaignIds: allCampaignIds
-                                    });
                                   }
                                 }}
                               >
@@ -1333,11 +2357,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                                 onClick={() => {
                                   // Limpar sem recarregar dados
                                   setSelectedCampaigns([]);
-                                  setCampaignFilters({
-                                    ...campaignFilters,
-                                    campaignIds: []
-                                  });
-                                  setCampaignInsights(null); // Limpar insights apenas
+                                  setSelectedAdsets([]); // Limpar adsets também
+                                  setSelectedAds([]); // Limpar ads também
                                 }}
                               >
                                 Limpar
@@ -1357,7 +2378,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                                       checked={selectedCampaigns.includes(campaign.id)}
                                       onChange={() => handleCampaignSelect(campaign.id)}
                                     />
-                                    <span className="campaign-name">{campaign.name}</span>
+                                    <span className="campaign-name" title={campaign.name}>{campaign.name}</span>
                                     <span className={`campaign-status ${campaign.status?.toLowerCase()}`}>
                                       {campaign.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
                                     </span>
@@ -1371,6 +2392,163 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   </div>
                 </div>
               )}
+
+              {/* Filtro de Conjuntos de Anúncios */}
+              <div className="adset-selector">
+                <label className="filter-label">Conjuntos de Anúncios:</label>
+                <div className="adset-filter-content">
+                  {loadingAdsets ? (
+                    <div className="adset-loading">Carregando conjuntos...</div>
+                  ) : (
+                    <div className="adset-filter-container" ref={adsetDropdownRef}>
+                      <button 
+                        className="adset-filter-button"
+                        onClick={() => setShowAdsetDropdown(!showAdsetDropdown)}
+                      >
+                        {selectedAdsets.length === 0 
+                          ? `Selecionar conjuntos ${getFilteredAdsets.length < adsets.length ? `(${getFilteredAdsets.length} disponíveis)` : ''}` 
+                          : selectedAdsets.length === getFilteredAdsets.length 
+                            ? `Todos os conjuntos (${selectedAdsets.length})`
+                            : `${selectedAdsets.length} de ${getFilteredAdsets.length} selecionado(s)`}
+                        <span className={`dropdown-arrow ${showAdsetDropdown ? 'open' : ''}`}>▼</span>
+                      </button>
+                      
+                      {showAdsetDropdown && (
+                        <div className="adset-dropdown show">
+                          <div className="adset-actions">
+                            <button 
+                              className="select-all-btn"
+                              onClick={() => {
+                                const filteredIds = getFilteredAdsets.map(a => a.id);
+                                if (selectedAdsets.length === filteredIds.length) {
+                                  setSelectedAdsets([]);
+                                  const newFilters = {
+                                    ...campaignFilters,
+                                    adsetIds: []
+                                  };
+                                  setCampaignFilters(newFilters);
+                                } else {
+                                  setSelectedAdsets(filteredIds);
+                                }
+                              }}
+                            >
+                              {selectedAdsets.length === getFilteredAdsets.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                            </button>
+                            <button 
+                              className="clear-all-btn"
+                              onClick={() => {
+                                setSelectedAdsets([]);
+                              }}
+                            >
+                              Limpar
+                            </button>
+                          </div>
+                          
+                          <div className="adset-list">
+                            {getFilteredAdsets.map(adset => (
+                              <label key={adset.id} className="adset-item">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAdsets.includes(adset.id)}
+                                  onChange={() => handleAdsetSelect(adset.id)}
+                                />
+                                <span className="adset-name" title={adset.name}>{adset.name}</span>
+                                <span className={`adset-status ${adset.status?.toLowerCase()}`}>
+                                  {adset.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Filtro de Anúncios */}
+              <div className="ad-selector">
+                <label className="filter-label">Anúncios:</label>
+                <div className="ad-filter-content">
+                  {loadingAds ? (
+                    <div className="ad-loading">Carregando anúncios...</div>
+                  ) : (
+                    <div className="ad-filter-container" ref={adDropdownRef}>
+                      <button 
+                        className="ad-filter-button"
+                        onClick={() => setShowAdDropdown(!showAdDropdown)}
+                      >
+                        {selectedAds.length === 0 
+                          ? `Selecionar anúncios ${getFilteredAds.length < ads.length ? `(${getFilteredAds.length} disponíveis)` : ''}` 
+                          : selectedAds.length === getFilteredAds.length 
+                            ? `Todos os anúncios (${selectedAds.length})`
+                            : `${selectedAds.length} de ${getFilteredAds.length} selecionado(s)`}
+                        <span className={`dropdown-arrow ${showAdDropdown ? 'open' : ''}`}>▼</span>
+                      </button>
+                      
+                      {showAdDropdown && (
+                        <div className="ad-dropdown show">
+                          <div className="ad-actions">
+                            <button 
+                              className="select-all-btn"
+                              onClick={() => {
+                                const filteredIds = getFilteredAds.map(a => a.id);
+                                if (selectedAds.length === filteredIds.length) {
+                                  setSelectedAds([]);
+                                  const newFilters = {
+                                    ...campaignFilters,
+                                    adIds: []
+                                  };
+                                  setCampaignFilters(newFilters);
+                                } else {
+                                  setSelectedAds(filteredIds);
+                                }
+                              }}
+                            >
+                              {selectedAds.length === getFilteredAds.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                            </button>
+                            <button 
+                              className="clear-all-btn"
+                              onClick={() => {
+                                setSelectedAds([]);
+                              }}
+                            >
+                              Limpar
+                            </button>
+                          </div>
+                          
+                          <div className="ad-list">
+                            {getFilteredAds.map(ad => (
+                              <label key={ad.id} className="ad-item">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAds.includes(ad.id)}
+                                  onChange={() => handleAdSelect(ad.id)}
+                                />
+                                <span className="ad-name" title={ad.name}>{ad.name}</span>
+                                <span className={`ad-status ${ad.status?.toLowerCase()}`}>
+                                  {ad.status === 'ACTIVE' ? 'Ativo' : 'Pausado'}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botão Aplicar Filtros */}
+              <div className="apply-filters-container">
+                <button 
+                  className="apply-filters-btn"
+                  onClick={handleApplyFilters}
+                  disabled={loadingInsights}
+                >
+                  {loadingInsights ? 'Aplicando...' : 'Aplicar Filtros'}
+                </button>
+              </div>
             </div>
             <div className="period-controls">
               <div className="period-selector">
@@ -1449,10 +2627,28 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       <div className="dashboard-row row-compact">
         <div className="card card-metrics-group wide">
           <div className="card-title">
-            {campaignInsights && selectedCampaigns.length > 0 
-              ? `Métricas de Performance - ${selectedCampaigns.length} Campanha(s) Selecionada(s)`
-              : 'Métricas de Performance'}
-            {loadingInsights && <span className="loading-indicator"> - Atualizando...</span>}
+            {campaignInsights && selectedCampaigns.length > 0 ? (
+              <>
+                Métricas de Performance - {selectedCampaigns.length} Campanha(s)
+                {selectedAdsets.length > 0 && (
+                  <>, {selectedAdsets.filter(adsetId => {
+                    const adset = adsets.find(a => a.id === adsetId);
+                    return adset && selectedCampaigns.includes(adset.campaign_id);
+                  }).length} Conjunto(s) de Anúncios</>
+                )}
+                {selectedAds.length > 0 && (
+                  <>, {selectedAds.length} Anúncio(s)</>
+                )}
+                {' '}Filtrada(s)
+                <span className="filtered-badge">📊 FILTRADO</span>
+              </>
+            ) : (
+              <>
+                Métricas de Performance
+                <span className="unfiltered-badge">📈 DADOS GERAIS</span>
+              </>
+            )}
+            {loadingInsights && <span className="loading-indicator"> 🔄 Atualizando...</span>}
           </div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
@@ -1538,24 +2734,70 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       <div className="dashboard-row">
         {/* Status dos Leads CRM - movido do dashboard de vendas */}
         <div className="card card-lg">
-          <div className="card-title">Status dos Leads CRM</div>
+          <div className="card-title">
+            Status dos Leads CRM
+            <span className="corrected-badge">✅ CORRIGIDO</span>
+          </div>
           <CompactChart 
             type="pie" 
-            data={[
-              {
-                name: 'Leads em Negociação',
-                value: salesData?.activeLeads ||  // V2: KPIs endpoint - usando dados de vendas
-                       (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0)
-              },
-              {
-                name: 'Leads em Remarketing',
-                value: salesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0
-              },
-              {
-                name: 'Leads Reativados',
-                value: 0  // Temporariamente 0 até implementar salesbotRecovery nos V2
-              }
-            ].filter(item => item.value > 0)} 
+            data={(() => {
+              // ✅ CORREÇÃO IMPLEMENTADA: Conforme análise detalhada
+              // 
+              // PROBLEMA ANTERIOR:
+              // - Buscava stage específico "Leads em Remarketing" que NÃO existe
+              // - Resultado era sempre 0, dados incorretos
+              //
+              // SOLUÇÃO IMPLEMENTADA:
+              // - Mapeia stages existentes que representam remarketing
+              // - Soma múltiplos stages: "Lead Novo" + "Contato Feito" + "Acompanhamento"
+              // - Dados reais esperados: ~87 leads em remarketing
+              
+              // 1. Leads em Negociação (já correto)
+              const leadsEmNegociacao = salesData?.activeLeads || 
+                (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.active || 0), 0) : 0);
+              
+              // 2. ✅ CORREÇÃO: Leads em Remarketing - usar função helper
+              const leadsEmRemarketing = getLeadsEmRemarketing(salesData?.pipelineStatus);
+              
+              // 3. Leads Reativados (manter como 0 por enquanto)
+              const leadsReativados = 0;
+              
+              // Debug: Comparação antes/depois da correção
+              const antesCorrecao = salesData?.pipelineStatus?.find(stage => stage.name === 'Leads em Remarketing')?.value || 0;
+              
+              console.log('🎯 Correção CRM Leads - ANTES vs DEPOIS:', {
+                antes: {
+                  leadsEmRemarketing: antesCorrecao,
+                  metodo: 'Busca stage específico "Leads em Remarketing"'
+                },
+                depois: {
+                  leadsEmNegociacao,
+                  leadsEmRemarketing,
+                  leadsReativados,
+                  metodo: 'Soma stages: Lead Novo + Contato Feito + Acompanhamento'
+                },
+                detalhes: {
+                  stagesDisponiveis: salesData?.pipelineStatus?.map(s => `${s.name}: ${s.value}`) || [],
+                  stagesUsados: salesData?.pipelineStatus?.filter(stage => ["Lead Novo", "Contato Feito", "Acompanhamento"].includes(stage.name))?.map(s => `${s.name}: ${s.value}`) || [],
+                  diferencaEncontrada: leadsEmRemarketing - antesCorrecao
+                }
+              });
+              
+              return [
+                {
+                  name: 'Leads em Negociação',
+                  value: leadsEmNegociacao
+                },
+                {
+                  name: 'Leads em Remarketing',
+                  value: leadsEmRemarketing
+                },
+                {
+                  name: 'Leads Reativados',
+                  value: leadsReativados
+                }
+              ].filter(item => item.value > 0);
+            })()} 
             config={{ 
               name: 'Status dos Leads CRM',
               colors: [COLORS.primary, COLORS.secondary, COLORS.success]
@@ -1611,7 +2853,30 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         </div>
       )}
 
-      {/* Linha 6: Tendência e métricas do Facebook */}
+      {/* Linha 6: Rank Corretores - Reuniões */}
+      {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && (
+        <div className="dashboard-row">
+          <div className="card card-full">
+            <div className="card-title">Rank Corretores - Reunião</div>
+            <CompactChart 
+              type="bar" 
+              data={[...salesData.leadsByUser]
+                .filter(user => user.name !== 'SA IMOB')
+                .map(user => ({
+                  ...user,
+                  meetingsHeld: user.meetingsHeld || user.meetings || 0
+                }))
+                .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0))
+              } 
+              config={{ xKey: 'name', yKey: 'meetingsHeld', color: COLORS.secondary }}
+              style={{ height: getChartHeight('medium') }}
+              loading={false}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Linha 7: Tendência e métricas do Facebook */}
       <div className="dashboard-row">
         {filteredData.metricsTrend && filteredData.metricsTrend.length > 0 && (
           <div className="card card-lg">
@@ -1650,37 +2915,245 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           />
         </div>
       </div>
+
+      {/* Linha 8: Top Cidades - TEMPORARIAMENTE DESABILITADO */}
+      {/* <div className="dashboard-row">
+        <div className="card card-lg">
+          <div className="card-title">
+            Top Cidades por Leads
+            {loadingGeographics && <span className="loading-indicator"> - Carregando...</span>}
+          </div>
+          <CityChart />
+        </div>
+      </div> */}
       
-      {/* Modal de período customizado */}
-      {showCustomPeriod && (
-        <div className="custom-period-backdrop" onClick={() => setShowCustomPeriod(false)}>
-          <div className="custom-period-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Selecionar Período Personalizado</h3>
-            <div className="date-inputs">
-              <label>
-                Data Inicial:
-                <input
-                  type="date"
-                  value={customPeriod.startDate}
-                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
-                />
+      {/* ✅ Modal de Período Personalizado - CORRIGIDO */}
+      {/* Agora usa SimpleModal (igual ao dashboard de vendas) ao invés do modal customizado */}
+      <SimpleModal
+        isOpen={showCustomPeriod}
+        onClose={() => {
+          setShowCustomPeriod(false);
+        }}
+      >
+        <div style={{ display: 'grid', gap: '24px' }}>
+          {/* Campos de Data com Design Melhorado */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: '#4a5568',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>📅</span> Data Inicial
               </label>
-              <label>
-                Data Final:
-                <input
-                  type="date"
-                  value={customPeriod.endDate}
-                  onChange={(e) => setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
-                />
-              </label>
+              <input
+                type="date"
+                value={customPeriod?.startDate || ''}
+                onChange={(e) => setCustomPeriod(prev => ({ ...prev, startDate: e.target.value }))}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '8px', 
+                  border: '2px solid #e2e8f0', 
+                  width: '100%',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: '#fafbfc'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#4E5859';
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(78, 88, 89, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.backgroundColor = '#fafbfc';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
             </div>
-            <div className="modal-actions">
-              <button onClick={() => setShowCustomPeriod(false)}>Cancelar</button>
-              <button onClick={applyCustomPeriod}>Aplicar</button>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: '#4a5568',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>🏁</span> Data Final
+              </label>
+              <input
+                type="date"
+                value={customPeriod?.endDate || ''}
+                onChange={(e) => setCustomPeriod(prev => ({ ...prev, endDate: e.target.value }))}
+                style={{ 
+                  padding: '12px 16px', 
+                  borderRadius: '8px', 
+                  border: '2px solid #e2e8f0', 
+                  width: '100%',
+                  fontSize: '14px',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: '#fafbfc'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#4E5859';
+                  e.target.style.backgroundColor = 'white';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(78, 88, 89, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#e2e8f0';
+                  e.target.style.backgroundColor = '#fafbfc';
+                  e.target.style.boxShadow = 'none';
+                }}
+              />
             </div>
           </div>
+
+          {/* Preview do Período Selecionado */}
+          {customPeriod?.startDate && customPeriod?.endDate && (
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '8px',
+              fontSize: '14px',
+              color: '#0369a1'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📊</span> Período Selecionado
+              </div>
+              <div>
+                {new Date(customPeriod.startDate + 'T12:00:00').toLocaleDateString('pt-BR')} até {' '}
+                {new Date(customPeriod.endDate + 'T12:00:00').toLocaleDateString('pt-BR')}
+                {' '}({Math.ceil((new Date(customPeriod.endDate + 'T12:00:00') - new Date(customPeriod.startDate + 'T12:00:00')) / (1000 * 60 * 60 * 24)) + 1} dias)
+              </div>
+            </div>
+          )}
+
+          {/* Botões de Ação */}
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '8px' }}>
+            <button 
+              onClick={() => setShowCustomPeriod(false)}
+              style={{ 
+                padding: '12px 24px', 
+                backgroundColor: '#f7fafc', 
+                color: '#4a5568',
+                border: '2px solid #e2e8f0', 
+                borderRadius: '8px', 
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#edf2f7';
+                e.target.style.borderColor = '#cbd5e0';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#f7fafc';
+                e.target.style.borderColor = '#e2e8f0';
+              }}
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={() => {
+                console.log('🎯 Marketing - Aplicando período personalizado:', {
+                  customPeriod,
+                  startDate: customPeriod?.startDate,
+                  endDate: customPeriod?.endDate
+                });
+                
+                if (!customPeriod?.startDate || !customPeriod?.endDate) {
+                  alert('Por favor, selecione ambas as datas');
+                  return;
+                }
+                
+                const startDate = new Date(customPeriod.startDate + 'T12:00:00');
+                const endDate = new Date(customPeriod.endDate + 'T12:00:00');
+                
+                if (startDate > endDate) {
+                  alert('A data inicial deve ser anterior à data final');
+                  return;
+                }
+                
+                const diffInDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+                if (diffInDays > 365) {
+                  alert('O período não pode ser maior que 365 dias');
+                  return;
+                }
+                
+                console.log('✅ Marketing - Período válido, aplicando:', {
+                  periodo: { startDate: customPeriod.startDate, endDate: customPeriod.endDate },
+                  diasCalculados: diffInDays,
+                  estadoAntesDeAplicar: {
+                    selectedCampaigns: selectedCampaigns.length,
+                    selectedAdsets: selectedAdsets.length,
+                    selectedAds: selectedAds.length,
+                    campaigns: campaigns.length,
+                    adsets: adsets.length,
+                    ads: ads.length
+                  }
+                });
+                
+                // ✅ Preservar seleções antes de aplicar período
+                preserveDropdownSelections();
+                
+                applyCustomPeriod();
+                
+                // Debug: Verificar estado após aplicar e restaurar se necessário
+                setTimeout(() => {
+                  console.log('🔍 Estado após aplicar período personalizado:', {
+                    selectedCampaigns: selectedCampaigns.length,
+                    selectedAdsets: selectedAdsets.length,
+                    selectedAds: selectedAds.length,
+                    campaigns: campaigns.length,
+                    adsets: adsets.length,
+                    ads: ads.length
+                  });
+                  
+                  // Se as seleções foram perdidas, tentar restaurar
+                  if (selectedCampaigns.length === 0 && campaigns.length > 0) {
+                    console.log('🔧 Detectado reset dos dropdowns, tentando restaurar...');
+                    restoreDropdownSelections();
+                  }
+                }, 1000);
+              }}
+              style={{ 
+                padding: '12px 24px', 
+                background: 'linear-gradient(135deg, #4E5859 0%, #96856F 100%)', 
+                color: 'white',
+                border: 'none', 
+                borderRadius: '8px', 
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(78, 88, 89, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%)';
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 4px 12px rgba(78, 88, 89, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'linear-gradient(135deg, #4E5859 0%, #96856F 100%)';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 2px 8px rgba(78, 88, 89, 0.3)';
+              }}
+            >
+              Aplicar Período
+            </button>
+          </div>
         </div>
-      )}
+      </SimpleModal>
     </div>
   );
 }
