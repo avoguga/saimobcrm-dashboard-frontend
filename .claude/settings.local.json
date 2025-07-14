@@ -8,7 +8,10 @@
       "Bash(mv:*)",
       "Bash(rm:*)",
       "Bash(curl:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }
