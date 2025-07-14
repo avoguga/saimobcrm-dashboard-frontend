@@ -9,7 +9,7 @@
 
 import { MockDataService } from './mockDataService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohenrique.dev';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Flags HONESTAS por módulo
 const USE_MOCK_SALES = false; // ✅ VENDAS: Endpoints V2 implementados!

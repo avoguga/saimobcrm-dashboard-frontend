@@ -1,24 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { createPortal } from 'react-dom';
 import * as echarts from 'echarts';
 import { KommoAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 import SimpleModal from './SimpleModal';
+import DetailModal from './common/DetailModal';
+import MultiSelectFilter from './common/MultiSelectFilter';
+import { COLORS } from '../constants/colors';
 import './Dashboard.css';
-
-// Paleta de cores da SA IMOB
-const COLORS = {
-  primary: '#4E5859',
-  secondary: '#96856F',
-  tertiary: '#75777B',
-  dark: '#212121',
-  light: '#C1C5C9',
-  white: '#FFFFFF',
-  success: '#4ce0b3',
-  warning: '#ffaa5b',
-  danger: '#ff3a5e',
-  lightBg: '#f8f9fa'
-};
 
 // Componente de métrica com seta e fundo colorido (como na imagem)
 const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'number' }) => {
@@ -126,203 +114,6 @@ const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'nu
   );
 };
 
-// Memoized Modal Component to prevent parent re-renders
-const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error }) => {
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000
-      }}
-      onClick={onClose}
-    >
-      <div 
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '24px',
-          maxWidth: '90vw',
-          maxHeight: '80vh',
-          width: '800px',
-          overflowY: 'auto',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header do modal */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '20px',
-          borderBottom: `2px solid ${COLORS.primary}`,
-          paddingBottom: '12px'
-        }}>
-          <h3 style={{ margin: 0, color: COLORS.primary }}>{title}</h3>
-          <button 
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: COLORS.tertiary,
-              padding: '0',
-              width: '30px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Conteúdo do modal */}
-        <div>
-          {isLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-              <div>Carregando dados...</div>
-            </div>
-          ) : error ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: COLORS.danger }}>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
-              <div><strong>Erro ao carregar dados</strong></div>
-              <div style={{ fontSize: '14px', marginTop: '8px' }}>{error}</div>
-            </div>
-          ) : data.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: COLORS.tertiary }}>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>
-                {type === 'reunioes' || type === 'leads' ? '📊' : 
-                 type === 'propostas' ? '📋' : '💰'}
-              </div>
-              <div><strong>Nenhum registro encontrado</strong></div>
-              <div style={{ fontSize: '14px', marginTop: '8px' }}>
-                Não há {type} no período selecionado.
-              </div>
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ 
-                width: '100%', 
-                borderCollapse: 'collapse',
-                fontSize: '14px'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: COLORS.lightBg }}>
-                    {type === 'leads' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data de Criação</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                      </>
-                    )}
-                    {type === 'reunioes' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                      </>
-                    )}
-                    {type === 'propostas' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Proposta</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                      </>
-                    )}
-                    {type === 'vendas' && (
-                      <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Venda</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Valor da Venda</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((item, index) => (
-                    <tr key={index} style={{ 
-                      backgroundColor: index % 2 === 0 ? 'white' : COLORS.lightBg,
-                      borderBottom: `1px solid ${COLORS.light}`
-                    }}>
-                      {type === 'leads' && (
-                        <>
-                          <td style={{ padding: '12px' }}>{item['Data de Criação']}</td>
-                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                        </>
-                      )}
-                      {type === 'reunioes' && (
-                        <>
-                          <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
-                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                        </>
-                      )}
-                      {type === 'propostas' && (
-                        <>
-                          <td style={{ padding: '12px' }}>{item['Data da Proposta']}</td>
-                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                        </>
-                      )}
-                      {type === 'vendas' && (
-                        <>
-                          <td style={{ padding: '12px' }}>{item['Data da Venda']}</td>
-                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
-                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
-                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
-                          <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
-                            {item['Valor da Venda']}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              
-              {/* Footer com total */}
-              <div style={{ 
-                marginTop: '16px', 
-                padding: '12px',
-                backgroundColor: COLORS.lightBg,
-                borderRadius: '4px',
-                textAlign: 'center',
-                fontWeight: 'bold',
-                color: COLORS.primary
-              }}>
-                Total: {data.length} {type}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-});
 
 // Componente para exibir indicador de tendência
 const TrendIndicator = ({ value, showZero = false }) => {
@@ -360,94 +151,6 @@ const TrendIndicator = ({ value, showZero = false }) => {
   );
 };
 
-// Componente MultiSelectFilter
-const MultiSelectFilter = ({ label, options, selectedValues, onChange, placeholder }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  // Fechar dropdown quando clicar fora
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const handleToggleOption = (value) => {
-    const newSelectedValues = selectedValues.includes(value)
-      ? selectedValues.filter(v => v !== value)
-      : [...selectedValues, value];
-    
-    onChange(newSelectedValues);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedValues.length === options.length) {
-      onChange([]);
-    } else {
-      onChange(options.map(option => option.value));
-    }
-  };
-
-  const getDisplayText = () => {
-    if (selectedValues.length === 0) return placeholder;
-    if (selectedValues.length === 1) {
-      const option = options.find(opt => opt.value === selectedValues[0]);
-      return option?.label || selectedValues[0];
-    }
-    return `${selectedValues.length} selecionados`;
-  };
-
-  return (
-    <div className="multi-select-container" ref={dropdownRef}>
-      <label className="filter-label">{label}:</label>
-      <div className="multi-select-wrapper">
-        <button
-          type="button"
-          className="multi-select-button"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <span className="multi-select-text">{getDisplayText()}</span>
-          <span className={`multi-select-arrow ${isOpen ? 'open' : ''}`}>▼</span>
-        </button>
-
-        {isOpen && (
-          <div className="multi-select-dropdown">
-            <div className="multi-select-option select-all" onClick={handleSelectAll}>
-              <input
-                type="checkbox"
-                checked={selectedValues.length === options.length}
-                readOnly
-              />
-              <span>Selecionar Todos</span>
-            </div>
-            <div className="multi-select-divider"></div>
-            {options.map((option) => (
-              <div
-                key={option.value}
-                className={`multi-select-option ${selectedValues.includes(option.value) ? 'selected' : ''}`}
-                onClick={() => handleToggleOption(option.value)}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedValues.includes(option.value)}
-                  readOnly
-                />
-                <span>{option.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, pendingCorretor, setPendingCorretor, pendingSource, setPendingSource, applyFilters, hasPendingFilters, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
   
@@ -538,17 +241,33 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   }, [salesData]);
 
   // Função para abrir modal específico por corretor
-  const openModalByCorretor = async (type, corretorName) => {
-    const titles = {
-      'leads': `Leads de ${corretorName}`,
-      'reunioes': `Reuniões de ${corretorName}`,
-      'vendas': `Vendas de ${corretorName}`
+  const openModalByCorretor = async (type, corretorName, value, params, seriesName) => {
+    // Ajustar título baseado na série clicada
+    const getTitle = () => {
+      if (type === 'leads') {
+        if (seriesName === 'Leads Orgânicos') {
+          return `Leads Orgânicos de ${corretorName}`;
+        } else if (seriesName === 'Leads') {
+          return `Leads Pagos de ${corretorName}`;
+        } else {
+          return `Todos os Leads de ${corretorName}`;
+        }
+      } else if (type === 'reunioes') {
+        if (seriesName === 'Reuniões Orgânicas') {
+          return `Reuniões Orgânicas de ${corretorName}`;
+        } else if (seriesName === 'Reuniões') {
+          return `Reuniões Pagas de ${corretorName}`;
+        } else {
+          return `Todas as Reuniões de ${corretorName}`;
+        }
+      }
+      return `Dados de ${corretorName}`;
     };
 
     modalStateRef.current = {
       isOpen: true,
       type,
-      title: titles[type] || `Dados de ${corretorName}`,
+      title: getTitle(),
       isLoading: true,
       data: [],
       error: null
@@ -583,9 +302,39 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       // Usar o corretor específico clicado e o filtro de fonte selecionado
       const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource || '', extraParams);
       
+      // Filtrar dados baseado na série clicada
+      const getFilteredData = () => {
+        if (type === 'leads') {
+          if (seriesName === 'Leads Orgânicos') {
+            return tablesData.organicosDetalhes || [];
+          } else if (seriesName === 'Leads') {
+            return tablesData.leadsDetalhes || [];
+          } else {
+            // Leads Totais - mostrar todos
+            return [
+              ...(tablesData.leadsDetalhes || []),
+              ...(tablesData.organicosDetalhes || [])
+            ];
+          }
+        } else if (type === 'reunioes') {
+          if (seriesName === 'Reuniões Orgânicas') {
+            return tablesData.reunioesOrganicasDetalhes || [];
+          } else if (seriesName === 'Reuniões') {
+            return tablesData.reunioesDetalhes || [];
+          } else {
+            // Reuniões Totais - mostrar todas
+            return [
+              ...(tablesData.reunioesDetalhes || []),
+              ...(tablesData.reunioesOrganicasDetalhes || [])
+            ];
+          }
+        }
+        return tablesData.vendasDetalhes || [];
+      };
+
       const dataMap = {
-        'leads': tablesData.leadsDetalhes || [], // Usar leadsDetalhes direto do backend
-        'reunioes': tablesData.reunioesDetalhes || [],
+        'leads': getFilteredData(),
+        'reunioes': getFilteredData(),
         'vendas': tablesData.vendasDetalhes || []
       };
 
@@ -794,6 +543,173 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       {subtitle && <div className="mini-metric-subtitle">{subtitle}</div>}
     </div>
   );
+
+  // Grouped Bar Chart Component for Organic/Paid/Total Leads (matching Marketing dashboard)
+  const GroupedBarChart = memo(({ data, style, loading = false, title = "Leads", onBarClick = null }) => {
+    const chartRef = useRef(null);
+    const chartInstance = useRef(null);
+    const isMobile = windowSize.width < 768;
+
+    // Configuração de labels simplificada - apenas números
+    const labelOption = {
+      show: true,
+      position: 'top',
+      formatter: '{c}',
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#2d3748'
+    };
+
+    useEffect(() => {
+      if (!chartRef.current) return;
+
+      if (!chartInstance.current) {
+        chartInstance.current = echarts.init(chartRef.current);
+        
+        // Configuração simplificada do gráfico
+        const emptyOption = {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            formatter: function(params) {
+              let result = `<strong>${params[0].name}</strong><br/>`;
+              params.forEach(item => {
+                const color = `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:${item.color};"></span>`;
+                result += `${color}${item.seriesName}: <strong>${item.value}</strong><br/>`;
+              });
+              return result;
+            }
+          },
+          legend: {
+            data: ['Leads Totais', 'Leads', 'Leads Orgânicos'],
+            top: 10,
+            left: 'center',
+            textStyle: { fontSize: 12, fontWeight: '500' },
+            itemGap: 20
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '15%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            axisTick: { show: false },
+            data: [],
+            axisLabel: { 
+              fontSize: 11,
+              rotate: isMobile ? 30 : 0,
+              interval: 0
+            }
+          },
+          yAxis: {
+            type: 'value',
+            axisLabel: { fontSize: 12 }
+          },
+          series: [
+            {
+              name: 'Leads Totais',
+              type: 'bar',
+              barGap: 0,
+              label: labelOption,
+              emphasis: { focus: 'series' },
+              data: [],
+              itemStyle: { color: '#4E5859' }
+            },
+            {
+              name: 'Leads',
+              type: 'bar',
+              label: labelOption,
+              emphasis: { focus: 'series' },
+              data: [],
+              itemStyle: { color: '#96856F' }
+            },
+            {
+              name: 'Leads Orgânicos',
+              type: 'bar',
+              label: labelOption,
+              emphasis: { focus: 'series' },
+              data: [],
+              itemStyle: { color: '#4ce0b3' }
+            }
+          ]
+        };
+        
+        chartInstance.current.setOption(emptyOption);
+        
+        // Adicionar evento de clique se fornecido
+        if (onBarClick) {
+          chartInstance.current.on('click', function (params) {
+            console.log('🎯 Clique na barra:', params);
+            console.log('🎯 Nome do corretor:', params.name);
+            console.log('🎯 Série clicada:', params.seriesName);
+            onBarClick(params.name, params.value, params, params.seriesName);
+          });
+        }
+      }
+    }, [onBarClick]);
+
+    // Controlar loading
+    useEffect(() => {
+      if (!chartInstance.current) return;
+      
+      if (loading || !data || data.length === 0) {
+        chartInstance.current.showLoading({
+          text: 'Carregando...',
+          color: '#4E5859',
+          textColor: '#666',
+          maskColor: 'rgba(255, 255, 255, 0.8)',
+          zlevel: 0
+        });
+        return;
+      } else {
+        chartInstance.current.hideLoading();
+      }
+    }, [loading, data]);
+
+    // Atualizar dados
+    useEffect(() => {
+      if (!chartInstance.current || !data || data.length === 0 || loading) return;
+
+      const updateOption = {
+        xAxis: {
+          data: data.map(item => item.name || item.period)
+        },
+        series: [
+          {
+            name: 'Leads Totais',
+            data: data.map(item => item.total || 0)
+          },
+          {
+            name: 'Leads',
+            data: data.map(item => item.pagos || 0)
+          },
+          {
+            name: 'Leads Orgânicos',
+            data: data.map(item => item.organicos || 0)
+          }
+        ]
+      };
+
+      chartInstance.current.setOption(updateOption, false);
+    }, [data, loading]);
+
+    // Cleanup
+    useEffect(() => {
+      return () => {
+        if (chartInstance.current) {
+          chartInstance.current.dispose();
+          chartInstance.current = null;
+        }
+      };
+    }, []);
+
+    return <div ref={chartRef} style={{...style, cursor: onBarClick ? 'pointer' : 'default'}} />;
+  });
 
   // Memoized Compact Chart Component com Loading Animation e Update Dinâmico
   const CompactChart = memo(({ data, type, config, style, loading = false, onBarClick = null }) => {
@@ -1428,10 +1344,12 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         /* Estilos para MultiSelectFilter */
         .multi-select-container {
           display: flex;
-          flex-direction: column;
           gap: 4px;
           position: relative;
           min-width: 200px;
+          flex: 1;
+          max-width: 250px;
+          align-items: center;
         }
 
         .multi-select-wrapper {
@@ -1452,6 +1370,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           cursor: pointer;
           transition: all 0.2s ease;
           min-height: 42px;
+          height: 42px;
         }
 
         .multi-select-button:hover {
@@ -1597,6 +1516,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           font-weight: 600;
           white-space: nowrap;
           margin-left: 8px;
+          height: 42px;
+          align-self: flex-end;
         }
 
         .filter-icon {
@@ -1631,11 +1552,33 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
         /* Responsividade para indicador de filtros */
         @media (max-width: 768px) {
+          .filters-group {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          
+          .multi-select-container {
+            max-width: none;
+            width: 100%;
+          }
+          
+          .apply-filters-btn {
+            align-self: stretch;
+            width: 100%;
+            justify-content: center;
+            margin-left: 0;
+          }
+          
           .filter-indicator {
             padding: 6px 10px;
             font-size: 12px;
             margin-left: 0;
-            margin-top: 8px;
+            margin-top: 0;
+            align-self: stretch;
+            width: 100%;
+            justify-content: center;
           }
           
           .filter-icon {
@@ -1892,13 +1835,18 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           <>
             <div className="card card-full">
               <div className="card-title">Leads criados no período</div>
-              <CompactChart 
-                type="bar" 
-                data={sortedChartsData.sortedLeadsData} 
-                config={chartConfigs.leadsConfig}
+              <GroupedBarChart 
+                data={sortedChartsData.sortedLeadsData.map(user => ({
+                  name: user.name,
+                  organicos: user.organicLeads || 0,
+                  pagos: user.paidLeads || 0,
+                  total: user.value || 0
+                }))}
                 style={chartStyle}
-                onBarClick={(corretorName) => openModalByCorretor('leads', corretorName)}
-                  />
+                loading={false}
+                title="Leads por Corretor"
+                onBarClick={(corretorName, value, params, seriesName) => openModalByCorretor('leads', corretorName, value, params, seriesName)}
+              />
             </div>
             
             <div className="card card-full">
