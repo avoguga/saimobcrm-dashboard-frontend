@@ -1589,6 +1589,43 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             font-size: 12px;
           }
         }
+
+        /* Indicador de status global */
+        .global-status-indicator {
+          position: fixed;
+          top: 300px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 1000;
+          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .status-icon {
+          animation: statusSpin 1s linear infinite;
+        }
+
+        @keyframes statusSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+          font-size: 34px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
       `}</style>
 
       <div className="dashboard-row row-header">
@@ -1693,9 +1730,11 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
       {/* Linha 1: KPIs principais */}
       <div className="dashboard-row row-compact">
-         <div className="card card-metrics-group">
-          <div className="card-title">Métricas de Produtividade</div>
+         
+        <div className="card card-metrics-group">
+          <div className="card-title">Métricas de Vendas e Produtividade</div>
           <div className="metrics-group">
+               <div className="metrics-group">
             <div 
               className="mini-metric-card"
               onClick={() => openModal('reunioes')}
@@ -1728,8 +1767,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <span>TAXA CONV.</span>
               </div>
             </div>
-            <div 
-              className="mini-metric-card"
+            {/* <div 
+            w  className="mini-metric-card"
               onClick={() => openModal('propostas')}
               onKeyDown={(e) => e.key === 'Enter' && openModal('propostas')}
               tabIndex={0}
@@ -1759,12 +1798,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </span>
                 <span>TAXA CONV.</span>
               </div>
-            </div>
+            </div> */}
           </div>
-        </div>
-        <div className="card card-metrics-group">
-          <div className="card-title">Métricas de Vendas</div>
-          <div className="metrics-group">
             <div 
               className="mini-metric-card"
               onClick={() => openModal('vendas')}
@@ -2125,6 +2160,18 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           </div>
         </div>
       </SimpleModal>
+
+      {/* Indicador de Status Geral */}
+      {(isLoading || isUpdating) && (
+        <div className="global-status-indicator">
+          <div className="status-content">
+            <span className="status-text">
+              {isLoading ? 'Carregando dados de vendas...' :
+               isUpdating ? 'Atualizando período...' : 'Carregando...'}
+            </span>
+          </div>
+        </div>
+      )}
 
     </div>
   );

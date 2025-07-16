@@ -133,7 +133,6 @@ function Dashboard() {
         
         // Carregar corretores e fontes em paralelo
         const [corretoresResponse, sourceOptionsResponse] = await Promise.all([
-          KommoAPI.getCorretoresList(),
           KommoAPI.getSourceOptions()
         ]);
         
