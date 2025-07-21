@@ -278,6 +278,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     try {
       const extraParams = {};
       
+      // Usar a mesma lógica dos gráficos: priorizar start_date/end_date sobre days
       if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
         extraParams.start_date = customPeriod.startDate;
         extraParams.end_date = customPeriod.endDate;
@@ -290,6 +291,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.start_date = firstDayStr;
         extraParams.end_date = todayStr;
       } else {
+        // Para períodos predefinidos (7d, 30d, 60d, 90d), usar days
         const periodToDays = {
           '7d': 7,
           '30d': 30,
@@ -298,6 +300,19 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         };
         extraParams.days = periodToDays[period] || 30;
       }
+
+      // DEBUG: Log para verificar parâmetros enviados
+      console.log('🔍 Detail Table API Params:', {
+        period,
+        corretorName,
+        selectedSource,
+        extraParams,
+        fullUrl: `/dashboard/detailed-tables?${new URLSearchParams({
+          corretor: corretorName || '',
+          fonte: selectedSource || '',
+          ...extraParams
+        }).toString()}`
+      });
 
       // Usar o corretor específico clicado e o filtro de fonte selecionado
       const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource || '', extraParams);
@@ -310,11 +325,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           } else if (seriesName === 'Leads') {
             return tablesData.leadsDetalhes || [];
           } else {
-            // Leads Totais - mostrar todos
-            return [
-              ...(tablesData.leadsDetalhes || []),
-              ...(tablesData.organicosDetalhes || [])
-            ];
+            // Fallback - mostrar leads pagos
+            return tablesData.leadsDetalhes || [];
           }
         } else if (type === 'reunioes') {
           if (seriesName === 'Reuniões Orgânicas') {
@@ -378,11 +390,11 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     try {
       const extraParams = {};
       
+      // Usar a mesma lógica dos gráficos: priorizar start_date/end_date sobre days
       if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
         extraParams.start_date = customPeriod.startDate;
         extraParams.end_date = customPeriod.endDate;
       } else if (period === 'current_month') {
-        // Para mês atual, calcular as datas
         const now = new Date();
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         const firstDayStr = firstDay.toISOString().split('T')[0];
@@ -391,7 +403,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.start_date = firstDayStr;
         extraParams.end_date = todayStr;
       } else {
-        // Para períodos predefinidos, passar o número de dias
+        // Para períodos predefinidos (7d, 30d, 60d, 90d), usar days
         const periodToDays = {
           '7d': 7,
           '30d': 30,
@@ -400,6 +412,14 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         };
         extraParams.days = periodToDays[period] || 30;
       }
+
+      // DEBUG: Log para verificar parâmetros enviados
+      console.log('🔍 Detail Table API Params (General):', {
+        period,
+        type,
+        extraParams,
+        fullUrl: `/dashboard/detailed-tables?${new URLSearchParams(extraParams).toString()}`
+      });
 
       // Buscar dados sem filtros de backend (filtragem será feita no frontend)
       const tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
@@ -555,7 +575,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       show: true,
       position: 'top',
       formatter: '{c}',
-      fontSize: 12,
+      fontSize: isMobile ? 9 : 12,
       fontWeight: 'bold',
       color: '#2d3748'
     };
@@ -583,7 +603,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             }
           },
           legend: {
-            data: ['Leads Totais', 'Leads', 'Leads Orgânicos'],
+            data: ['Leads', 'Leads Orgânicos'],
             top: 10,
             left: 'center',
             textStyle: { fontSize: 12, fontWeight: '500' },
@@ -612,17 +632,9 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           },
           series: [
             {
-              name: 'Leads Totais',
-              type: 'bar',
-              barGap: 0,
-              label: labelOption,
-              emphasis: { focus: 'series' },
-              data: [],
-              itemStyle: { color: '#4E5859' }
-            },
-            {
               name: 'Leads',
               type: 'bar',
+              barGap: 0,
               label: labelOption,
               emphasis: { focus: 'series' },
               data: [],
@@ -680,10 +692,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           data: data.map(item => item.name || item.period)
         },
         series: [
-          {
-            name: 'Leads Totais',
-            data: data.map(item => item.total || 0)
-          },
           {
             name: 'Leads',
             data: data.map(item => item.pagos || 0)
@@ -783,7 +791,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               label: {
                 show: true,
                 position: 'top',
-                fontSize: isMobile ? 12 : 14,
+                fontSize: isMobile ? 10 : 14,
                 fontWeight: 'bold',
                 color: '#2d3748',
                 backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -1874,8 +1882,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 data={sortedChartsData.sortedLeadsData.map(user => ({
                   name: user.name,
                   organicos: user.organicLeads || 0,
-                  pagos: user.paidLeads || 0,
-                  total: user.value || 0
+                  pagos: user.paidLeads || 0
                 }))}
                 style={chartStyle}
                 loading={false}
@@ -2167,7 +2174,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           <div className="status-content">
             <span className="status-text">
               {isLoading ? 'Carregando dados de vendas...' :
-               isUpdating ? 'Atualizando período...' : 'Carregando...'}
+               isUpdating ? 'Atualizando...' : 'Carregando...'}
             </span>
           </div>
         </div>

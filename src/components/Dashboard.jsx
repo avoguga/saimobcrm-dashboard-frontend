@@ -102,6 +102,18 @@ function Dashboard() {
   const [refreshInterval, setRefreshInterval] = useState(30); // segundos
   const [lastUpdate, setLastUpdate] = useState(null);
   
+  // Função para extrair lista de corretores dos dados de vendas
+  const extractCorretoresFromSalesData = (salesData) => {
+    if (!salesData?.leadsByUser || !Array.isArray(salesData.leadsByUser)) {
+      return [];
+    }
+    
+    return salesData.leadsByUser
+      .map(user => ({ name: user.name }))
+      .filter(corretor => corretor.name && corretor.name !== 'Vazio' && corretor.name !== 'Desconhecido')
+      .sort((a, b) => a.name.localeCompare(b.name));
+  };
+  
   // Hook para detecção de tamanho de tela responsiva
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -131,15 +143,8 @@ function Dashboard() {
     const fetchInitialData = async () => {
       try {
         
-        // Carregar corretores e fontes em paralelo
-        const [corretoresResponse, sourceOptionsResponse] = await Promise.all([
-          KommoAPI.getSourceOptions()
-        ]);
-        
-        
-        if (corretoresResponse?.corretores) {
-          setCorretores(corretoresResponse.corretores);
-        }
+        // Carregar apenas fontes (corretores serão extraídos dos dados de vendas)
+        const sourceOptionsResponse = await KommoAPI.getSourceOptions();
         
         
         if (sourceOptionsResponse && Array.isArray(sourceOptionsResponse)) {
@@ -161,6 +166,16 @@ function Dashboard() {
     
     fetchInitialData();
   }, []);
+
+  // Atualizar lista de corretores quando dados de vendas forem carregados
+  useEffect(() => {
+    if (salesData) {
+      const corretoresFromData = extractCorretoresFromSalesData(salesData);
+      if (corretoresFromData.length > 0) {
+        setCorretores(corretoresFromData);
+      }
+    }
+  }, [salesData]);
 
   // Função para calcular dias do período
   const calculateDays = () => {

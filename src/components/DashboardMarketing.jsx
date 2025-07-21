@@ -1208,7 +1208,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               label: {
                 show: true,
                 position: 'top',
-                fontSize: isMobile ? 12 : 14,
+                fontSize: isMobile ? 8 : 14,
                 fontWeight: 'bold',
                 color: '#2d3748',
                 backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -1325,7 +1325,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             label: {
               show: true,
               position: 'top',
-              fontSize: isMobile ? 12 : 14,
+              fontSize: isMobile ? 10 : 14,
               fontWeight: 'bold',
               color: '#2d3748',
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
