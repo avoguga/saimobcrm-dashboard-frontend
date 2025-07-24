@@ -235,7 +235,7 @@ export class GranularAPI {
                 segment.genero === 'unknown' ? 'Não informado' :
                 segment.genero,
           value: segment.leads || 0
-        })).filter(item => item.name !== 'Não informado' || item.value > 0); // Filtrar 'unknown' se não tiver leads
+        }));
 
         const enhancedData = {
           ...marketingData,

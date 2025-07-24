@@ -269,6 +269,7 @@ function Dashboard() {
             facebookCampaigns
           };
           
+     
           setMarketingData(enrichedMarketingData);
         } catch (error) {
           setError(`Falha ao carregar dados de marketing: ${error.message}`);

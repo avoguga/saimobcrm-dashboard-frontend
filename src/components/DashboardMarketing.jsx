@@ -145,7 +145,10 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       campaignsCount: data?.facebookCampaigns?.length || 0,
       currentSelectedCampaigns: selectedCampaigns.length,
       period,
-      dataKeys: data ? Object.keys(data) : []
+      dataKeys: data ? Object.keys(data) : [],
+      hasGenderData: !!(data && data.genderData),
+      genderDataLength: data?.genderData?.length || 0,
+      genderDataSample: data?.genderData
     });
     
     if (data && data.facebookCampaigns && Array.isArray(data.facebookCampaigns)) {
@@ -202,7 +205,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         hasGenderData: !!(data && data.genderData),
         isArray: Array.isArray(data?.genderData),
         genderDataValue: data?.genderData,
-        allDataKeys: data ? Object.keys(data) : []
+        genderDataType: typeof data?.genderData,
+        allDataKeys: data ? Object.keys(data) : [],
+        dataStringified: data ? JSON.stringify(data, null, 2).substring(0, 500) + '...' : null
       });
     }
   }, [data]); // Removido selectedCampaigns da dependência para evitar loop
@@ -3040,19 +3045,17 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           </div>
           <CompactChart 
             type="pie" 
-            data={(() => {
-              console.log('🎯 Estado demographicData no gráfico:', {
-                genderDataLength: demographicData.genderData.length,
-                genderData: demographicData.genderData,
-                willShowData: demographicData.genderData.length > 0
-              });
-              return demographicData.genderData.length > 0 ? demographicData.genderData : [
-                { name: 'Sem dados', value: 1 }
-              ];
-            })()} 
+            data={
+              // Usar dados direto da prop se disponível, senão usar estado
+              (data && data.genderData && Array.isArray(data.genderData) && data.genderData.length > 0) 
+                ? data.genderData 
+                : (demographicData.genderData.length > 0 ? demographicData.genderData : [
+                    { name: 'Sem dados', value: 1 }
+                  ])
+            } 
             config={{ 
               name: 'Leads por Gênero',
-              colors: demographicData.genderData.length > 0 ? 
+              colors: (data && data.genderData && data.genderData.length > 0) || demographicData.genderData.length > 0 ? 
                 [COLORS.primary, COLORS.secondary, COLORS.light] : 
                 [COLORS.light]
             }}
