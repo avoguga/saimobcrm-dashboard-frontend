@@ -196,6 +196,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         ...prev,
         genderData: data.genderData
       }));
+    } else {
+      console.log('⚠️ Dados de gênero não disponíveis:', {
+        hasData: !!data,
+        hasGenderData: !!(data && data.genderData),
+        isArray: Array.isArray(data?.genderData),
+        genderDataValue: data?.genderData,
+        allDataKeys: data ? Object.keys(data) : []
+      });
     }
   }, [data]); // Removido selectedCampaigns da dependência para evitar loop
   
@@ -3032,9 +3040,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           </div>
           <CompactChart 
             type="pie" 
-            data={demographicData.genderData.length > 0 ? demographicData.genderData : [
-              { name: 'Sem dados', value: 1 }
-            ]} 
+            data={(() => {
+              console.log('🎯 Estado demographicData no gráfico:', {
+                genderDataLength: demographicData.genderData.length,
+                genderData: demographicData.genderData,
+                willShowData: demographicData.genderData.length > 0
+              });
+              return demographicData.genderData.length > 0 ? demographicData.genderData : [
+                { name: 'Sem dados', value: 1 }
+              ];
+            })()} 
             config={{ 
               name: 'Leads por Gênero',
               colors: demographicData.genderData.length > 0 ? 

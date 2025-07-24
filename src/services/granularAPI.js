@@ -232,9 +232,10 @@ export class GranularAPI {
         const genderData_formatted = genderSegments.map(segment => ({
           name: segment.genero === 'male' ? 'Masculino' : 
                 segment.genero === 'female' ? 'Feminino' : 
+                segment.genero === 'unknown' ? 'Não informado' :
                 segment.genero,
           value: segment.leads || 0
-        }));
+        })).filter(item => item.name !== 'Não informado' || item.value > 0); // Filtrar 'unknown' se não tiver leads
 
         const enhancedData = {
           ...marketingData,
@@ -260,9 +261,11 @@ export class GranularAPI {
             spend: whatsappSummary.total_spend
           },
           gender: {
+            raw: genderSegments,
             segments: genderSegments.length,
             totalLeads: genderData.summary?.total_leads || 0,
-            formatted: genderData_formatted
+            formatted: genderData_formatted,
+            byGender: genderData.summary?.by_gender
           }
         });
 
