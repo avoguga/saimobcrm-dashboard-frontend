@@ -9,6 +9,7 @@
 
 import { MockDataService } from './mockDataService';
 
+// const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohenrique.dev';
 
 // Flags HONESTAS por módulo
@@ -210,40 +211,37 @@ export class GranularAPI {
         // DEBUG: Log final marketing API call
         console.log('🔍 Marketing API Final URL:', `${API_URL}/dashboard/marketing-complete?${params}`);
 
-        // Buscar dados de marketing em paralelo
-        const [marketingData, whatsappMetrics] = await Promise.all([
+        // Mapear periodo para preset WhatsApp
+        let whatsappPreset = 'last_30d';
+        if (days <= 7) whatsappPreset = 'last_7d';
+        
+        // Buscar dados de marketing em paralelo com WhatsApp
+        const [marketingData, whatsappData] = await Promise.all([
           fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json()),
-          this.getWhatsAppAndProfileMetrics(customDates)
+          this.getWhatsAppMetrics(whatsappPreset)
         ]);
 
         console.timeEnd('Marketing Dashboard Load');
 
-        // Combinar dados de marketing com métricas específicas
+        // Combinar dados usando summary conforme guia do backend
+        const summary = whatsappData.summary || {};
         const enhancedData = {
           ...marketingData,
-          // Sobrescrever dados mock com dados reais extraídos
-          whatsappConversations: whatsappMetrics.whatsappConversations,
-          profileVisits: whatsappMetrics.profileVisits,
-          // Manter dados existentes e adicionar novos
-          facebookMetrics: {
-            ...marketingData.facebookMetrics,
-            whatsappConversations: whatsappMetrics.whatsappConversations,
-            profileVisits: whatsappMetrics.profileVisits
-          },
+          // Substituir dados mock com dados reais do WhatsApp
+          whatsappConversations: summary.total_conversations || 0,
+          profileVisits: summary.total_profile_visits || 0,
+          whatsappSpend: summary.total_spend || 0,
           _metadata: { 
-            realAPI: true, 
-            granular: true, 
-            singleEndpoint: true, 
-            enhancedWithRealMetrics: true,
-            whatsappSource: 'facebook_insights',
-            ...marketingData._metadata 
+            ...marketingData._metadata,
+            whatsappIntegrated: true,
+            whatsappEndpoint: '/facebook-ads/whatsapp/insights'
           }
         };
 
-        console.log('✅ Marketing dashboard carregado com métricas reais:', {
-          whatsappConversations: whatsappMetrics.whatsappConversations,
-          profileVisits: whatsappMetrics.profileVisits,
-          originalProfileVisits: marketingData.profileVisits
+        console.log('✅ WhatsApp dados integrados:', {
+          conversations: summary.total_conversations,
+          profileVisits: summary.total_profile_visits,
+          spend: summary.total_spend
         });
 
         return enhancedData;
@@ -1058,6 +1056,35 @@ export class GranularAPI {
       return [];
     }
   }
+
+  /**
+   * 📱 BUSCAR MÉTRICAS WHATSAPP
+   * Implementação conforme guia do backend
+   */
+  static async getWhatsAppMetrics(datePreset = 'last_7d') {
+    try {
+      const response = await fetch(`${API_URL}/facebook-ads/whatsapp/insights?date_preset=${datePreset}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📱 WhatsApp metrics recebidos:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar WhatsApp metrics:', error);
+      return {
+        summary: {
+          total_conversations: 0,
+          total_profile_visits: 0,
+          total_spend: 0
+        }
+      };
+    }
+  }
+
 
   /**
    * Limpar cache

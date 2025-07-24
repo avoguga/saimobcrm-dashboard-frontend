@@ -140,12 +140,15 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     console.log('🔍 Effect data mudou:', {
       hasData: !!data,
       hasFacebookCampaigns: !!(data && data.facebookCampaigns),
+      facebookCampaignsType: typeof data?.facebookCampaigns,
+      isArray: Array.isArray(data?.facebookCampaigns),
       campaignsCount: data?.facebookCampaigns?.length || 0,
       currentSelectedCampaigns: selectedCampaigns.length,
-      period
+      period,
+      dataKeys: data ? Object.keys(data) : []
     });
     
-    if (data && data.facebookCampaigns) {
+    if (data && data.facebookCampaigns && Array.isArray(data.facebookCampaigns)) {
       setCampaigns(data.facebookCampaigns);
       
       // ✅ PROTEÇÃO: Só resetar seleções se não há campanhas selecionadas
@@ -169,6 +172,15 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       
       // Mostrar filtro de campanhas sempre que houver campanhas
       setShowCampaignFilter(true);
+    } else {
+      console.log('⚠️ facebookCampaigns não é um array válido:', {
+        exists: !!data?.facebookCampaigns,
+        type: typeof data?.facebookCampaigns,
+        value: data?.facebookCampaigns
+      });
+      // Inicializar com arrays vazios para evitar erros
+      setCampaigns([]);
+      setShowCampaignFilter(false);
     }
     
     if (data && data.campaignInsights) {
