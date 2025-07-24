@@ -1755,6 +1755,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           gap: 4px;
           position: relative;
           min-width: 200px;
+          align-items: center;
         }
 
         .multi-select-wrapper {
@@ -1981,9 +1982,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         .campaign-selector,
         .adset-selector,
         .ad-selector {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
+          /* Removido flex-direction: column para manter alinhamento horizontal */
           min-width: 220px;
         }
 
@@ -2215,48 +2214,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           background-color: #ccc;
         }
 
-        /* Estilos para o botão Aplicar Filtros */
-        .apply-filters-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          margin-top: 16px;
-          padding: 0 16px;
-        }
-
-        .apply-filters-btn {
-          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
-          color: white;
-          border: none;
-          border-radius: 8px;
-          padding: 12px 24px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 2px 8px rgba(78, 88, 89, 0.2);
-          min-width: 140px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .apply-filters-btn:hover:not(:disabled) {
-          background: linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%);
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
-        }
-
-        .apply-filters-btn:active:not(:disabled) {
-          transform: translateY(0);
-          box-shadow: 0 2px 8px rgba(78, 88, 89, 0.2);
-        }
-
-        .apply-filters-btn:disabled {
-          background: #ccc;
-          cursor: not-allowed;
-          transform: none;
-          box-shadow: none;
-        }
+        /* Botão Aplicar Filtros usa estilos do Dashboard.css */
 
         /* Badges indicadores de status */
         .filtered-badge, .unfiltered-badge, .corrected-badge {
@@ -2436,27 +2394,29 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
               {/* Filtro de Campanhas Facebook */}
               {showCampaignFilter && (
-                <div className="campaign-selector">
+                <div className="multi-select-container">
                   <label className="filter-label">Campanhas:</label>
-                  <div className="campaign-filter-content">
+                  <div className="multi-select-wrapper">
                     {loadingCampaigns ? (
                       <div className="campaign-loading">Carregando campanhas...</div>
                     ) : (
-                      <div className="campaign-filter-container" ref={dropdownRef}>
+                      <div ref={dropdownRef} style={{ width: '100%' }}>
                         <button 
-                          className="campaign-filter-button"
+                          className="multi-select-button"
                           onClick={() => setShowDropdown(!showDropdown)}
                         >
-                          {selectedCampaigns.length === 0 
-                            ? 'Selecionar campanhas' 
-                            : selectedCampaigns.length === campaigns.length 
-                              ? `Todas as campanhas (${selectedCampaigns.length})`
-                              : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
-                          <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
+                          <span className="multi-select-text">
+                            {selectedCampaigns.length === 0 
+                              ? 'Selecionar campanhas' 
+                              : selectedCampaigns.length === campaigns.length 
+                                ? `Todas as campanhas (${selectedCampaigns.length})`
+                                : `${selectedCampaigns.length} campanha(s) selecionada(s)`}
+                          </span>
+                          <span className={`multi-select-arrow ${showDropdown ? 'open' : ''}`}>▼</span>
                         </button>
                         
                         {showDropdown && (
-                          <div className="campaign-dropdown show">
+                          <div className="multi-select-dropdown">
                             <div className="campaign-search">
                               <input
                                 type="text"
@@ -2534,27 +2494,29 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               )}
 
               {/* Filtro de Conjuntos de Anúncios */}
-              <div className="adset-selector">
+              <div className="multi-select-container">
                 <label className="filter-label">Conjuntos de Anúncios:</label>
-                <div className="adset-filter-content">
+                <div className="multi-select-wrapper">
                   {loadingAdsets ? (
                     <div className="adset-loading">Carregando conjuntos...</div>
                   ) : (
-                    <div className="adset-filter-container" ref={adsetDropdownRef}>
+                    <div ref={adsetDropdownRef} style={{ width: '100%' }}>
                       <button 
-                        className="adset-filter-button"
+                        className="multi-select-button"
                         onClick={() => setShowAdsetDropdown(!showAdsetDropdown)}
                       >
-                        {selectedAdsets.length === 0 
-                          ? `Selecionar conjuntos ${getFilteredAdsets.length < adsets.length ? `(${getFilteredAdsets.length} disponíveis)` : ''}` 
-                          : selectedAdsets.length === getFilteredAdsets.length 
-                            ? `Todos os conjuntos (${selectedAdsets.length})`
-                            : `${selectedAdsets.length} de ${getFilteredAdsets.length} selecionado(s)`}
-                        <span className={`dropdown-arrow ${showAdsetDropdown ? 'open' : ''}`}>▼</span>
+                        <span className="multi-select-text">
+                          {selectedAdsets.length === 0 
+                            ? `Selecionar conjuntos ${getFilteredAdsets.length < adsets.length ? `(${getFilteredAdsets.length} disponíveis)` : ''}` 
+                            : selectedAdsets.length === getFilteredAdsets.length 
+                              ? `Todos os conjuntos (${selectedAdsets.length})`
+                              : `${selectedAdsets.length} de ${getFilteredAdsets.length} selecionado(s)`}
+                        </span>
+                        <span className={`multi-select-arrow ${showAdsetDropdown ? 'open' : ''}`}>▼</span>
                       </button>
                       
                       {showAdsetDropdown && (
-                        <div className="adset-dropdown show">
+                        <div className="multi-select-dropdown">
                           <div className="adset-actions">
                             <button 
                               className="select-all-btn"
@@ -2607,27 +2569,29 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               </div>
 
               {/* Filtro de Anúncios */}
-              <div className="ad-selector">
+              <div className="multi-select-container">
                 <label className="filter-label">Anúncios:</label>
-                <div className="ad-filter-content">
+                <div className="multi-select-wrapper">
                   {loadingAds ? (
                     <div className="ad-loading">Carregando anúncios...</div>
                   ) : (
-                    <div className="ad-filter-container" ref={adDropdownRef}>
+                    <div ref={adDropdownRef} style={{ width: '100%' }}>
                       <button 
-                        className="ad-filter-button"
+                        className="multi-select-button"
                         onClick={() => setShowAdDropdown(!showAdDropdown)}
                       >
-                        {selectedAds.length === 0 
-                          ? `Selecionar anúncios ${getFilteredAds.length < ads.length ? `(${getFilteredAds.length} disponíveis)` : ''}` 
-                          : selectedAds.length === getFilteredAds.length 
-                            ? `Todos os anúncios (${selectedAds.length})`
-                            : `${selectedAds.length} de ${getFilteredAds.length} selecionado(s)`}
-                        <span className={`dropdown-arrow ${showAdDropdown ? 'open' : ''}`}>▼</span>
+                        <span className="multi-select-text">
+                          {selectedAds.length === 0 
+                            ? `Selecionar anúncios ${getFilteredAds.length < ads.length ? `(${getFilteredAds.length} disponíveis)` : ''}` 
+                            : selectedAds.length === getFilteredAds.length 
+                              ? `Todos os anúncios (${selectedAds.length})`
+                              : `${selectedAds.length} de ${getFilteredAds.length} selecionado(s)`}
+                        </span>
+                        <span className={`multi-select-arrow ${showAdDropdown ? 'open' : ''}`}>▼</span>
                       </button>
                       
                       {showAdDropdown && (
-                        <div className="ad-dropdown show">
+                        <div className="multi-select-dropdown">
                           <div className="ad-actions">
                             <button 
                               className="select-all-btn"
@@ -2679,18 +2643,21 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                 </div>
               </div>
 
-              {/* Botão Aplicar Filtros */}
-              <div className="apply-filters-container">
+              {/* Botão Aplicar Filtros - Mostrar apenas quando há mudanças nos filtros */}
+              {((selectedCampaigns.length > 0 && selectedCampaigns.length < campaigns.length) || 
+                selectedAdsets.length > 0 || 
+                selectedAds.length > 0) && (
                 <button 
                   className="apply-filters-btn"
                   onClick={handleApplyFilters}
                   disabled={loadingInsights}
+                  title="Aplicar filtros selecionados"
                 >
                   {loadingInsights ? 'Aplicando...' : 'Aplicar Filtros'}
                 </button>
-              </div>
+              )}
             </div>
-            <div className="period-controls">
+            <div className="period-controls" style={{ position: 'relative' }}>
               <div className="period-selector">
                 <button 
                   className={period === 'current_month' ? 'active' : ''} 

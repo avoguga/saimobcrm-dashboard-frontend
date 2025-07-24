@@ -182,7 +182,7 @@ body {
 /* Dashboard layout */
 .dashboard-content {
   padding: var(--spacing-lg);
-  max-width: 1600px;
+  max-width: 1700px;
   margin: 0 auto;
 }
 
@@ -199,10 +199,9 @@ body {
 
 .section-title {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--spacing-md);
+  width: 100%;
 }
 
 .section-title h2 {
@@ -215,8 +214,10 @@ body {
 .dashboard-controls {
   display: flex;
   gap: var(--spacing-md);
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .filters-group {
@@ -1390,10 +1391,7 @@ body {
     font-size: 12px;
   }
   
-  .section-title {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  /* section-title já está com flex-direction: column como padrão */
   
   .dashboard-controls {
     width: 100%;
