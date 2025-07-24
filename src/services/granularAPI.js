@@ -799,17 +799,28 @@ export class GranularAPI {
     const cached = this.getCached(cacheKey);
     
     if (cached) {
-      return cached;
+      console.log('📋 Facebook campaigns (cached):', { isArray: Array.isArray(cached), length: cached?.length });
+      return Array.isArray(cached) ? cached : [];
     }
 
     try {
       const response = await fetch(`${API_URL}/facebook-ads/campaigns`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const campaigns = await response.json();
+      console.log('📋 Facebook campaigns recebidas:', { isArray: Array.isArray(campaigns), length: campaigns?.length, type: typeof campaigns });
       
-      this.setCache(cacheKey, campaigns);
+      // Garantir que sempre retornamos um array
+      const validCampaigns = Array.isArray(campaigns) ? campaigns : [];
       
-      return campaigns;
+      this.setCache(cacheKey, validCampaigns);
+      
+      return validCampaigns;
     } catch (error) {
+      console.error('❌ Erro ao buscar Facebook campaigns:', error);
       // Retornar array vazio em caso de erro
       return [];
     }

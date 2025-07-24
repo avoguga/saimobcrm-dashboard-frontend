@@ -241,14 +241,18 @@ function Dashboard() {
           
           
           // CARREGAMENTO PARALELO: Dashboard geral + Insights de campanhas Facebook
-          const [marketingResult, facebookCampaigns] = await Promise.all([
+          const [marketingResult, facebookCampaignsRaw] = await Promise.all([
             GranularAPI.loadMarketingDashboard(days, null, customDates),
             GranularAPI.getFacebookCampaigns()
           ]);
           
+          // Garantir que facebookCampaigns seja sempre um array
+          const facebookCampaigns = Array.isArray(facebookCampaignsRaw) ? facebookCampaignsRaw : [];
+          console.log('📋 Facebook campaigns validadas:', { isArray: Array.isArray(facebookCampaigns), length: facebookCampaigns.length });
+          
           // Carregar insights de todas as campanhas
           let campaignInsights = null;
-          if (facebookCampaigns && facebookCampaigns.length > 0) {
+          if (facebookCampaigns && Array.isArray(facebookCampaigns) && facebookCampaigns.length > 0) {
             const allCampaignIds = facebookCampaigns.map(campaign => campaign.id);
             const dateRange = customDates ? {
               start: customDates.start_date,
