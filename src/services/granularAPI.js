@@ -215,33 +215,55 @@ export class GranularAPI {
         let whatsappPreset = 'last_30d';
         if (days <= 7) whatsappPreset = 'last_7d';
         
-        // Buscar dados de marketing em paralelo com WhatsApp
-        const [marketingData, whatsappData] = await Promise.all([
+        // Buscar dados de marketing em paralelo com WhatsApp e gênero
+        const [marketingData, whatsappData, genderData] = await Promise.all([
           fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json()),
-          this.getWhatsAppMetrics(whatsappPreset)
+          this.getWhatsAppMetrics(whatsappPreset),
+          this.getGenderSegmentation(whatsappPreset)
         ]);
 
         console.timeEnd('Marketing Dashboard Load');
 
         // Combinar dados usando summary conforme guia do backend
-        const summary = whatsappData.summary || {};
+        const whatsappSummary = whatsappData.summary || {};
+        const genderSegments = genderData.data || [];
+        
+        // Converter dados de gênero para formato esperado pelo chart
+        const genderData_formatted = genderSegments.map(segment => ({
+          name: segment.genero === 'male' ? 'Masculino' : 
+                segment.genero === 'female' ? 'Feminino' : 
+                segment.genero,
+          value: segment.leads || 0
+        }));
+
         const enhancedData = {
           ...marketingData,
           // Substituir dados mock com dados reais do WhatsApp
-          whatsappConversations: summary.total_conversations || 0,
-          profileVisits: summary.total_profile_visits || 0,
-          whatsappSpend: summary.total_spend || 0,
+          whatsappConversations: whatsappSummary.total_conversations || 0,
+          profileVisits: whatsappSummary.total_profile_visits || 0,
+          whatsappSpend: whatsappSummary.total_spend || 0,
+          // Substituir dados mock com dados reais de gênero
+          genderData: genderData_formatted,
           _metadata: { 
             ...marketingData._metadata,
             whatsappIntegrated: true,
-            whatsappEndpoint: '/facebook-ads/whatsapp/insights'
+            genderIntegrated: true,
+            whatsappEndpoint: '/facebook-ads/whatsapp/insights',
+            genderEndpoint: '/facebook-ads/leads/segmentation'
           }
         };
 
-        console.log('✅ WhatsApp dados integrados:', {
-          conversations: summary.total_conversations,
-          profileVisits: summary.total_profile_visits,
-          spend: summary.total_spend
+        console.log('✅ Dados integrados:', {
+          whatsapp: {
+            conversations: whatsappSummary.total_conversations,
+            profileVisits: whatsappSummary.total_profile_visits,
+            spend: whatsappSummary.total_spend
+          },
+          gender: {
+            segments: genderSegments.length,
+            totalLeads: genderData.summary?.total_leads || 0,
+            formatted: genderData_formatted
+          }
         });
 
         return enhancedData;
@@ -1080,6 +1102,33 @@ export class GranularAPI {
           total_conversations: 0,
           total_profile_visits: 0,
           total_spend: 0
+        }
+      };
+    }
+  }
+
+  /**
+   * 👥 BUSCAR SEGMENTAÇÃO POR GÊNERO
+   * Implementação conforme guia do backend
+   */
+  static async getGenderSegmentation(datePreset = 'last_30d') {
+    try {
+      const response = await fetch(`${API_URL}/facebook-ads/leads/segmentation?date_preset=${datePreset}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('👥 Gender segmentation recebido:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao buscar gender segmentation:', error);
+      return {
+        data: [],
+        summary: {
+          total_leads: 0
         }
       };
     }

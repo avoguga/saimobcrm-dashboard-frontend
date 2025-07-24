@@ -188,6 +188,15 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       // Marcar que os dados iniciais foram carregados
       initialDataLoadedRef.current = true;
     }
+
+    // Usar dados de gênero reais se disponíveis
+    if (data && data.genderData && Array.isArray(data.genderData)) {
+      console.log('📊 Usando dados de gênero reais:', data.genderData);
+      setDemographicData(prev => ({
+        ...prev,
+        genderData: data.genderData
+      }));
+    }
   }, [data]); // Removido selectedCampaigns da dependência para evitar loop
   
   // Carregar dados de adsets e ads ao montar o componente
