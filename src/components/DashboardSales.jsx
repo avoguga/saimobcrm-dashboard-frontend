@@ -1639,6 +1639,52 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       <div className="dashboard-row row-header">
         <div className="section-title">
           <h2>Dashboard de Vendas</h2>
+          {/* Label do período selecionado */}
+          <div style={{
+            fontSize: '14px',
+            color: '#64748b',
+            fontWeight: '500',
+            marginTop: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span>📅</span>
+            <span>
+              Período: {(() => {
+                const now = new Date();
+                let startDate, endDate;
+                
+                if (period === 'current_month') {
+                  startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                  endDate = now;
+                } else if (period === '7d') {
+                  endDate = now;
+                  startDate = new Date(now);
+                  startDate.setDate(startDate.getDate() - 7);
+                } else if (period === '30d') {
+                  endDate = now;
+                  startDate = new Date(now);
+                  startDate.setDate(startDate.getDate() - 30);
+                } else if (period === '60d') {
+                  endDate = now;
+                  startDate = new Date(now);
+                  startDate.setDate(startDate.getDate() - 60);
+                } else if (period === '90d') {
+                  endDate = now;
+                  startDate = new Date(now);
+                  startDate.setDate(startDate.getDate() - 90);
+                } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+                  startDate = new Date(customPeriod.startDate + 'T12:00:00');
+                  endDate = new Date(customPeriod.endDate + 'T12:00:00');
+                } else {
+                  return 'Selecione um período';
+                }
+                
+                return `${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`;
+              })()}
+            </span>
+          </div>
           <div className="dashboard-controls">
             <div className="filters-group">
               <MultiSelectFilter 
@@ -1877,7 +1923,21 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
             <div className="card card-full">
-              <div className="card-title">Leads criados no período</div>
+              <div className="card-title">
+                Leads criados no período
+                <span style={{
+                  marginLeft: '12px',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  color: '#4E5859',
+                  backgroundColor: '#f0f4f8',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  border: '2px solid #e2e8f0'
+                }}>
+                  {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.organicLeads || 0) + (user.paidLeads || 0), 0)}
+                </span>
+              </div>
               <GroupedBarChart 
                 data={sortedChartsData.sortedLeadsData.map(user => ({
                   name: user.name,
@@ -1892,7 +1952,21 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             
             <div className="card card-full">
-              <div className="card-title">Rank Corretores - Reunião</div>
+              <div className="card-title">
+                Rank Corretores - Reunião
+                <span style={{
+                  marginLeft: '12px',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  color: '#4E5859',
+                  backgroundColor: '#f0f4f8',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  border: '2px solid #e2e8f0'
+                }}>
+                  {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
+                </span>
+              </div>
               <CompactChart 
                 type="bar" 
                 data={sortedChartsData.sortedMeetingsData} 
@@ -1903,7 +1977,21 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             
             <div className="card card-full">
-              <div className="card-title">Rank Corretores - Venda</div>
+              <div className="card-title">
+                Rank Corretores - Venda
+                <span style={{
+                  marginLeft: '12px',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  color: '#4E5859',
+                  backgroundColor: '#f0f4f8',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  border: '2px solid #e2e8f0'
+                }}>
+                  {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
+                </span>
+              </div>
               <CompactChart 
                 type="bar" 
                 data={sortedChartsData.sortedSalesData} 
