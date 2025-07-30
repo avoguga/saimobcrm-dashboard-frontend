@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
 // Paleta de cores da SA IMOB
@@ -17,6 +17,89 @@ const COLORS = {
 
 // Memoized Modal Component to prevent parent re-renders
 const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error }) => {
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [filterField, setFilterField] = useState('Nome do Lead');
+  const [filterValue, setFilterValue] = useState('');
+  
+  const getFilterOptions = () => {
+    const commonFields = ['Nome do Lead', 'Corretor', 'Fonte', 'Anúncio', 'Público'];
+    
+    switch (type) {
+      case 'leads':
+        return ['Data de Criação', ...commonFields, 'Funil', 'Etapa'];
+      case 'reunioes':
+        return ['Data da Reunião', ...commonFields, 'Funil', 'Etapa'];
+      case 'propostas':
+        return ['Data da Proposta', ...commonFields];
+      case 'vendas':
+        return ['Data da Venda', ...commonFields, 'Valor da Venda'];
+      default:
+        return commonFields;
+    }
+  };
+  
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const sortedData = useMemo(() => {
+    if (!data || !Array.isArray(data)) return data;
+    
+    // Primeiro filtrar pelo campo selecionado
+    let filteredData = data;
+    if (filterValue.trim() !== '') {
+      filteredData = data.filter(item => {
+        const fieldValue = (item[filterField] || '').toString().toLowerCase();
+        return fieldValue.includes(filterValue.toLowerCase());
+      });
+    }
+    
+    // Depois ordenar se houver configuração de ordenação
+    if (!sortConfig.key) return filteredData;
+    
+    return [...filteredData].sort((a, b) => {
+      const aValue = a[sortConfig.key] || '';
+      const bValue = b[sortConfig.key] || '';
+      
+      if (typeof aValue === 'string') {
+        const comparison = aValue.toLowerCase().localeCompare(bValue.toLowerCase());
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
+      }
+      
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data, sortConfig, filterField, filterValue]);
+  
+  const renderSortableHeader = (key, label) => (
+    <th 
+      style={{ 
+        padding: '12px', 
+        textAlign: 'left', 
+        borderBottom: `1px solid ${COLORS.light}`,
+        cursor: 'pointer',
+        userSelect: 'none',
+        position: 'relative'
+      }}
+      onClick={() => handleSort(key)}
+    >
+      {label}
+      <span style={{ 
+        marginLeft: '5px', 
+        fontSize: '12px',
+        opacity: sortConfig.key === key ? 1 : 0.3
+      }}>
+        {sortConfig.key === key && sortConfig.direction === 'asc' ? '▲' : 
+         sortConfig.key === key && sortConfig.direction === 'desc' ? '▼' : '↕'}
+      </span>
+    </th>
+  );
+  
   if (!isOpen) return null;
 
   return createPortal(
@@ -40,9 +123,9 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           backgroundColor: 'white',
           borderRadius: '8px',
           padding: '24px',
-          maxWidth: '90vw',
+          maxWidth: '120vw',
           maxHeight: '80vh',
-          width: '800px',
+          width: '1200px',
           overflowY: 'auto',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
         }}
@@ -78,6 +161,91 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           </button>
         </div>
 
+        {/* Filtro por campo selecionável */}
+        {!isLoading && !error && data && data.length > 0 && (
+          <div style={{ 
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            flexWrap: 'wrap'
+          }}>
+            <label style={{ 
+              fontSize: '14px', 
+              fontWeight: 'bold',
+              color: COLORS.primary,
+              minWidth: '60px'
+            }}>
+              Filtrar por:
+            </label>
+            <select
+              value={filterField}
+              onChange={(e) => {
+                setFilterField(e.target.value);
+                setFilterValue(''); // Limpar o valor quando mudar o campo
+              }}
+              style={{
+                padding: '8px 12px',
+                border: `1px solid ${COLORS.light}`,
+                borderRadius: '4px',
+                fontSize: '14px',
+                outline: 'none',
+                backgroundColor: 'white',
+                minWidth: '140px'
+              }}
+            >
+              {getFilterOptions().map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={filterValue}
+              onChange={(e) => setFilterValue(e.target.value)}
+              placeholder={`Digite para filtrar por ${filterField}...`}
+              style={{
+                flex: 1,
+                minWidth: '200px',
+                padding: '8px 12px',
+                border: `1px solid ${COLORS.light}`,
+                borderRadius: '4px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.target.style.borderColor = COLORS.primary}
+              onBlur={(e) => e.target.style.borderColor = COLORS.light}
+            />
+            {filterValue && (
+              <button
+                onClick={() => setFilterValue('')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: COLORS.tertiary,
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  padding: '4px'
+                }}
+                title="Limpar filtro"
+              >
+                ✕
+              </button>
+            )}
+            <div style={{ 
+              fontSize: '12px', 
+              color: COLORS.tertiary,
+              minWidth: '100px',
+              textAlign: 'right'
+            }}>
+              {filterValue ? 
+                `${sortedData?.length || 0} de ${data?.length || 0} registros` : 
+                `${data?.length || 0} registros`
+              }
+            </div>
+          </div>
+        )}
+
         {/* Conteúdo do modal */}
         <div>
           {isLoading ? (
@@ -91,7 +259,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
               <div><strong>Erro ao carregar dados</strong></div>
               <div style={{ fontSize: '14px', marginTop: '8px' }}>{error}</div>
             </div>
-          ) : data.length === 0 ? (
+          ) : !data || data.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: COLORS.tertiary }}>
               <div style={{ fontSize: '24px', marginBottom: '12px' }}>
                 {type === 'reunioes' || type === 'leads' ? '📊' : 
@@ -113,45 +281,53 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                   <tr style={{ backgroundColor: COLORS.lightBg }}>
                     {type === 'leads' && (
                       <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data de Criação</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Funil</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Etapa</th>
+                        {renderSortableHeader('Data de Criação', 'Data de Criação')}
+                        {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
+                        {renderSortableHeader('Corretor', 'Corretor')}
+                        {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Anúncio', 'Anúncio')}
+                        {renderSortableHeader('Público', 'Público-Alvo')}
+                        {renderSortableHeader('Funil', 'Funil')}
+                        {renderSortableHeader('Etapa', 'Etapa')}
                       </>
                     )}
                     {type === 'reunioes' && (
                       <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Reunião</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Funil</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Etapa</th>
+                        {renderSortableHeader('Data da Reunião', 'Data da Reunião')}
+                        {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
+                        {renderSortableHeader('Corretor', 'Corretor')}
+                        {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Anúncio', 'Anúncio')}
+                        {renderSortableHeader('Público', 'Público-Alvo')}
+                        {renderSortableHeader('Funil', 'Funil')}
+                        {renderSortableHeader('Etapa', 'Etapa')}
                       </>
                     )}
                     {type === 'propostas' && (
                       <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Proposta</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
+                        {renderSortableHeader('Data da Proposta', 'Data da Proposta')}
+                        {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
+                        {renderSortableHeader('Corretor', 'Corretor')}
+                        {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Anúncio', 'Anúncio')}
+                        {renderSortableHeader('Público', 'Público-Alvo')}
                       </>
                     )}
                     {type === 'vendas' && (
                       <>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Data da Venda</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Nome do Lead</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Corretor</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Fonte</th>
-                        <th style={{ padding: '12px', textAlign: 'left', borderBottom: `1px solid ${COLORS.light}` }}>Valor da Venda</th>
+                        {renderSortableHeader('Data da Venda', 'Data da Venda')}
+                        {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
+                        {renderSortableHeader('Corretor', 'Corretor')}
+                        {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Anúncio', 'Anúncio')}
+                        {renderSortableHeader('Público', 'Público-Alvo')}
+                        {renderSortableHeader('Valor da Venda', 'Valor da Venda')}
                       </>
                     )}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((item, index) => {
+                  {(sortedData || []).map((item, index) => {
                     const isOrganic = item['Fonte'] === 'Orgânico';
                     const rowBgColor = isOrganic 
                       ? (index % 2 === 0 ? 'rgba(76, 224, 179, 0.05)' : 'rgba(76, 224, 179, 0.1)')
@@ -169,6 +345,8 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                             <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                             <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                             <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                            <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
+                            <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Funil']}</td>
                             <td style={{ padding: '12px' }}>{item['Etapa']}</td>
                           </>
@@ -179,6 +357,8 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                             <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                             <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                             <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                            <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
+                            <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Funil']}</td>
                             <td style={{ padding: '12px' }}>{item['Etapa']}</td>
                           </>
@@ -189,6 +369,8 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
+                          <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                         </>
                       )}
                       {type === 'vendas' && (
@@ -197,6 +379,8 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
+                          <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
                             {item['Valor da Venda']}
                           </td>

@@ -539,6 +539,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       // Usar o corretor específico clicado e o filtro de fonte selecionado
       const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource || '', extraParams);
       
+      console.log('📊 Modal - Dados recebidos:', {
+        corretor: corretorName,
+        fonte: selectedSource,
+        periodo: period,
+        type: type,
+        tablesData: tablesData,
+        leadsDetalhes: tablesData?.leadsDetalhes,
+        reunioesDetalhes: tablesData?.reunioesDetalhes
+      });
+      
       const dataMap = {
         'leads': tablesData.leadsDetalhes || [], // Usar leadsDetalhes direto do backend
         'reunioes': tablesData.reunioesDetalhes || [],
@@ -3014,7 +3024,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               config={{ xKey: 'name', yKey: 'meetingsHeld', color: COLORS.secondary }}
               style={{ height: getChartHeight('medium') }}
               loading={loadingPeriodSales}
-              onBarClick={(corretorName) => openModalByCorretor('meetings', corretorName)}
+              onBarClick={(corretorName) => openModalByCorretor('reunioes', corretorName)}
             />
           </div>
         </div>

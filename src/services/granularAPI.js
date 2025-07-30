@@ -215,11 +215,12 @@ export class GranularAPI {
         let whatsappPreset = 'last_30d';
         if (days <= 7) whatsappPreset = 'last_7d';
         
-        // Buscar dados de marketing em paralelo com WhatsApp e gênero
-        const [marketingData, whatsappData, genderData] = await Promise.all([
+        // Buscar dados de marketing em paralelo com WhatsApp, gênero e campanhas
+        const [marketingData, whatsappData, genderData, campaignsData] = await Promise.all([
           fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json()),
           this.getWhatsAppMetrics(whatsappPreset),
-          this.getGenderSegmentation(whatsappPreset)
+          this.getGenderSegmentation(whatsappPreset),
+          fetch(`${API_URL}/facebook-ads/campaigns`).then(r => r.json()).catch(() => ({ campaigns: [] }))
         ]);
 
         console.timeEnd('Marketing Dashboard Load');
@@ -245,12 +246,16 @@ export class GranularAPI {
           whatsappSpend: whatsappSummary.total_spend || 0,
           // Substituir dados mock com dados reais de gênero
           genderData: genderData_formatted,
+          // Adicionar campanhas Facebook para o filtro
+          facebookCampaigns: campaignsData.campaigns || campaignsData.data || [],
           _metadata: { 
             ...marketingData._metadata,
             whatsappIntegrated: true,
             genderIntegrated: true,
+            campaignsIntegrated: true,
             whatsappEndpoint: '/facebook-ads/whatsapp/insights',
-            genderEndpoint: '/facebook-ads/leads/segmentation'
+            genderEndpoint: '/facebook-ads/leads/segmentation',
+            campaignsEndpoint: '/facebook-ads/campaigns'
           }
         };
 
@@ -266,6 +271,11 @@ export class GranularAPI {
             totalLeads: genderData.summary?.total_leads || 0,
             formatted: genderData_formatted,
             byGender: genderData.summary?.by_gender
+          },
+          campaigns: {
+            raw: campaignsData,
+            count: (campaignsData.campaigns || campaignsData.data || []).length,
+            campaigns: campaignsData.campaigns || campaignsData.data || []
           }
         });
 
