@@ -402,7 +402,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                 fontWeight: 'bold',
                 color: COLORS.primary
               }}>
-                Total: {data.length} {type}
+                Total: {sortedData.length} {type}
               </div>
             </div>
           )}

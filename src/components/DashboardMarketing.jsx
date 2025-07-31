@@ -463,7 +463,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     if (!periodSalesData?.leadsByUser || periodSalesData.leadsByUser.length === 0) {
       return {
         sortedLeadsData: [],
-        sortedMeetingsData: []
+        sortedMeetingsData: [],
+        totalMeetings: 0
       };
     }
 
@@ -476,6 +477,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       fonte: selectedSource
     });
 
+    const meetingsData = [...periodSalesData.leadsByUser]
+      .filter(user => user.name !== 'SA IMOB')
+      .map(user => ({
+        ...user,
+        meetingsHeld: user.meetingsHeld || user.meetings || 0
+      }))
+      .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0));
+
+    const totalMeetings = meetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
+
     return {
       // Ordenar por total de leads (value) - decrescente
       sortedLeadsData: [...periodSalesData.leadsByUser]
@@ -483,13 +494,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         .sort((a, b) => (b.value || 0) - (a.value || 0)),
         
       // Ordenar por reuniões - decrescente  
-      sortedMeetingsData: [...periodSalesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB')
-        .map(user => ({
-          ...user,
-          meetingsHeld: user.meetingsHeld || user.meetings || 0
-        }))
-        .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0))
+      sortedMeetingsData: meetingsData,
+      totalMeetings: totalMeetings
     };
   }, [periodSalesData?.leadsByUser]);
 
@@ -559,6 +565,64 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         ...modalStateRef.current,
         isLoading: false,
         data: dataMap[type]
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
+    } catch (error) {
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        error: error.message
+      };
+      
+      setModalForceUpdate(prev => prev + 1);
+    }
+  };
+
+  // ✅ FUNÇÃO: Abrir modal com todas as reuniões
+  const openAllMeetingsModal = async () => {
+    modalStateRef.current = {
+      isOpen: true,
+      type: 'reunioes',
+      title: 'Todas as Reuniões',
+      isLoading: true,
+      data: [],
+      error: null
+    };
+    
+    setModalForceUpdate(prev => prev + 1);
+
+    try {
+      // Preparar parâmetros extras para incluir período
+      let extraParams = {};
+      
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        extraParams.start_date = customPeriod.startDate;
+        extraParams.end_date = customPeriod.endDate;
+      } else if (period === 'current_month') {
+        // Para mês atual, usar do dia 1 do mês até hoje
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        extraParams.start_date = firstDayOfMonth.toISOString().split('T')[0];
+        extraParams.end_date = today.toISOString().split('T')[0];
+      } else if (period && period !== 'custom') {
+        const periodToDays = {
+          '7d': 7,
+          '30d': 30,
+          '60d': 60,
+          '90d': 90
+        };
+        extraParams.days = periodToDays[period] || 30;
+      }
+
+      // Buscar dados de todos os corretores
+      const tablesData = await KommoAPI.getDetailedTables('', selectedSource || '', extraParams);
+      
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        data: tablesData?.reunioesDetalhes || []
       };
       
       setModalForceUpdate(prev => prev + 1);
@@ -3016,6 +3080,22 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           <div className="card card-full">
             <div className="card-title">
               Rank Corretores - Reunião
+              {!loadingPeriodSales && sortedSalesChartsData.totalMeetings > 0 && (
+                <span 
+                  className="total-indicator" 
+                  onClick={openAllMeetingsModal}
+                  style={{ 
+                    marginLeft: '10px', 
+                    fontSize: '0.9em', 
+                    color: '#007bff', 
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                  title="Clique para ver todas as reuniões"
+                >
+                  Total: {sortedSalesChartsData.totalMeetings}
+                </span>
+              )}
               {loadingPeriodSales && <span className="loading-indicator"> - Carregando...</span>}
             </div>
             <CompactChart 
