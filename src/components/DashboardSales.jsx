@@ -6,6 +6,7 @@ import SimpleModal from './SimpleModal';
 import DetailModal from './common/DetailModal';
 import MultiSelectFilter from './common/MultiSelectFilter';
 import { COLORS } from '../constants/colors';
+import ExcelExporter from '../utils/excelExport';
 import './Dashboard.css';
 
 // Componente de métrica com seta e fundo colorido (como na imagem)
@@ -155,6 +156,103 @@ const TrendIndicator = ({ value, showZero = false }) => {
 const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, pendingCorretor, setPendingCorretor, pendingSource, setPendingSource, applyFilters, hasPendingFilters, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
   
   const [rawSalesData, setRawSalesData] = useState(data); // Dados originais sem filtro
+
+  // Funções de exportação Excel
+  const handleExportMeetings = () => {
+    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
+      alert('Não há dados de reuniões para exportar');
+      return;
+    }
+
+    const filters = {
+      corretor: selectedCorretor,
+      fonte: selectedSource
+    };
+
+    const periodLabel = (() => {
+      if (period === 'current_month') return 'Mês Atual';
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+      }
+      return period.replace('d', ' dias');
+    })();
+
+    const result = ExcelExporter.exportMeetingsData(
+      sortedChartsData.sortedMeetingsData || salesData.leadsByUser,
+      filters,
+      periodLabel
+    );
+
+    if (result.success) {
+      alert(`Relatório de reuniões exportado com sucesso: ${result.fileName}`);
+    } else {
+      alert(`Erro ao exportar: ${result.error}`);
+    }
+  };
+
+  const handleExportSales = () => {
+    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
+      alert('Não há dados de vendas para exportar');
+      return;
+    }
+
+    const filters = {
+      corretor: selectedCorretor,
+      fonte: selectedSource
+    };
+
+    const periodLabel = (() => {
+      if (period === 'current_month') return 'Mês Atual';
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+      }
+      return period.replace('d', ' dias');
+    })();
+
+    const result = ExcelExporter.exportSalesData(
+      sortedChartsData.sortedSalesData || salesData.leadsByUser,
+      filters,
+      periodLabel
+    );
+
+    if (result.success) {
+      alert(`Relatório de vendas exportado com sucesso: ${result.fileName}`);
+    } else {
+      alert(`Erro ao exportar: ${result.error}`);
+    }
+  };
+
+  const handleExportLeads = () => {
+    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
+      alert('Não há dados de leads para exportar');
+      return;
+    }
+
+    const filters = {
+      corretor: selectedCorretor,
+      fonte: selectedSource
+    };
+
+    const periodLabel = (() => {
+      if (period === 'current_month') return 'Mês Atual';
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+      }
+      return period.replace('d', ' dias');
+    })();
+
+    const result = ExcelExporter.exportLeadsData(
+      sortedChartsData.sortedLeadsData || salesData.leadsByUser,
+      filters,
+      periodLabel
+    );
+
+    if (result.success) {
+      alert(`Relatório de leads exportado com sucesso: ${result.fileName}`);
+    } else {
+      alert(`Erro ao exportar: ${result.error}`);
+    }
+  };
   const [salesData, setSalesData] = useState(data); // Dados filtrados
   const [comparisonData, setComparisonData] = useState(null);
   
@@ -1925,35 +2023,64 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
             <div className="card card-full">
-              <div className="card-title">
-                Leads criados no período (CRM)
-                <span 
-                  style={{
-                    marginLeft: '12px',
-                    fontSize: '18px',
-                    fontWeight: '700',
-                    color: '#007bff',
-                    backgroundColor: '#f0f4f8',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    border: '2px solid #e2e8f0',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onClick={() => openModal('leads')}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e3f2fd';
-                    e.target.style.borderColor = '#007bff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f0f4f8';
-                    e.target.style.borderColor = '#e2e8f0';
-                  }}
-                  title="Clique para ver detalhes dos leads"
-                >
-                  Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.organicLeads || 0) + (user.paidLeads || 0), 0)}
-                </span>
+              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Leads criados no período (CRM)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span 
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '700',
+                      color: '#007bff',
+                      backgroundColor: '#f0f4f8',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      border: '2px solid #e2e8f0',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => openModal('leads')}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#e3f2fd';
+                      e.target.style.borderColor = '#007bff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#f0f4f8';
+                      e.target.style.borderColor = '#e2e8f0';
+                    }}
+                    title="Clique para ver detalhes dos leads"
+                  >
+                    Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.organicLeads || 0) + (user.paidLeads || 0), 0)}
+                  </span>
+                  <button
+                    onClick={handleExportLeads}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#218838';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#28a745';
+                      e.target.style.transform = 'translateY(0)';
+                    }}
+                    title="Exportar dados de leads para Excel"
+                  >
+                    📊 Excel
+                  </button>
+                </div>
               </div>
               <GroupedBarChart 
                 data={sortedChartsData.sortedLeadsData.map(user => ({
@@ -1969,35 +2096,64 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             
             <div className="card card-full">
-              <div className="card-title">
-                Rank Corretores - Reunião
-                <span 
-                  style={{
-                    marginLeft: '12px',
-                    fontSize: '18px',
-                    fontWeight: '700',
-                    color: '#007bff',
-                    backgroundColor: '#f0f4f8',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    border: '2px solid #e2e8f0',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onClick={() => openModal('reunioes')}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e3f2fd';
-                    e.target.style.borderColor = '#007bff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f0f4f8';
-                    e.target.style.borderColor = '#e2e8f0';
-                  }}
-                  title="Clique para ver todas as reuniões"
-                >
-                  Total: {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
-                </span>
+              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Rank Corretores - Reunião</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span 
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '700',
+                      color: '#007bff',
+                      backgroundColor: '#f0f4f8',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      border: '2px solid #e2e8f0',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => openModal('reunioes')}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#e3f2fd';
+                      e.target.style.borderColor = '#007bff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#f0f4f8';
+                      e.target.style.borderColor = '#e2e8f0';
+                    }}
+                    title="Clique para ver todas as reuniões"
+                  >
+                    Total: {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
+                  </span>
+                  <button
+                    onClick={handleExportMeetings}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#218838';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#28a745';
+                      e.target.style.transform = 'translateY(0)';
+                    }}
+                    title="Exportar dados de reuniões para Excel"
+                  >
+                    📊 Excel
+                  </button>
+                </div>
               </div>
               <CompactChart 
                 type="bar" 
@@ -2009,35 +2165,64 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             
             <div className="card card-full">
-              <div className="card-title">
-                Rank Corretores - Venda
-                <span 
-                  style={{
-                    marginLeft: '12px',
-                    fontSize: '18px',
-                    fontWeight: '700',
-                    color: '#007bff',
-                    backgroundColor: '#f0f4f8',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    border: '2px solid #e2e8f0',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onClick={() => openModal('vendas')}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#e3f2fd';
-                    e.target.style.borderColor = '#007bff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#f0f4f8';
-                    e.target.style.borderColor = '#e2e8f0';
-                  }}
-                  title="Clique para ver todas as vendas"
-                >
-                  Total: {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
-                </span>
+              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Rank Corretores - Venda</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span 
+                    style={{
+                      fontSize: '18px',
+                      fontWeight: '700',
+                      color: '#007bff',
+                      backgroundColor: '#f0f4f8',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      border: '2px solid #e2e8f0',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => openModal('vendas')}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#e3f2fd';
+                      e.target.style.borderColor = '#007bff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#f0f4f8';
+                      e.target.style.borderColor = '#e2e8f0';
+                    }}
+                    title="Clique para ver todas as vendas"
+                  >
+                    Total: {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
+                  </span>
+                  <button
+                    onClick={handleExportSales}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: '#28a745',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#218838';
+                      e.target.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#28a745';
+                      e.target.style.transform = 'translateY(0)';
+                    }}
+                    title="Exportar dados de vendas para Excel"
+                  >
+                    📊 Excel
+                  </button>
+                </div>
               </div>
               <CompactChart 
                 type="bar" 

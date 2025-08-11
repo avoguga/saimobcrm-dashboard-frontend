@@ -7,6 +7,7 @@ import MultiSelectFilter from './common/MultiSelectFilter';
 import { COLORS } from '../constants/colors';
 import { KommoAPI } from '../services/api';
 import GranularAPI from '../services/granularAPI';
+import ExcelExporter from '../utils/excelExport';
 import './Dashboard.css';
 
 
@@ -14,6 +15,80 @@ import './Dashboard.css';
 function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, salesData, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
   const [marketingData, setMarketingData] = useState(data);
   const [filteredData, setFilteredData] = useState(data);
+
+  // Funções de exportação Excel para Marketing
+  const handleExportMarketingComplete = () => {
+    if (!marketingData) {
+      alert('Não há dados de marketing para exportar');
+      return;
+    }
+
+    const filters = {
+      fonte: selectedSource,
+      campanha: selectedCampaigns.join(', ')
+    };
+
+    const periodLabel = (() => {
+      if (period === 'current_month') return 'Mês Atual';
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+      }
+      return period.replace('d', ' dias');
+    })();
+
+    const result = ExcelExporter.exportMarketingData(marketingData, filters, periodLabel);
+
+    if (result.success) {
+      alert(`Relatório completo de marketing exportado: ${result.fileName}`);
+    } else {
+      alert(`Erro ao exportar: ${result.error}`);
+    }
+  };
+
+  const handleExportCampaignInsights = () => {
+    if (!campaignInsights || campaignInsights.length === 0) {
+      alert('Não há dados de campanhas para exportar');
+      return;
+    }
+
+    const filename = 'relatorio_campanhas_facebook';
+    const periodLabel = (() => {
+      if (period === 'current_month') return 'Mês Atual';
+      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+      }
+      return period.replace('d', ' dias');
+    })();
+
+    const exportData = campaignInsights.map(campaign => ({
+      'Nome da Campanha': campaign.campaign_name || campaign.name || '',
+      'Status': campaign.status || 'Ativo',
+      'Impressões': campaign.impressions || 0,
+      'Cliques': campaign.clicks || 0,
+      'CTR (%)': campaign.ctr || 0,
+      'CPC (R$)': campaign.cpc || 0,
+      'Investimento (R$)': campaign.spend || campaign.amount_spent || 0,
+      'Leads': campaign.leads || campaign.actions_lead || 0,
+      'CPL (R$)': campaign.cost_per_lead || 0,
+      'ROAS': campaign.roas || 0
+    }));
+
+    const metadata = {
+      'Relatório': 'Insights de Campanhas Facebook',
+      'Período': periodLabel,
+      'Data de Geração': new Date().toLocaleString('pt-BR'),
+      'Total de Campanhas': exportData.length,
+      'Campanhas Filtradas': selectedCampaigns.join(', ') || 'Todas'
+    };
+
+    const result = ExcelExporter.exportChartData(exportData, filename, 'Campanhas Facebook', { metadata });
+
+    if (result.success) {
+      alert(`Relatório de campanhas Facebook exportado: ${result.fileName}`);
+    } else {
+      alert(`Erro ao exportar: ${result.error}`);
+    }
+  };
   
   // Estados para filtros de campanhas Facebook
   const [campaigns, setCampaigns] = useState([]);
@@ -2487,7 +2562,39 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       <div className="dashboard-row row-header">
         <div className="section-title">
           <h2>Dashboard de Marketing</h2>
-          <div className="dashboard-controls">
+          <div className="dashboard-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Botão de Exportação Geral */}
+            <button
+              onClick={handleExportMarketingComplete}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#218838';
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#28a745';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+              }}
+              title="Exportar relatório completo de marketing para Excel"
+            >
+              📊 Exportar Marketing
+            </button>
             <div className="filters-group">
               <MultiSelectFilter 
                 label="Fonte"
@@ -2864,6 +2971,38 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               </>
             )}
             {loadingInsights && <span className="loading-indicator"> 🔄 Atualizando...</span>}
+            {/* Botão de Export Campanhas Facebook */}
+            {campaignInsights && campaignInsights.length > 0 && (
+              <button
+                onClick={handleExportCampaignInsights}
+                style={{
+                  marginLeft: '12px',
+                  padding: '6px 12px',
+                  backgroundColor: '#17a2b8',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#138496';
+                  e.target.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#17a2b8';
+                  e.target.style.transform = 'translateY(0)';
+                }}
+                title="Exportar dados das campanhas Facebook para Excel"
+              >
+                📊 Facebook Excel
+              </button>
+            )}
           </div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
