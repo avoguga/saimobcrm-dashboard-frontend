@@ -371,6 +371,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   // Função para abrir modal sem causar re-render
   const openModal = async (type) => {
     const titles = {
+      'leads': 'Todos os Leads',
       'reunioes': 'Reuniões Realizadas',
       'propostas': 'Propostas Enviadas', 
       'vendas': 'Vendas Realizadas'
@@ -425,6 +426,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       const tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       
       const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
         'reunioes': tablesData.reunioesDetalhes || [],
         'propostas': tablesData.propostasDetalhes || [],
         'vendas': tablesData.vendasDetalhes || []
@@ -1924,18 +1926,33 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           <>
             <div className="card card-full">
               <div className="card-title">
-                Leads criados no período
-                <span style={{
-                  marginLeft: '12px',
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: '#4E5859',
-                  backgroundColor: '#f0f4f8',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  border: '2px solid #e2e8f0'
-                }}>
-                  {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.organicLeads || 0) + (user.paidLeads || 0), 0)}
+                Leads criados no período (CRM)
+                <span 
+                  style={{
+                    marginLeft: '12px',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    color: '#007bff',
+                    backgroundColor: '#f0f4f8',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    border: '2px solid #e2e8f0',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => openModal('leads')}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e3f2fd';
+                    e.target.style.borderColor = '#007bff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f0f4f8';
+                    e.target.style.borderColor = '#e2e8f0';
+                  }}
+                  title="Clique para ver detalhes dos leads"
+                >
+                  Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.organicLeads || 0) + (user.paidLeads || 0), 0)}
                 </span>
               </div>
               <GroupedBarChart 
@@ -1954,17 +1971,32 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             <div className="card card-full">
               <div className="card-title">
                 Rank Corretores - Reunião
-                <span style={{
-                  marginLeft: '12px',
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: '#4E5859',
-                  backgroundColor: '#f0f4f8',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  border: '2px solid #e2e8f0'
-                }}>
-                  {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
+                <span 
+                  style={{
+                    marginLeft: '12px',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    color: '#007bff',
+                    backgroundColor: '#f0f4f8',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    border: '2px solid #e2e8f0',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => openModal('reunioes')}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e3f2fd';
+                    e.target.style.borderColor = '#007bff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f0f4f8';
+                    e.target.style.borderColor = '#e2e8f0';
+                  }}
+                  title="Clique para ver todas as reuniões"
+                >
+                  Total: {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
                 </span>
               </div>
               <CompactChart 
@@ -1979,17 +2011,32 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             <div className="card card-full">
               <div className="card-title">
                 Rank Corretores - Venda
-                <span style={{
-                  marginLeft: '12px',
-                  fontSize: '18px',
-                  fontWeight: '700',
-                  color: '#4E5859',
-                  backgroundColor: '#f0f4f8',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  border: '2px solid #e2e8f0'
-                }}>
-                  {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
+                <span 
+                  style={{
+                    marginLeft: '12px',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    color: '#007bff',
+                    backgroundColor: '#f0f4f8',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    border: '2px solid #e2e8f0',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => openModal('vendas')}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#e3f2fd';
+                    e.target.style.borderColor = '#007bff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#f0f4f8';
+                    e.target.style.borderColor = '#e2e8f0';
+                  }}
+                  title="Clique para ver todas as vendas"
+                >
+                  Total: {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
                 </span>
               </div>
               <CompactChart 
@@ -2004,7 +2051,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         ) : salesData?.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
           <>
             <div className="card card-full">
-              <div className="card-title">Leads criados no período</div>
+              <div className="card-title">Leads criados no período (CRM)</div>
               <CompactChart 
                 type="bar" 
                 data={chartData.leadsData} 

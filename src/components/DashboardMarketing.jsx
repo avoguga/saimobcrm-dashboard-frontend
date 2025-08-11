@@ -2818,7 +2818,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           <div className="card-title">Métricas Principais</div>
           <div className="metrics-group">
             <MiniMetricCardWithTrend
-              title="TOTAL DE LEADS"
+              title="TOTAL DE LEADS (META)"
               value={filteredData.totalLeads || 0}
               trendValue={25.8}
               color={COLORS.primary}
@@ -3059,7 +3059,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         <div className="dashboard-row">
           <div className="card card-full">
             <div className="card-title">
-              Leads criados no período
+              Leads criados no período (CRM)
               {loadingPeriodSales && <span className="loading-indicator"> - Carregando...</span>}
             </div>
             <CompactChart 
@@ -3114,7 +3114,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       <div className="dashboard-row">
         {filteredData.metricsTrend && filteredData.metricsTrend.length > 0 && (
           <div className="card card-lg">
-            <div className="card-title">Tendência de Leads</div>
+            <div className="card-title">Tendência de Leads (META)</div>
             <CompactChart 
               type="line" 
               data={filteredData.metricsTrend} 

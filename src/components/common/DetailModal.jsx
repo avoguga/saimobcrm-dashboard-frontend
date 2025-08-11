@@ -22,7 +22,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
   const [filterValue, setFilterValue] = useState('');
   
   const getFilterOptions = () => {
-    const commonFields = ['Nome do Lead', 'Corretor', 'Fonte', 'Anúncio', 'Público'];
+    const commonFields = ['Nome do Lead', 'Corretor', 'Fonte', 'Anúncio', 'Público', 'Produto'];
     
     switch (type) {
       case 'leads':
@@ -285,6 +285,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
                         {renderSortableHeader('Corretor', 'Corretor')}
                         {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Produto', 'Produto')}
                         {renderSortableHeader('Anúncio', 'Anúncio')}
                         {renderSortableHeader('Público', 'Público-Alvo')}
                         {renderSortableHeader('Funil', 'Funil')}
@@ -297,6 +298,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
                         {renderSortableHeader('Corretor', 'Corretor')}
                         {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Produto', 'Produto')}
                         {renderSortableHeader('Anúncio', 'Anúncio')}
                         {renderSortableHeader('Público', 'Público-Alvo')}
                         {renderSortableHeader('Funil', 'Funil')}
@@ -309,6 +311,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
                         {renderSortableHeader('Corretor', 'Corretor')}
                         {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Produto', 'Produto')}
                         {renderSortableHeader('Anúncio', 'Anúncio')}
                         {renderSortableHeader('Público', 'Público-Alvo')}
                       </>
@@ -319,6 +322,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
                         {renderSortableHeader('Corretor', 'Corretor')}
                         {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Produto', 'Produto')}
                         {renderSortableHeader('Anúncio', 'Anúncio')}
                         {renderSortableHeader('Público', 'Público-Alvo')}
                         {renderSortableHeader('Valor da Venda', 'Valor da Venda')}
@@ -345,6 +349,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                             <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                             <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                             <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                            <td style={{ padding: '12px' }}>{item['Produto'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Funil']}</td>
@@ -357,6 +362,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                             <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                             <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                             <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                            <td style={{ padding: '12px' }}>{item['Produto'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                             <td style={{ padding: '12px' }}>{item['Funil']}</td>
@@ -369,6 +375,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px' }}>{item['Produto'] || 'N/A'}</td>
                           <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
                           <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                         </>
@@ -379,6 +386,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px' }}>{item['Produto'] || 'N/A'}</td>
                           <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
                           <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
