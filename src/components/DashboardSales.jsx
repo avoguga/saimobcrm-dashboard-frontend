@@ -50,22 +50,22 @@ const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'nu
     switch (trend) {
       case 'up':
         return {
-          backgroundColor: 'rgba(76, 224, 179, 0.15)', // Verde claro
-          color: '#4ce0b3',
+          backgroundColor: 'rgba(76, 224, 179, 0.25)', // Verde com mais opacidade
+          color: '#374151', // Cinza escuro
           icon: '↑',
           sign: '+'
         };
       case 'down':
         return {
-          backgroundColor: 'rgba(255, 58, 94, 0.15)', // Vermelho claro
-          color: '#ff3a5e',
+          backgroundColor: 'rgba(255, 58, 94, 0.25)', // Vermelho com mais opacidade
+          color: '#374151', // Cinza escuro
           icon: '↓',
           sign: ''
         };
       default:
         return {
-          backgroundColor: 'rgba(117, 119, 123, 0.1)', // Cinza claro
-          color: '#75777B',
+          backgroundColor: 'rgba(117, 119, 123, 0.15)', // Cinza claro
+          color: '#374151', // Cinza escuro
           icon: '→',
           sign: ''
         };
@@ -137,11 +137,9 @@ const TrendIndicator = ({ value, showZero = false }) => {
     fontSize: '12px',
     fontWeight: '600',
     backgroundColor: isPositive 
-      ? 'rgba(76, 224, 179, 0.15)'  // Verde claro para positivo
-      : 'rgba(255, 58, 94, 0.15)',  // Vermelho claro para negativo
-    color: isPositive 
-      ? '#4ce0b3' // Verde para positivo
-      : '#ff3a5e', // Vermelho para negativo
+      ? 'rgba(76, 224, 179, 0.25)'  // Verde com mais opacidade
+      : 'rgba(255, 58, 94, 0.25)',  // Vermelho com mais opacidade
+    color: '#374151', // Cinza escuro
     marginLeft: '8px'
   };
   
@@ -171,10 +169,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     const periodLabel = (() => {
       if (period === 'current_month') return 'Mês Atual';
+      if (period === 'previous_month') return 'Mês Anterior';
+      if (period === 'year') return 'Anual';
       if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
         return `${customPeriod.startDate} a ${customPeriod.endDate}`;
       }
-      return period.replace('d', ' dias');
+      if (period === '7d') return '7 dias';
+      return period;
     })();
 
     const result = ExcelExporter.exportMeetingsData(
@@ -203,10 +204,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     const periodLabel = (() => {
       if (period === 'current_month') return 'Mês Atual';
+      if (period === 'previous_month') return 'Mês Anterior';
+      if (period === 'year') return 'Anual';
       if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
         return `${customPeriod.startDate} a ${customPeriod.endDate}`;
       }
-      return period.replace('d', ' dias');
+      if (period === '7d') return '7 dias';
+      return period;
     })();
 
     const result = ExcelExporter.exportSalesData(
@@ -235,10 +239,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     const periodLabel = (() => {
       if (period === 'current_month') return 'Mês Atual';
+      if (period === 'previous_month') return 'Mês Anterior';
+      if (period === 'year') return 'Anual';
       if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
         return `${customPeriod.startDate} a ${customPeriod.endDate}`;
       }
-      return period.replace('d', ' dias');
+      if (period === '7d') return '7 dias';
+      return period;
     })();
 
     const result = ExcelExporter.exportLeadsData(
@@ -388,13 +395,25 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         
         extraParams.start_date = firstDayStr;
         extraParams.end_date = todayStr;
+      } else if (period === 'previous_month') {
+        // Para mês anterior completo
+        const now = new Date();
+        const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        
+        extraParams.start_date = firstDayPreviousMonth.toISOString().split('T')[0];
+        extraParams.end_date = lastDayPreviousMonth.toISOString().split('T')[0];
+      } else if (period === 'year') {
+        // Para ano atual
+        const now = new Date();
+        const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+        
+        extraParams.start_date = firstDayOfYear.toISOString().split('T')[0];
+        extraParams.end_date = now.toISOString().split('T')[0];
       } else {
-        // Para períodos predefinidos (7d, 30d, 60d, 90d), usar days
+        // Para períodos predefinidos (7d), usar days
         const periodToDays = {
-          '7d': 7,
-          '30d': 30,
-          '60d': 60,
-          '90d': 90
+          '7d': 7
         };
         extraParams.days = periodToDays[period] || 30;
       }
@@ -501,13 +520,25 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         
         extraParams.start_date = firstDayStr;
         extraParams.end_date = todayStr;
+      } else if (period === 'previous_month') {
+        // Para mês anterior completo
+        const now = new Date();
+        const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        
+        extraParams.start_date = firstDayPreviousMonth.toISOString().split('T')[0];
+        extraParams.end_date = lastDayPreviousMonth.toISOString().split('T')[0];
+      } else if (period === 'year') {
+        // Para ano atual
+        const now = new Date();
+        const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+        
+        extraParams.start_date = firstDayOfYear.toISOString().split('T')[0];
+        extraParams.end_date = now.toISOString().split('T')[0];
       } else {
-        // Para períodos predefinidos (7d, 30d, 60d, 90d), usar days
+        // Para períodos predefinidos (7d), usar days
         const periodToDays = {
-          '7d': 7,
-          '30d': 30,
-          '60d': 60,
-          '90d': 90
+          '7d': 7
         };
         extraParams.days = periodToDays[period] || 30;
       }
@@ -1762,18 +1793,14 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   endDate = now;
                   startDate = new Date(now);
                   startDate.setDate(startDate.getDate() - 7);
-                } else if (period === '30d') {
+                } else if (period === 'previous_month') {
+                  // Mês anterior completo
+                  startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+                } else if (period === 'year') {
+                  // Ano atual
+                  startDate = new Date(now.getFullYear(), 0, 1);
                   endDate = now;
-                  startDate = new Date(now);
-                  startDate.setDate(startDate.getDate() - 30);
-                } else if (period === '60d') {
-                  endDate = now;
-                  startDate = new Date(now);
-                  startDate.setDate(startDate.getDate() - 60);
-                } else if (period === '90d') {
-                  endDate = now;
-                  startDate = new Date(now);
-                  startDate.setDate(startDate.getDate() - 90);
                 } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
                   startDate = new Date(customPeriod.startDate + 'T12:00:00');
                   endDate = new Date(customPeriod.endDate + 'T12:00:00');
@@ -1853,22 +1880,16 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   7 Dias
                 </button>
                 <button 
-                  className={period === '30d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('30d')}
+                  className={period === 'previous_month' ? 'active' : ''} 
+                  onClick={() => handlePeriodChange('previous_month')}
                 >
-                  30 Dias
+                  Mês Anterior
                 </button>
                 <button 
-                  className={period === '60d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('60d')}
+                  className={period === 'year' ? 'active' : ''} 
+                  onClick={() => handlePeriodChange('year')}
                 >
-                  60 Dias
-                </button>
-                <button 
-                  className={period === '90d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('90d')}
-                >
-                  90 Dias
+                  Anual
                 </button>
                 <button 
                   className={period === 'custom' ? 'active' : ''} 
@@ -1964,7 +1985,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               style={{ cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: COLORS.success }}>
+                <div className="mini-metric-value" style={{ color: '#374151' }}>
                   {salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
                 </div>
                 <TrendIndicator value={(() => {
@@ -1988,7 +2009,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: COLORS.success }}>
+                <div className="mini-metric-value" style={{ color: '#374151' }}>
                   R$ {(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
@@ -2001,7 +2022,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: COLORS.warning }}>
+                <div className="mini-metric-value" style={{ color: '#374151' }}>
                   R$ {(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {

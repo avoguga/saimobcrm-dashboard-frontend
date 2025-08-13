@@ -21,6 +21,26 @@ const loadPreviousPeriodData = async (period, originalDays, customPeriod, corret
       start_date: firstDayPreviousMonth.toISOString().split('T')[0],
       end_date: lastDayPreviousMonth.toISOString().split('T')[0]
     };
+  } else if (period === 'previous_month') {
+    // Para mês anterior, buscar mês anteanterior
+    const now = new Date();
+    const firstDayTwoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const lastDayTwoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+    
+    previousCustomDates = {
+      start_date: firstDayTwoMonthsAgo.toISOString().split('T')[0],
+      end_date: lastDayTwoMonthsAgo.toISOString().split('T')[0]
+    };
+  } else if (period === 'year') {
+    // Para ano atual, buscar ano anterior completo
+    const now = new Date();
+    const firstDayLastYear = new Date(now.getFullYear() - 1, 0, 1);
+    const lastDayLastYear = new Date(now.getFullYear() - 1, 11, 31);
+    
+    previousCustomDates = {
+      start_date: firstDayLastYear.toISOString().split('T')[0],
+      end_date: lastDayLastYear.toISOString().split('T')[0]
+    };
   } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
     // Para período customizado, calcular mesmo número de dias anteriores
     const startDate = new Date(customPeriod.startDate);
@@ -185,18 +205,29 @@ function Dashboard() {
       const end = new Date(defaultPeriod.endDate);
       return Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
     }
+    if (period === 'previous_month') {
+      // Para mês anterior, retornar 30 dias aproximadamente
+      return 30;
+    }
+    if (period === 'year') {
+      // Para ano atual, calcular dias desde o início do ano
+      const today = new Date();
+      const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+      return Math.ceil((today - firstDayOfYear) / (1000 * 60 * 60 * 24)) + 1;
+    }
     if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
       const start = new Date(customPeriod.startDate);
       const end = new Date(customPeriod.endDate);
       return Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     }
-    return parseInt(period.replace('d', ''));
+    if (period === '7d') return 7;
+    return 30; // Padrão
   };
 
   // Função para verificar se o período está válido para fazer requisição
   const isPeriodValid = () => {
-    if (period === 'current_month') {
-      return true; // Mês atual sempre é válido
+    if (period === 'current_month' || period === 'previous_month' || period === 'year' || period === '7d') {
+      return true; // Períodos predefinidos sempre são válidos
     }
     if (period === 'custom') {
       return Boolean(customPeriod.startDate && customPeriod.endDate);
@@ -229,6 +260,21 @@ function Dashboard() {
             customDates = {
               start_date: defaultPeriod.startDate,
               end_date: defaultPeriod.endDate
+            };
+          } else if (period === 'previous_month') {
+            const today = new Date();
+            const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            customDates = {
+              start_date: firstDayPreviousMonth.toISOString().split('T')[0],
+              end_date: lastDayPreviousMonth.toISOString().split('T')[0]
+            };
+          } else if (period === 'year') {
+            const today = new Date();
+            const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+            customDates = {
+              start_date: firstDayOfYear.toISOString().split('T')[0],
+              end_date: today.toISOString().split('T')[0]
             };
           } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
             params.start_date = customPeriod.startDate;
@@ -305,6 +351,21 @@ function Dashboard() {
               start_date: defaultPeriod.startDate,
               end_date: defaultPeriod.endDate
             };
+          } else if (period === 'previous_month') {
+            const today = new Date();
+            const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            customDates = {
+              start_date: firstDayPreviousMonth.toISOString().split('T')[0],
+              end_date: lastDayPreviousMonth.toISOString().split('T')[0]
+            };
+          } else if (period === 'year') {
+            const today = new Date();
+            const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+            customDates = {
+              start_date: firstDayOfYear.toISOString().split('T')[0],
+              end_date: today.toISOString().split('T')[0]
+            };
           } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
             customDates = {
               start_date: customPeriod.startDate,
@@ -374,6 +435,21 @@ function Dashboard() {
             customDates = {
               start_date: defaultPeriod.startDate,
               end_date: defaultPeriod.endDate
+            };
+          } else if (period === 'previous_month') {
+            const today = new Date();
+            const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            customDates = {
+              start_date: firstDayPreviousMonth.toISOString().split('T')[0],
+              end_date: lastDayPreviousMonth.toISOString().split('T')[0]
+            };
+          } else if (period === 'year') {
+            const today = new Date();
+            const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+            customDates = {
+              start_date: firstDayOfYear.toISOString().split('T')[0],
+              end_date: today.toISOString().split('T')[0]
             };
           } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
             params.start_date = customPeriod.startDate;

@@ -30,10 +30,13 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
     const periodLabel = (() => {
       if (period === 'current_month') return 'Mês Atual';
+      if (period === 'previous_month') return 'Mês Anterior';
+      if (period === 'year') return 'Anual';
       if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
         return `${customPeriod.startDate} a ${customPeriod.endDate}`;
       }
-      return period.replace('d', ' dias');
+      if (period === '7d') return '7 dias';
+      return period;
     })();
 
     const result = ExcelExporter.exportMarketingData(marketingData, filters, periodLabel);
@@ -54,10 +57,13 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     const filename = 'relatorio_campanhas_facebook';
     const periodLabel = (() => {
       if (period === 'current_month') return 'Mês Atual';
+      if (period === 'previous_month') return 'Mês Anterior';
+      if (period === 'year') return 'Anual';
       if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
         return `${customPeriod.startDate} a ${customPeriod.endDate}`;
       }
-      return period.replace('d', ' dias');
+      if (period === '7d') return '7 dias';
+      return period;
     })();
 
     const exportData = campaignInsights.map(campaign => ({
@@ -485,13 +491,31 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           start_date: firstDayOfMonth.toISOString().split('T')[0],
           end_date: today.toISOString().split('T')[0]
         };
+      } else if (period === 'previous_month') {
+        // Para mês anterior completo
+        const today = new Date();
+        const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        
+        customDates = {
+          start_date: firstDayPreviousMonth.toISOString().split('T')[0],
+          end_date: lastDayPreviousMonth.toISOString().split('T')[0]
+        };
+        days = 30; // Aproximado para cálculo
+      } else if (period === 'year') {
+        // Para ano atual, do dia 1 de janeiro até hoje
+        const today = new Date();
+        const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+        
+        customDates = {
+          start_date: firstDayOfYear.toISOString().split('T')[0],
+          end_date: today.toISOString().split('T')[0]
+        };
+        days = 365; // Aproximado para cálculo
       } else if (period && period !== 'custom') {
         // Para outros períodos, usar dias
         const periodToDays = {
-          '7d': 7,
-          '30d': 30,
-          '60d': 60,
-          '90d': 90
+          '7d': 7
         };
         days = periodToDays[period] || 30;
       }
@@ -607,12 +631,24 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         
         extraParams.start_date = firstDayOfMonth.toISOString().split('T')[0];
         extraParams.end_date = today.toISOString().split('T')[0];
+      } else if (period === 'previous_month') {
+        // Para mês anterior completo
+        const today = new Date();
+        const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        
+        extraParams.start_date = firstDayPreviousMonth.toISOString().split('T')[0];
+        extraParams.end_date = lastDayPreviousMonth.toISOString().split('T')[0];
+      } else if (period === 'year') {
+        // Para ano atual
+        const today = new Date();
+        const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+        
+        extraParams.start_date = firstDayOfYear.toISOString().split('T')[0];
+        extraParams.end_date = today.toISOString().split('T')[0];
       } else if (period && period !== 'custom') {
         const periodToDays = {
-          '7d': 7,
-          '30d': 30,
-          '60d': 60,
-          '90d': 90
+          '7d': 7
         };
         extraParams.days = periodToDays[period] || 30;
       }
@@ -681,12 +717,24 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         
         extraParams.start_date = firstDayOfMonth.toISOString().split('T')[0];
         extraParams.end_date = today.toISOString().split('T')[0];
+      } else if (period === 'previous_month') {
+        // Para mês anterior completo
+        const today = new Date();
+        const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        
+        extraParams.start_date = firstDayPreviousMonth.toISOString().split('T')[0];
+        extraParams.end_date = lastDayPreviousMonth.toISOString().split('T')[0];
+      } else if (period === 'year') {
+        // Para ano atual
+        const today = new Date();
+        const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+        
+        extraParams.start_date = firstDayOfYear.toISOString().split('T')[0];
+        extraParams.end_date = today.toISOString().split('T')[0];
       } else if (period && period !== 'custom') {
         const periodToDays = {
-          '7d': 7,
-          '30d': 30,
-          '60d': 60,
-          '90d': 90
+          '7d': 7
         };
         extraParams.days = periodToDays[period] || 30;
       }
@@ -790,14 +838,14 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               case '7d':
                 startDate.setDate(endDate.getDate() - 7);
                 break;
-              case '30d':
-                startDate.setDate(endDate.getDate() - 30);
+              case 'previous_month':
+                // Mês anterior completo
+                startDate.setFullYear(endDate.getFullYear(), endDate.getMonth() - 1, 1);
+                endDate.setFullYear(endDate.getFullYear(), endDate.getMonth(), 0);
                 break;
-              case '60d':
-                startDate.setDate(endDate.getDate() - 60);
-                break;
-              case '90d':
-                startDate.setDate(endDate.getDate() - 90);
+              case 'year':
+                // Ano atual
+                startDate.setFullYear(endDate.getFullYear(), 0, 1);
                 break;
               default:
                 startDate.setDate(endDate.getDate() - 30);
@@ -1299,11 +1347,9 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       fontSize: '12px',
       fontWeight: '600',
       backgroundColor: isPositive 
-        ? 'rgba(76, 224, 179, 0.15)'  // Verde claro para positivo
-        : 'rgba(255, 58, 94, 0.15)',  // Vermelho claro para negativo
-      color: isPositive 
-        ? '#4ce0b3' // Verde para positivo
-        : '#ff3a5e', // Vermelho para negativo
+        ? 'rgba(76, 224, 179, 0.25)'  // Verde com mais opacidade
+        : 'rgba(255, 58, 94, 0.25)',  // Vermelho com mais opacidade
+      color: '#374151', // Cinza escuro
       marginLeft: '8px'
     };
     
@@ -2887,22 +2933,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
                   7 Dias
                 </button>
                 <button 
-                  className={period === '30d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('30d')}
+                  className={period === 'previous_month' ? 'active' : ''} 
+                  onClick={() => handlePeriodChange('previous_month')}
                 >
-                  30 Dias
+                  Mês Anterior
                 </button>
                 <button 
-                  className={period === '60d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('60d')}
+                  className={period === 'year' ? 'active' : ''} 
+                  onClick={() => handlePeriodChange('year')}
                 >
-                  60 Dias
-                </button>
-                <button 
-                  className={period === '90d' ? 'active' : ''} 
-                  onClick={() => handlePeriodChange('90d')}
-                >
-                  90 Dias
+                  Anual
                 </button>
                 <button 
                   className={period === 'custom' ? 'active' : ''} 
