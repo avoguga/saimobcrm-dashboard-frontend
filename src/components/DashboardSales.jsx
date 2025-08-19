@@ -464,6 +464,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       const dataMap = {
         'leads': getFilteredData(),
         'reunioes': getFilteredData(),
+        'propostas': tablesData.propostasDetalhes || [],
         'vendas': tablesData.vendasDetalhes || []
       };
 
@@ -1931,7 +1932,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               </div>
               <div className="mini-metric-title">REUNIÕES REALIZADAS</div>
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: COLORS.primary, fontWeight: '600' }}>
+                <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalMeetings = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
                     const totalLeads = salesData.totalLeads || 0;
@@ -1942,8 +1943,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <span>TAXA CONV.</span>
               </div>
             </div>
-            {/* <div 
-            w  className="mini-metric-card"
+            <div 
+              className="mini-metric-card"
               onClick={() => openModal('propostas')}
               onKeyDown={(e) => e.key === 'Enter' && openModal('propostas')}
               tabIndex={0}
@@ -1953,19 +1954,19 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
-                  {salesData?.proposalStats?.total || 0}
+                  {salesData?.totalProposals || (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0) : 0)}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData?.proposalStats?.total || 0;
+                  const current = salesData?.totalProposals || (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0) : 0);
                   const previous = comparisonData?.previousPeriod?.totalProposals || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
               <div className="mini-metric-title">PROPOSTAS REALIZADAS</div>
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: COLORS.secondary, fontWeight: '600' }}>
+                <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
-                    const totalProposals = salesData?.proposalStats?.total || 0;
+                    const totalProposals = salesData?.totalProposals || (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0) : 0);
                     const totalMeetings = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
                     const conversionRate = totalMeetings > 0 ? (totalProposals / totalMeetings) * 100 : 0;
                     return conversionRate.toFixed(1);
@@ -1973,7 +1974,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </span>
                 <span>TAXA CONV.</span>
               </div>
-            </div> */}
+            </div>
           </div>
             <div 
               className="mini-metric-card"
@@ -1996,7 +1997,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               </div>
               <div className="mini-metric-title">VENDAS REALIZADAS</div>
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ color: COLORS.success, fontWeight: '600' }}>
+                <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalSales = salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0);
                     const totalProposals = salesData?.proposalStats?.total || 0;

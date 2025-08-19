@@ -820,6 +820,15 @@ function Dashboard() {
             <span className="icon">{(isLoadingMarketing || isLoadingSales) ? '⏳' : '🔄'}</span> 
             {(isLoadingMarketing || isLoadingSales) ? 'Atualizando...' : 'Refresh Cache'}
           </button>
+          
+          <div className="data-timestamp">
+            Dados atualizados em: {(lastUpdate || new Date()).toLocaleString('pt-BR')}
+            {autoRefresh && (
+              <span className="auto-refresh-indicator">
+                • Auto-refresh: {refreshInterval}s
+              </span>
+            )}
+          </div>
         </div>
       </div>
       
@@ -877,17 +886,6 @@ function Dashboard() {
           applyCustomPeriod={applyCustomPeriod}
         />
       )}
-      
-      <div className="dashboard-footer">
-        <div className="data-timestamp">
-          Dados atualizados em: {(lastUpdate || new Date()).toLocaleString('pt-BR')}
-          {autoRefresh && (
-            <span className="auto-refresh-indicator">
-              • Auto-refresh: {refreshInterval}s
-            </span>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
