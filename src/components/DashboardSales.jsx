@@ -2321,7 +2321,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
       {/* Linha 5: Gráficos de Corretores - Layout Vertical */}
       <div className="dashboard-row" style={{ flexDirection: 'column' }}>
-        {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
+        {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && sortedChartsData.sortedLeadsData.length > 0 ? (
           <>
             <div className="card card-full" key={`leads-${searchField}-${searchValue}`}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2570,7 +2570,32 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         ) : (
           <div className="card card-full">
             <div className="error-message">
-              {salesData?.totalLeads > 0 ? (
+              {searchValue && searchValue.trim() !== '' ? (
+                // Quando há um filtro ativo mas não retorna resultados
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+                  <h3 style={{ color: '#4a5568', marginBottom: '8px' }}>Dados não encontrados</h3>
+                  <p style={{ color: '#718096', fontSize: '14px' }}>
+                    Nenhum resultado encontrado para "{searchValue}" no campo "{searchField}"
+                  </p>
+                  <button
+                    onClick={() => setSearchValue('')}
+                    style={{
+                      marginTop: '16px',
+                      padding: '8px 16px',
+                      backgroundColor: '#4E5859',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Limpar filtro
+                  </button>
+                </div>
+              ) : salesData?.totalLeads > 0 ? (
                 <>
                   <p>Foram encontrados {salesData.totalLeads} leads com as fontes selecionadas: <strong>{selectedSource}</strong></p>
                   <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
