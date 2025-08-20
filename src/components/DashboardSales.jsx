@@ -465,17 +465,27 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         return tablesData.vendasDetalhes || [];
       };
 
-      const dataMap = {
-        'leads': getFilteredData(),
-        'reunioes': getFilteredData(),
-        'propostas': tablesData.propostasDetalhes || [],
-        'vendas': tablesData.vendasDetalhes || []
-      };
+      let modalData = getFilteredData();
+      
+      // Se é tipo propostas ou vendas, usar os dados específicos
+      if (type === 'propostas') {
+        modalData = tablesData.propostasDetalhes || [];
+      } else if (type === 'vendas') {
+        modalData = tablesData.vendasDetalhes || [];
+      }
+      
+      // Aplicar pré-filtro se houver filtro ativo no dashboard (exceto para filtro de corretor)
+      if (searchValue && searchField && searchField !== 'Corretor') {
+        modalData = modalData.filter(item => {
+          const fieldValue = (item[searchField] || '').toString().toLowerCase();
+          return fieldValue.includes(searchValue.toLowerCase().trim());
+        });
+      }
 
       modalStateRef.current = {
         ...modalStateRef.current,
         isLoading: false,
-        data: dataMap[type]
+        data: modalData
       };
       
       setModalForceUpdate(prev => prev + 1);
@@ -565,11 +575,20 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         'propostas': tablesData.propostasDetalhes || [],
         'vendas': tablesData.vendasDetalhes || []
       };
+      
+      // Aplicar pré-filtro se houver filtro ativo no dashboard
+      let modalData = dataMap[type];
+      if (searchValue && searchField) {
+        modalData = modalData.filter(item => {
+          const fieldValue = (item[searchField] || '').toString().toLowerCase();
+          return fieldValue.includes(searchValue.toLowerCase().trim());
+        });
+      }
 
       modalStateRef.current = {
         ...modalStateRef.current,
         isLoading: false,
-        data: dataMap[type]
+        data: modalData
       };
       
       setModalForceUpdate(prev => prev + 1);
@@ -2579,6 +2598,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         isLoading={modalStateRef.current.isLoading}
         data={modalStateRef.current.data}
         error={modalStateRef.current.error}
+        initialFilterField={searchField}
+        initialFilterValue={searchValue}
       />
 
       {/* Modal de Período Personalizado */}

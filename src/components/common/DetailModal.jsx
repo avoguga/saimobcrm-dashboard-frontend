@@ -1,4 +1,4 @@
-import React, { memo, useState, useMemo } from 'react';
+import React, { memo, useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 // Paleta de cores da SA IMOB
@@ -16,10 +16,22 @@ const COLORS = {
 };
 
 // Memoized Modal Component to prevent parent re-renders
-const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error }) => {
+const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error, initialFilterField, initialFilterValue }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
-  const [filterField, setFilterField] = useState('Nome do Lead');
-  const [filterValue, setFilterValue] = useState('');
+  const [filterField, setFilterField] = useState(initialFilterField || 'Nome do Lead');
+  const [filterValue, setFilterValue] = useState(initialFilterValue || '');
+  
+  // Atualizar os filtros quando o modal abrir com novos valores iniciais
+  useEffect(() => {
+    if (isOpen) {
+      if (initialFilterField) {
+        setFilterField(initialFilterField);
+      }
+      if (initialFilterValue) {
+        setFilterValue(initialFilterValue);
+      }
+    }
+  }, [isOpen, initialFilterField, initialFilterValue]);
   
   const getFilterOptions = () => {
     const commonFields = ['Nome do Lead', 'Corretor', 'Fonte', 'Anúncio', 'Público', 'Produto'];
