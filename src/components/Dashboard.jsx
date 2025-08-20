@@ -513,7 +513,16 @@ function Dashboard() {
 
     // Limpar cache se for refresh forçado
     if (forceRefresh) {
+      // Limpar cache local
       KommoAPI.clearCache();
+      
+      // Limpar cache do backend (Kommo)
+      try {
+        await KommoAPI.flushKommoCache();
+      } catch (error) {
+        console.error('Erro ao limpar cache do Kommo:', error);
+        // Continuar mesmo se falhar a limpeza do cache do backend
+      }
     }
 
     if (activeTab === 'marketing') {

@@ -2224,12 +2224,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             <div 
               className="mini-metric-card"
-              onClick={() => openModal('propostas')}
-              onKeyDown={(e) => e.key === 'Enter' && openModal('propostas')}
-              tabIndex={0}
-              role="button"
-              aria-label="Clique para ver detalhes das propostas realizadas"
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'default' }}
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.secondary }}>

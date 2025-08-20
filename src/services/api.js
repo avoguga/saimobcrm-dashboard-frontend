@@ -37,10 +37,36 @@ export const KommoAPI = {
   },
 
   /**
-   * Limpa todo o cache
+   * Limpa todo o cache local
    */
   clearCache() {
     this._cache.clear();
+  },
+
+  /**
+   * Limpa o cache do backend (Kommo)
+   */
+  async flushKommoCache() {
+    try {
+      const response = await fetch(`${API_URL}/cache/flush/kommo`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ao limpar cache do Kommo: ${response.status} - ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Cache do Kommo limpo com sucesso:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Erro ao limpar cache do Kommo:', error);
+      throw error;
+    }
   },
 
   /**
