@@ -263,6 +263,10 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   const [salesData, setSalesData] = useState(data); // Dados filtrados
   const [comparisonData, setComparisonData] = useState(null);
   
+  // Estados para filtro de busca avançada
+  const [searchField, setSearchField] = useState('Corretor');
+  const [searchValue, setSearchValue] = useState('');
+  
   // Estado do modal usando ref para não causar re-renders
   const modalStateRef = useRef({
     isOpen: false,
@@ -662,17 +666,81 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       };
     }
 
+
+    // Função para filtrar por busca avançada
+    const filterByAdvancedSearch = (users) => {
+      if (!searchValue.trim()) return users;
+      
+      return users.filter(user => {
+        // Se o campo de busca é "Corretor", buscar pelo nome do corretor
+        if (searchField === 'Corretor') {
+          const corretorName = user.name || '';
+          return corretorName.toLowerCase().includes(searchValue.toLowerCase().trim());
+        }
+        
+        // Para outros campos, buscar nos leads individuais
+        // Se não tem leads individuais, manter na lista (pode ser dados antigos)
+        if (!user.leads || !Array.isArray(user.leads) || user.leads.length === 0) {
+          return true; // Manter usuários sem leads individuais
+        }
+        
+        // Verificar se algum lead individual tem o valor buscado
+        return user.leads.some(lead => {
+          let fieldValue = '';
+          
+          switch (searchField) {
+            case 'Nome do Lead':
+              fieldValue = lead.leadName || lead.name || lead.client_name || '';
+              break;
+            case 'Fonte':
+              fieldValue = lead.fonte || lead.source || lead.utm_source || '';
+              break;
+            case 'Anúncio':
+              fieldValue = lead.anuncio || lead.ad || lead.advertisement || lead.utm_campaign || '';
+              break;
+            case 'Público':
+              fieldValue = lead.publico || lead.audience || lead.publicoAlvo || lead.target_audience || '';
+              break;
+            case 'Produto':
+              fieldValue = lead.produto || lead.product || lead.empreendimento || '';
+              break;
+            case 'Funil':
+              fieldValue = lead.funil || lead.funnel || lead.pipeline || lead.pipeline_name || '';
+              break;
+            case 'Etapa':
+              fieldValue = lead.etapa || lead.stage || lead.status || lead.stage_name || '';
+              break;
+            default:
+              fieldValue = lead.leadName || lead.name || lead.client_name || '';
+          }
+          
+          return fieldValue.toLowerCase().includes(searchValue.toLowerCase().trim());
+        });
+      });
+    };
+
+    // Debug temporário para diagnosticar o problema
+    const originalData = [...salesData.leadsByUser].filter(user => user.name !== 'SA IMOB');
+    const filteredData = filterByAdvancedSearch(originalData);
+    
+    console.log('🔍 DEBUG Leads Data:');
+    console.log('Original data:', originalData);
+    console.log('Filtered data:', filteredData);
+    console.log('SearchValue:', searchValue);
+    console.log('SearchField:', searchField);
+    console.log('Original count:', originalData.length);
+    console.log('Filtered count:', filteredData.length);
+    console.log('Original total leads:', originalData.reduce((sum, user) => sum + (user.value || 0), 0));
+    console.log('Filtered total leads:', filteredData.reduce((sum, user) => sum + (user.value || 0), 0));
+
     return {
       // Ordenar por total de leads (value) - decrescente
-      // Filtrar corretores válidos
-      sortedLeadsData: [...salesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB' )
-        .sort((a, b) => (b.value || 0) - (a.value || 0)),
+      // Filtrar corretores válidos e por busca avançada
+      sortedLeadsData: filteredData.sort((a, b) => (b.value || 0) - (a.value || 0)),
         
       // Ordenar por reuniões - decrescente  
-      // Filtrar corretores válidos
-      sortedMeetingsData: [...salesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB' )
+      // Usar os mesmos dados filtrados para consistência
+      sortedMeetingsData: filteredData
         .map(user => ({
           ...user,
           meetingsHeld: user.meetingsHeld || user.meetings || 0
@@ -680,12 +748,11 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0)),
         
       // Ordenar por vendas - decrescente
-      // Filtrar corretores válidos
-      sortedSalesData: [...salesData.leadsByUser]
-        .filter(user => user.name !== 'SA IMOB' )
+      // Usar os mesmos dados filtrados para consistência
+      sortedSalesData: filteredData
         .sort((a, b) => (b.sales || 0) - (a.sales || 0))
     };
-  }, [salesData?.leadsByUser]);
+  }, [salesData?.leadsByUser, searchField, searchValue]);
 
   // Mini Metric Card Component
   const MiniMetricCard = ({ title, value, subtitle, color = COLORS.primary }) => (
@@ -1642,6 +1709,132 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           }
         }
 
+        /* Estilos para filtro de busca avançada */
+        .advanced-search-filter {
+          display: flex;
+          gap: 4px;
+          align-items: center;
+          min-width: 300px;
+          flex: 1;
+          max-width: 400px;
+        }
+
+        .search-field-selector {
+          flex-shrink: 0;
+        }
+
+        .search-field-select {
+          padding: 10px 12px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px 0 0 8px;
+          font-size: 14px;
+          color: #2d3748;
+          transition: all 0.2s ease;
+          min-height: 42px;
+          height: 42px;
+          box-sizing: border-box;
+          outline: none;
+          border-right: 1px solid #e2e8f0;
+          min-width: 100px;
+        }
+
+        .search-field-select:hover,
+        .search-field-select:focus {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+        }
+
+        .search-input-container {
+          display: flex;
+          align-items: center;
+          position: relative;
+          flex: 1;
+        }
+
+        .search-value-input {
+          flex: 1;
+          padding: 10px 12px;
+          background: white;
+          border: 2px solid #e2e8f0;
+          border-radius: 0 8px 8px 0;
+          border-left: none;
+          font-size: 14px;
+          color: #2d3748;
+          transition: all 0.2s ease;
+          min-height: 42px;
+          height: 42px;
+          box-sizing: border-box;
+          outline: none;
+        }
+
+        .search-value-input:hover,
+        .search-value-input:focus {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+        }
+
+        .search-value-input::placeholder {
+          color: #a0aec0;
+        }
+
+        .search-clear-button {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #a0aec0;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px;
+          line-height: 1;
+          transition: color 0.2s ease;
+        }
+
+        .search-clear-button:hover {
+          color: #4E5859;
+        }
+
+        /* Responsividade para filtro de busca avançada */
+        @media (max-width: 768px) {
+          .advanced-search-filter {
+            min-width: 250px;
+          }
+          
+          .search-field-select,
+          .search-value-input {
+            padding: 8px 10px;
+            font-size: 13px;
+            min-height: 38px;
+          }
+          
+          .search-field-select {
+            min-width: 80px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .advanced-search-filter {
+            min-width: unset;
+            max-width: none;
+            flex-direction: column;
+            gap: 8px;
+          }
+          
+          .search-field-select {
+            border-radius: 8px;
+            border-right: 2px solid #e2e8f0;
+            width: 100%;
+          }
+          
+          .search-value-input {
+            border-radius: 8px;
+            border-left: 2px solid #e2e8f0;
+          }
+        }
+
         /* Estilos para o indicador de filtros ativos */
         .filter-indicator {
           display: flex;
@@ -1833,6 +2026,47 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 onChange={(values) => setPendingSource(values.length === 0 ? '' : values.join(','))}
                 placeholder="Todas as Fontes"
               />
+
+              {/* Filtro de busca avançada */}
+              <div className="advanced-search-filter">
+                <div className="search-field-selector">
+                  <select
+                    value={searchField}
+                    onChange={(e) => {
+                      setSearchField(e.target.value);
+                      setSearchValue(''); // Limpar valor quando mudar o campo
+                    }}
+                    className="search-field-select"
+                  >
+                    <option value="Nome do Lead">Nome do Lead</option>
+                    <option value="Corretor">Corretor</option>
+                    <option value="Fonte">Fonte</option>
+                    <option value="Anúncio">Anúncio</option>
+                    <option value="Público">Público</option>
+                    <option value="Produto">Produto</option>
+                    <option value="Funil">Funil</option>
+                    <option value="Etapa">Etapa</option>
+                  </select>
+                </div>
+                <div className="search-input-container">
+                  <input
+                    type="text"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    placeholder={`Buscar por ${searchField.toLowerCase()}...`}
+                    className="search-value-input"
+                  />
+                  {searchValue && (
+                    <button
+                      onClick={() => setSearchValue('')}
+                      className="search-clear-button"
+                      title="Limpar busca"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* Botão para aplicar filtros */}
               {hasPendingFilters() && (
@@ -2044,7 +2278,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       <div className="dashboard-row" style={{ flexDirection: 'column' }}>
         {salesData?.leadsByUser && salesData.leadsByUser.length > 0 ? (
           <>
-            <div className="card card-full">
+            <div className="card card-full" key={`leads-${searchField}-${searchValue}`}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Leads criados no período (CRM)</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2072,7 +2306,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                     }}
                     title="Clique para ver detalhes dos leads"
                   >
-                    Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.organicLeads || 0) + (user.paidLeads || 0), 0)}
+                    Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0)}
                   </span>
                   <button
                     onClick={handleExportLeads}
@@ -2104,20 +2338,16 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   </button>
                 </div>
               </div>
-              <GroupedBarChart 
-                data={sortedChartsData.sortedLeadsData.map(user => ({
-                  name: user.name,
-                  organicos: user.organicLeads || 0,
-                  pagos: user.paidLeads || 0
-                }))}
+              <CompactChart 
+                type="bar"
+                data={sortedChartsData.sortedLeadsData}
+                config={chartConfigs.leadsConfig}
                 style={chartStyle}
-                loading={false}
-                title="Leads por Corretor"
-                onBarClick={(corretorName, value, params, seriesName) => openModalByCorretor('leads', corretorName, value, params, seriesName)}
+                onBarClick={(corretorName) => openModalByCorretor('leads', corretorName)}
               />
             </div>
             
-            <div className="card card-full">
+            <div className="card card-full" key={`meetings-${searchField}-${searchValue}`}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Rank Corretores - Reunião</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2186,7 +2416,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   />
             </div>
             
-            <div className="card card-full">
+            <div className="card card-full" key={`sales-${searchField}-${searchValue}`}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Rank Corretores - Venda</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
