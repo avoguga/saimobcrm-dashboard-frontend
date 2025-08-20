@@ -671,21 +671,23 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     const filterByAdvancedSearch = (users) => {
       if (!searchValue.trim()) return users;
       
-      return users.filter(user => {
-        // Se o campo de busca é "Corretor", buscar pelo nome do corretor
-        if (searchField === 'Corretor') {
+      // Se o campo de busca é "Corretor", filtrar apenas pelos corretores
+      if (searchField === 'Corretor') {
+        return users.filter(user => {
           const corretorName = user.name || '';
           return corretorName.toLowerCase().includes(searchValue.toLowerCase().trim());
-        }
-        
-        // Para outros campos, buscar nos leads individuais
-        // Se não tem leads individuais, manter na lista (pode ser dados antigos)
+        });
+      }
+      
+      // Para outros campos, filtrar os leads individuais e recalcular as métricas
+      return users.map(user => {
+        // Se não tem leads individuais, remover o usuário da lista
         if (!user.leads || !Array.isArray(user.leads) || user.leads.length === 0) {
-          return true; // Manter usuários sem leads individuais
+          return null;
         }
         
-        // Verificar se algum lead individual tem o valor buscado
-        return user.leads.some(lead => {
+        // Filtrar apenas os leads que correspondem ao critério
+        const filteredLeads = user.leads.filter(lead => {
           let fieldValue = '';
           
           switch (searchField) {
@@ -716,22 +718,46 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           
           return fieldValue.toLowerCase().includes(searchValue.toLowerCase().trim());
         });
-      });
+        
+        // Se não há leads filtrados, remover o usuário
+        if (filteredLeads.length === 0) {
+          return null;
+        }
+        
+        // Recalcular as métricas baseado nos leads filtrados
+        const meetingsHeld = filteredLeads.filter(lead => 
+          lead.etapa?.toLowerCase().includes('reunião') || 
+          lead.status_id === 80689731
+        ).length;
+        
+        const proposalsHeld = filteredLeads.filter(lead => 
+          lead.is_proposta === true || 
+          lead.etapa?.toLowerCase().includes('proposta')
+        ).length;
+        
+        const sales = filteredLeads.filter(lead => 
+          lead.etapa?.toLowerCase().includes('venda') || 
+          lead.etapa?.toLowerCase().includes('vendido') ||
+          lead.etapa?.toLowerCase().includes('ganho')
+        ).length;
+        
+        // Retornar o usuário com os leads filtrados e métricas recalculadas
+        return {
+          ...user,
+          leads: filteredLeads,
+          value: filteredLeads.length,
+          active: filteredLeads.length,
+          meetingsHeld: meetingsHeld,
+          meetings: meetingsHeld,
+          proposalsHeld: proposalsHeld,
+          sales: sales
+        };
+      }).filter(user => user !== null); // Remover usuários nulos
     };
 
-    // Debug temporário para diagnosticar o problema
+    // Filtrar dados e aplicar busca avançada
     const originalData = [...salesData.leadsByUser].filter(user => user.name !== 'SA IMOB');
     const filteredData = filterByAdvancedSearch(originalData);
-    
-    console.log('🔍 DEBUG Leads Data:');
-    console.log('Original data:', originalData);
-    console.log('Filtered data:', filteredData);
-    console.log('SearchValue:', searchValue);
-    console.log('SearchField:', searchField);
-    console.log('Original count:', originalData.length);
-    console.log('Filtered count:', filteredData.length);
-    console.log('Original total leads:', originalData.reduce((sum, user) => sum + (user.value || 0), 0));
-    console.log('Filtered total leads:', filteredData.reduce((sum, user) => sum + (user.value || 0), 0));
 
     return {
       // Ordenar por total de leads (value) - decrescente
