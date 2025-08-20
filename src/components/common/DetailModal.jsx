@@ -42,7 +42,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
       case 'reunioes':
         return ['Data da Reunião', ...commonFields, 'Funil', 'Etapa'];
       case 'propostas':
-        return ['Data da Proposta', ...commonFields];
+        return ['Data da Proposta', ...commonFields, 'Proposta'];
       case 'vendas':
         return ['Data da Venda', ...commonFields, 'Valor da Venda'];
       default:
@@ -65,6 +65,21 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
     let filteredData = data;
     if (filterValue.trim() !== '') {
       filteredData = data.filter(item => {
+        // Tratamento especial para o campo "Proposta"
+        if (filterField === 'Proposta') {
+          const isProposal = item['is_proposta'] === true;
+          const filterLower = filterValue.toLowerCase();
+          
+          if (filterLower.includes('sim') || filterLower.includes('yes') || filterLower.includes('true')) {
+            return isProposal;
+          } else if (filterLower.includes('não') || filterLower.includes('nao') || filterLower.includes('no') || filterLower.includes('false')) {
+            return !isProposal;
+          }
+          // Se não conseguir determinar, buscar no texto
+          const propostaText = isProposal ? 'sim' : 'não';
+          return propostaText.includes(filterLower);
+        }
+        
         const fieldValue = (item[filterField] || '').toString().toLowerCase();
         return fieldValue.includes(filterValue.toLowerCase());
       });
@@ -326,6 +341,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Produto', 'Produto')}
                         {renderSortableHeader('Anúncio', 'Anúncio')}
                         {renderSortableHeader('Público', 'Público-Alvo')}
+                        {renderSortableHeader('Proposta', 'Proposta')}
                       </>
                     )}
                     {type === 'vendas' && (
@@ -390,6 +406,31 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Produto'] || 'N/A'}</td>
                           <td style={{ padding: '12px' }}>{item['Anúncio'] || 'N/A'}</td>
                           <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            {item['is_proposta'] === true ? (
+                              <span style={{ 
+                                color: '#28a745', 
+                                fontWeight: 'bold',
+                                backgroundColor: '#d4edda',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px'
+                              }}>
+                                ✓ SIM
+                              </span>
+                            ) : (
+                              <span style={{ 
+                                color: '#dc3545', 
+                                fontWeight: 'bold',
+                                backgroundColor: '#f8d7da',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px'
+                              }}>
+                                ✗ NÃO
+                              </span>
+                            )}
+                          </td>
                         </>
                       )}
                       {type === 'vendas' && (

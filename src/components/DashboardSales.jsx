@@ -469,10 +469,42 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       
       // Se é tipo propostas ou vendas, usar os dados específicos
       if (type === 'propostas') {
-        modalData = tablesData.propostasDetalhes || [];
+        // Para propostas, buscar dos leads se não vier do backend
+        if (tablesData.propostasDetalhes && tablesData.propostasDetalhes.length > 0) {
+          modalData = tablesData.propostasDetalhes;
+        } else {
+          // Buscar propostas dos leads do corretor específico
+          if (!salesData?.leadsByUser) {
+            modalData = [];
+          } else {
+            const user = salesData.leadsByUser.find(u => u.name === corretorName);
+            if (user && user.leads && Array.isArray(user.leads)) {
+              modalData = user.leads
+                .filter(lead => 
+                  lead.is_proposta === true || 
+                  lead.etapa?.toLowerCase().includes('proposta')
+                )
+                .map(lead => ({
+                  'Data da Proposta': lead.createdDate || lead.created_date || 'N/A',
+                  'Nome do Lead': lead.leadName || lead.name || lead.client_name || 'N/A',
+                  'Corretor': corretorName,
+                  'Fonte': lead.fonte || lead.source || 'N/A',
+                  'Produto': lead.produto || lead.product || 'N/A',
+                  'Anúncio': lead.anuncio || lead.ad || 'N/A',
+                  'Público': lead.publico || lead.audience || 'N/A',
+                  'is_proposta': lead.is_proposta,
+                  'Etapa': lead.etapa || lead.stage || 'N/A'
+                }));
+            } else {
+              modalData = [];
+            }
+          }
+        }
       } else if (type === 'vendas') {
         modalData = tablesData.vendasDetalhes || [];
       }
+      
+      // Não filtrar propostas, pois propostasDetalhes já vem com os dados corretos do backend
       
       // Aplicar pré-filtro se houver filtro ativo no dashboard (exceto para filtro de corretor)
       if (searchValue && searchField && searchField !== 'Corretor') {
@@ -569,15 +601,63 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       // Buscar dados sem filtros de backend (filtragem será feita no frontend)
       const tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       
+      // Para propostas, vamos buscar dos leads que têm propostas usando a mesma lógica do leadsByUser
+      const getAllProposals = () => {
+        // Se não temos propostasDetalhes, vamos buscar dos leadsByUser
+        if (!salesData?.leadsByUser) return [];
+        
+        const allProposals = [];
+        
+        // Percorrer cada corretor e seus leads
+        salesData.leadsByUser.forEach(user => {
+          if (user.leads && Array.isArray(user.leads)) {
+            // Filtrar leads que são propostas usando a mesma lógica do dashboard
+            const userProposals = user.leads.filter(lead => 
+              lead.is_proposta === true || 
+              lead.etapa?.toLowerCase().includes('proposta')
+            );
+            
+            // Adicionar informações do corretor em cada lead
+            userProposals.forEach(lead => {
+              allProposals.push({
+                'Data da Proposta': lead.createdDate || lead.created_date || 'N/A',
+                'Nome do Lead': lead.leadName || lead.name || lead.client_name || 'N/A',
+                'Corretor': user.name || 'N/A',
+                'Fonte': lead.fonte || lead.source || 'N/A',
+                'Produto': lead.produto || lead.product || 'N/A',
+                'Anúncio': lead.anuncio || lead.ad || 'N/A',
+                'Público': lead.publico || lead.audience || 'N/A',
+                'is_proposta': lead.is_proposta,
+                'Etapa': lead.etapa || lead.stage || 'N/A'
+              });
+            });
+          }
+        });
+        
+        return allProposals;
+      };
+      
       const dataMap = {
         'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
         'reunioes': tablesData.reunioesDetalhes || [],
-        'propostas': tablesData.propostasDetalhes || [],
+        'propostas': tablesData.propostasDetalhes?.length > 0 ? tablesData.propostasDetalhes : getAllProposals(),
         'vendas': tablesData.vendasDetalhes || []
       };
       
+      // Debug para entender o que está vindo do backend
+      console.log('📊 Modal Data Debug:', {
+        type,
+        propostasFromBackend: tablesData.propostasDetalhes?.length,
+        propostasFromLeads: getAllProposals().length,
+        firstProposal: dataMap.propostas?.[0],
+        totalProposalsInCard: salesData?.totalProposals
+      });
+      
       // Aplicar pré-filtro se houver filtro ativo no dashboard
       let modalData = dataMap[type];
+      
+      // Não filtrar propostas, pois propostasDetalhes já vem com os dados corretos do backend
+      
       if (searchValue && searchField) {
         modalData = modalData.filter(item => {
           const fieldValue = (item[searchField] || '').toString().toLowerCase();
@@ -2224,7 +2304,12 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             <div 
               className="mini-metric-card"
-              style={{ cursor: 'default' }}
+              onClick={() => openModal('propostas')}
+              onKeyDown={(e) => e.key === 'Enter' && openModal('propostas')}
+              tabIndex={0}
+              role="button"
+              aria-label="Clique para ver detalhes das propostas realizadas"
+              style={{ cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
