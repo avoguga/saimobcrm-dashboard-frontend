@@ -2313,10 +2313,10 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
-                  {salesData?.totalProposals || (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0) : 0)}
+                  {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0)}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData?.totalProposals || (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0) : 0);
+                  const current = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
                   const previous = comparisonData?.previousPeriod?.totalProposals || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -2325,8 +2325,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
-                    const totalProposals = salesData?.totalProposals || (salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0) : 0);
-                    const totalMeetings = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
+                    const totalProposals = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
+                    const totalMeetings = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
                     const conversionRate = totalMeetings > 0 ? (totalProposals / totalMeetings) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
@@ -2346,10 +2346,10 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  {salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0)}
+                  {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0);
+                  const current = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
                   const previous = comparisonData?.previousPeriod?.totalSales || salesData?.previousWonLeads || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -2358,8 +2358,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
-                    const totalSales = salesData?.wonLeads || (salesData?.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.sales || 0), 0) : 0);
-                    const totalProposals = salesData?.proposalStats?.total || 0;
+                    const totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    const totalProposals = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
                     const conversionRate = totalProposals > 0 ? (totalSales / totalProposals) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
@@ -2370,10 +2370,18 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  R$ {(salesData?.averageDealSize || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(() => {
+                    // Usar dados da primeira requisição (salesData.kpis.sales) se disponível, senão calcular pelos usuários
+                    const totalSales = salesData?.kpis?.sales?.total || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    const totalRevenue = salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
+                    const avgDealSize = salesData?.kpis?.sales?.avg_deal_size || (totalSales > 0 ? (totalRevenue / totalSales) : 0);
+                    return avgDealSize;
+                  })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData?.averageDealSize || 0;
+                  const totalSales = salesData?.kpis?.sales?.total || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                  const totalRevenue = salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
+                  const current = salesData?.kpis?.sales?.avg_deal_size || (totalSales > 0 ? (totalRevenue / totalSales) : 0);
                   const previous = comparisonData?.previousPeriod?.averageDealSize || salesData?.previousAverageDealSize || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -2383,10 +2391,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  R$ {(salesData?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(() => {
+                    // Usar dados da primeira requisição (salesData.kpis.sales.total_revenue) se disponível
+                    return salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
+                  })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData?.totalRevenue || 0;
+                  const current = salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
                   const previous = comparisonData?.previousPeriod?.totalRevenue || (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
