@@ -2371,17 +2371,38 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
                   R$ {(() => {
-                    // Usar dados da primeira requisição (salesData.kpis.sales) se disponível, senão calcular pelos usuários
-                    const totalSales = salesData?.kpis?.sales?.total || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                    const totalRevenue = salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
-                    const avgDealSize = salesData?.kpis?.sales?.avg_deal_size || (totalSales > 0 ? (totalRevenue / totalSales) : 0);
+                    // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
+                    const hasFilter = searchValue.trim() !== '';
+                    
+                    let totalSales, totalRevenue, avgDealSize;
+                    
+                    if (hasFilter) {
+                      // Com filtro: usar o ticket médio global aplicado às vendas filtradas
+                      // (pois não temos dados de receita por lead individual)
+                      totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                      const globalAvgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
+                      totalRevenue = totalSales * globalAvgDealSize;
+                      avgDealSize = globalAvgDealSize;
+                    } else {
+                      // Sem filtro: usar dados globais da API
+                      totalSales = salesData?.kpis?.sales?.total || 0;
+                      totalRevenue = salesData?.kpis?.sales?.total_revenue || 0;
+                      avgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
+                    }
                     return avgDealSize;
                   })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  const totalSales = salesData?.kpis?.sales?.total || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                  const totalRevenue = salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
-                  const current = salesData?.kpis?.sales?.avg_deal_size || (totalSales > 0 ? (totalRevenue / totalSales) : 0);
+                  const hasFilter = searchValue.trim() !== '';
+                  
+                  let current;
+                  if (hasFilter) {
+                    // Com filtro: manter o ticket médio global (pois não temos dados de receita individual)
+                    current = salesData?.kpis?.sales?.avg_deal_size || 0;
+                  } else {
+                    // Sem filtro: usar dados globais da API
+                    current = salesData?.kpis?.sales?.avg_deal_size || 0;
+                  }
                   const previous = comparisonData?.previousPeriod?.averageDealSize || salesData?.previousAverageDealSize || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -2392,12 +2413,33 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
                   R$ {(() => {
-                    // Usar dados da primeira requisição (salesData.kpis.sales.total_revenue) se disponível
-                    return salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
+                    // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
+                    const hasFilter = searchValue.trim() !== '';
+                    
+                    if (hasFilter) {
+                      // Com filtro: calcular receita estimada (vendas filtradas * ticket médio global)
+                      const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                      const globalAvgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
+                      return filteredSales * globalAvgDealSize;
+                    } else {
+                      // Sem filtro: usar dados globais da API
+                      return salesData?.kpis?.sales?.total_revenue || 0;
+                    }
                   })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData?.kpis?.sales?.total_revenue || sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalRevenue || user.receitaTotal || 0), 0);
+                  const hasFilter = searchValue.trim() !== '';
+                  
+                  let current;
+                  if (hasFilter) {
+                    // Com filtro: calcular receita estimada (vendas filtradas * ticket médio global)
+                    const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    const globalAvgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
+                    current = filteredSales * globalAvgDealSize;
+                  } else {
+                    // Sem filtro: usar dados globais da API
+                    current = salesData?.kpis?.sales?.total_revenue || 0;
+                  }
                   const previous = comparisonData?.previousPeriod?.totalRevenue || (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
