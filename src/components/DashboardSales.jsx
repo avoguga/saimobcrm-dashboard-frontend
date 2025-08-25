@@ -2281,10 +2281,10 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.primary }}>
-                  {salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0}
+                  {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
                 </div>
                 <TrendIndicator value={(() => {
-                  const current = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
+                  const current = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
                   const previous = comparisonData?.previousPeriod?.totalMeetings || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -2293,7 +2293,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
-                    const totalMeetings = salesData.leadsByUser ? salesData.leadsByUser.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0) : 0;
+                    const totalMeetings = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
                     const totalLeads = salesData.totalLeads || 0;
                     const conversionRate = totalLeads > 0 ? (totalMeetings / totalLeads) * 100 : 0;
                     return conversionRate.toFixed(1);
