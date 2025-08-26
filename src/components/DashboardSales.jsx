@@ -723,26 +723,27 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
   const chartData = useMemo(() => {
     if (salesData?.analyticsTeam?.user_performance?.length > 0) {
       // Mapear dados e ordenar cada categoria separadamente
-      const leadsData = salesData.analyticsTeam.user_performance
+      // Criar cópia do array antes de ordenar para garantir ordenação decrescente consistente
+      const leadsData = [...salesData.analyticsTeam.user_performance]
         .map(user => ({
           name: user.user_name,
           value: user.new_leads || 0
         }))
-        .sort((a, b) => b.value - a.value); // Ordenar decrescente
+        .sort((a, b) => b.value - a.value); // Ordenar decrescente (maior para menor)
 
-      const activitiesData = salesData.analyticsTeam.user_performance
+      const activitiesData = [...salesData.analyticsTeam.user_performance]
         .map(user => ({
           name: user.user_name,
           value: user.activities || 0
         }))
-        .sort((a, b) => b.value - a.value); // Ordenar decrescente
+        .sort((a, b) => b.value - a.value); // Ordenar decrescente (maior para menor)
 
-      const wonDealsData = salesData.analyticsTeam.user_performance
+      const wonDealsData = [...salesData.analyticsTeam.user_performance]
         .map(user => ({
           name: user.user_name,
           value: user.won_deals || 0
         }))
-        .sort((a, b) => b.value - a.value); // Ordenar decrescente
+        .sort((a, b) => b.value - a.value); // Ordenar decrescente (maior para menor)
 
       return {
         leadsData,
