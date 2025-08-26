@@ -1222,13 +1222,21 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       let updateOption = {};
 
       if (type === 'bar') {
+        // Garantir ordenação decrescente antes de passar para o gráfico
+        const sortedData = [...data].sort((a, b) => {
+          const valueA = Number(a[config.yKey] || 0);
+          const valueB = Number(b[config.yKey] || 0);
+          const diff = valueB - valueA; // Decrescente
+          return diff !== 0 ? diff : (a[config.xKey] || '').localeCompare(b[config.xKey] || '');
+        });
+        
         updateOption = {
           xAxis: {
-            data: data.map(item => item[config.xKey])
+            data: sortedData.map(item => item[config.xKey])
           },
           series: [{
             name: config.name || 'Data', // Use name for navigation
-            data: data.map(item => item[config.yKey]),
+            data: sortedData.map(item => item[config.yKey]),
             itemStyle: { 
               color: config.color,
               emphasis: {
