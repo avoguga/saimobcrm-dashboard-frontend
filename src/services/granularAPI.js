@@ -7,14 +7,10 @@
  * APENAS métodos REALMENTE usados pelo Dashboard.jsx
  */
 
-import { MockDataService } from './mockDataService';
 
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohenrique.dev';
 
-// Flags HONESTAS por módulo
-const USE_MOCK_SALES = false; // ✅ VENDAS: Endpoints V2 implementados!
-const USE_MOCK_MARKETING = false; // ✅ MARKETING: Endpoints implementados!
 
 export class GranularAPI {
   /**
@@ -50,26 +46,7 @@ export class GranularAPI {
     console.time('Sales Dashboard V2 Load');
     
     try {
-      if (USE_MOCK_SALES) {
-        // Usar mocks (desenvolvimento)
-        const [kpis, leadsByUser, conversionRates, pipelineStatus] = await Promise.all([
-          MockDataService.getSalesKPIs(days, corretor, fonte, customDates),
-          MockDataService.getLeadsByUserChart(days, corretor, fonte),
-          MockDataService.getConversionRates(days, corretor, fonte),
-          MockDataService.getPipelineStatus(days, corretor, fonte)
-        ]);
-
-        console.timeEnd('Sales Dashboard V2 Load');
-
-        return {
-          ...kpis,
-          leadsByUser: leadsByUser.leadsByUser || [],
-          conversionRates: conversionRates.conversionRates || {},
-          funnelData: conversionRates.funnelData || [],
-          pipelineStatus: pipelineStatus.pipelineStatus || [], // V2: Corrigido de leadsByStage
-          _metadata: { mockData: true, granular: true }
-        };
-      } else {
+      // Usar endpoints V2 reais
         // Usar endpoints V2 reais
         const params = new URLSearchParams();
         
@@ -134,8 +111,7 @@ export class GranularAPI {
           pipelineStatus: pipelineStatus.pipelineStatus || [], // V2: Corrigido de leadsByStage
           _metadata: { realAPI: true, granular: true, v2Endpoints: true }
         };
-      }
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Erro no carregamento do dashboard de vendas:', error);
       throw error;
     }
@@ -149,138 +125,122 @@ export class GranularAPI {
     console.time('Marketing Dashboard Load');
     
     try {
-      if (USE_MOCK_MARKETING) {
-        // Usar mocks (backend ainda não implementou)
-        const [kpis, leadsBySource] = await Promise.all([
-          MockDataService.getMarketingKPIs(days, fonte, customDates),
-          MockDataService.getLeadsBySource(days, fonte)
-        ]);
-
-        console.timeEnd('Marketing Dashboard Load');
-
-        return {
-          ...kpis,
-          leadsBySource: leadsBySource.leadsBySource || [],
-          _metadata: { mockData: true, granular: true }
-        };
+      // Usar endpoints reais de marketing
+      const params = new URLSearchParams();
+      
+      // Suporte a período customizado
+      if (customDates && customDates.start_date && customDates.end_date) {
+        params.append('start_date', customDates.start_date);
+        params.append('end_date', customDates.end_date);
       } else {
-        // Usar endpoints reais de marketing
-        const params = new URLSearchParams();
-        
-        // Suporte a período customizado
-        if (customDates && customDates.start_date && customDates.end_date) {
-          params.append('start_date', customDates.start_date);
-          params.append('end_date', customDates.end_date);
-        } else {
-          params.append('days', days);
-        }
-        
-        if (fonte) params.append('fonte', fonte);
-
-        // DEBUG: Log marketing params before adding campaign filters
-        console.log('🔍 Marketing API Base Params:', {
-          fonte,
-          days,
-          customDates,
-          paramsString: params.toString()
-        });
-
-        // Adicionar filtros de campanhas Facebook
-        if (campaignFilters.campaignIds && campaignFilters.campaignIds.length > 0) {
-          campaignFilters.campaignIds.forEach(id => {
-            params.append('campaign_ids[]', id);
-          });
-        }
-        
-        if (campaignFilters.status && campaignFilters.status.length > 0) {
-          campaignFilters.status.forEach(s => {
-            params.append('campaign_status[]', s);
-          });
-        }
-        
-        if (campaignFilters.objective && campaignFilters.objective.length > 0) {
-          campaignFilters.objective.forEach(obj => {
-            params.append('campaign_objective[]', obj);
-          });
-        }
-        
-        if (campaignFilters.searchTerm) {
-          params.append('campaign_search', campaignFilters.searchTerm);
-        }
-
-        // DEBUG: Log final marketing API call
-        console.log('🔍 Marketing API Final URL:', `${API_URL}/dashboard/marketing-complete?${params}`);
-
-        // Mapear periodo para preset WhatsApp
-        let whatsappPreset = 'last_30d';
-        if (days <= 7) whatsappPreset = 'last_7d';
-        
-        // Buscar dados de marketing em paralelo com WhatsApp, gênero e campanhas
-        const [marketingData, whatsappData, genderData, campaignsData] = await Promise.all([
-          fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json()),
-          this.getWhatsAppMetrics(whatsappPreset),
-          this.getGenderSegmentation(whatsappPreset),
-          fetch(`${API_URL}/facebook-ads/campaigns`).then(r => r.json()).catch(() => ({ campaigns: [] }))
-        ]);
-
-        console.timeEnd('Marketing Dashboard Load');
-
-        // Combinar dados usando summary conforme guia do backend
-        const whatsappSummary = whatsappData.summary || {};
-        const genderSegments = genderData.data || [];
-        
-        // Converter dados de gênero para formato esperado pelo chart
-        const genderData_formatted = genderSegments.map(segment => ({
-          name: segment.genero === 'male' ? 'Masculino' : 
-                segment.genero === 'female' ? 'Feminino' : 
-                segment.genero === 'unknown' ? 'Não informado' :
-                segment.genero,
-          value: segment.leads || 0
-        }));
-
-        const enhancedData = {
-          ...marketingData,
-          // Substituir dados mock com dados reais do WhatsApp
-          whatsappConversations: whatsappSummary.total_conversations || 0,
-          profileVisits: whatsappSummary.total_profile_visits || 0,
-          whatsappSpend: whatsappSummary.total_spend || 0,
-          // Substituir dados mock com dados reais de gênero
-          genderData: genderData_formatted,
-          // Adicionar campanhas Facebook para o filtro
-          facebookCampaigns: campaignsData.campaigns || campaignsData.data || [],
-          _metadata: { 
-            ...marketingData._metadata,
-            whatsappIntegrated: true,
-            genderIntegrated: true,
-            campaignsIntegrated: true,
-            whatsappEndpoint: '/facebook-ads/whatsapp/insights',
-            genderEndpoint: '/facebook-ads/leads/segmentation',
-            campaignsEndpoint: '/facebook-ads/campaigns'
-          }
-        };
-
-        console.log('✅ Dados integrados:', {
-          whatsapp: {
-            conversations: whatsappSummary.total_conversations,
-            profileVisits: whatsappSummary.total_profile_visits,
-            spend: whatsappSummary.total_spend
-          },
-          gender: {
-            raw: genderSegments,
-            segments: genderSegments.length,
-            totalLeads: genderData.summary?.total_leads || 0,
-            formatted: genderData_formatted,
-            byGender: genderData.summary?.by_gender
-          },
-          campaigns: {
-            raw: campaignsData,
-            count: (campaignsData.campaigns || campaignsData.data || []).length,
-            campaigns: campaignsData.campaigns || campaignsData.data || []
-          }
-        });
-
-        return enhancedData;
+        params.append('days', days);
       }
+      
+      if (fonte) params.append('fonte', fonte);
+
+      // DEBUG: Log marketing params before adding campaign filters
+      console.log('🔍 Marketing API Base Params:', {
+        fonte,
+        days,
+        customDates,
+        paramsString: params.toString()
+      });
+
+      // Adicionar filtros de campanhas Facebook
+      if (campaignFilters.campaignIds && campaignFilters.campaignIds.length > 0) {
+        campaignFilters.campaignIds.forEach(id => {
+          params.append('campaign_ids[]', id);
+        });
+      }
+      
+      if (campaignFilters.status && campaignFilters.status.length > 0) {
+        campaignFilters.status.forEach(s => {
+          params.append('campaign_status[]', s);
+        });
+      }
+      
+      if (campaignFilters.objective && campaignFilters.objective.length > 0) {
+        campaignFilters.objective.forEach(obj => {
+          params.append('campaign_objective[]', obj);
+        });
+      }
+      
+      if (campaignFilters.searchTerm) {
+        params.append('campaign_search', campaignFilters.searchTerm);
+      }
+
+      // DEBUG: Log final marketing API call
+      console.log('🔍 Marketing API Final URL:', `${API_URL}/dashboard/marketing-complete?${params}`);
+
+      // Mapear periodo para preset WhatsApp
+      let whatsappPreset = 'last_30d';
+      if (days <= 7) whatsappPreset = 'last_7d';
+      
+      // Buscar dados de marketing em paralelo com WhatsApp, gênero e campanhas
+      const [marketingData, whatsappData, genderData, campaignsData] = await Promise.all([
+        fetch(`${API_URL}/dashboard/marketing-complete?${params}`).then(r => r.json()),
+        this.getWhatsAppMetrics(whatsappPreset),
+        this.getGenderSegmentation(whatsappPreset),
+        fetch(`${API_URL}/facebook-ads/campaigns`).then(r => r.json()).catch(() => ({ campaigns: [] }))
+      ]);
+
+      console.timeEnd('Marketing Dashboard Load');
+
+      // Combinar dados usando summary conforme guia do backend
+      const whatsappSummary = whatsappData.summary || {};
+      const genderSegments = genderData.data || [];
+      
+      // Converter dados de gênero para formato esperado pelo chart
+      const genderData_formatted = genderSegments.map(segment => ({
+        name: segment.genero === 'male' ? 'Masculino' : 
+              segment.genero === 'female' ? 'Feminino' : 
+              segment.genero === 'unknown' ? 'Não informado' :
+              segment.genero,
+        value: segment.leads || 0
+      }));
+
+      const enhancedData = {
+        ...marketingData,
+        // Substituir dados mock com dados reais do WhatsApp
+        whatsappConversations: whatsappSummary.total_conversations || 0,
+        profileVisits: whatsappSummary.total_profile_visits || 0,
+        whatsappSpend: whatsappSummary.total_spend || 0,
+        // Substituir dados mock com dados reais de gênero
+        genderData: genderData_formatted,
+        // Adicionar campanhas Facebook para o filtro
+        facebookCampaigns: campaignsData.campaigns || campaignsData.data || [],
+        _metadata: { 
+          ...marketingData._metadata,
+          whatsappIntegrated: true,
+          genderIntegrated: true,
+          campaignsIntegrated: true,
+          whatsappEndpoint: '/facebook-ads/whatsapp/insights',
+          genderEndpoint: '/facebook-ads/leads/segmentation',
+          campaignsEndpoint: '/facebook-ads/campaigns'
+        }
+      };
+
+      console.log('✅ Dados integrados:', {
+        whatsapp: {
+          conversations: whatsappSummary.total_conversations,
+          profileVisits: whatsappSummary.total_profile_visits,
+          spend: whatsappSummary.total_spend
+        },
+        gender: {
+          raw: genderSegments,
+          segments: genderSegments.length,
+          totalLeads: genderData.summary?.total_leads || 0,
+          formatted: genderData_formatted,
+          byGender: genderData.summary?.by_gender
+        },
+        campaigns: {
+          raw: campaignsData,
+          count: (campaignsData.campaigns || campaignsData.data || []).length,
+          campaigns: campaignsData.campaigns || campaignsData.data || []
+        }
+      });
+
+      return enhancedData;
     } catch (error) {
       console.error('❌ Erro no carregamento do dashboard de marketing:', error);
       throw error;

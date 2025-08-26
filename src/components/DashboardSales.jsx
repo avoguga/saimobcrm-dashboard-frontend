@@ -727,23 +727,32 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       const leadsData = [...salesData.analyticsTeam.user_performance]
         .map(user => ({
           name: user.user_name,
-          value: user.new_leads || 0
+          value: Number(user.new_leads || 0)
         }))
-        .sort((a, b) => b.value - a.value); // Ordenar decrescente (maior para menor)
+        .sort((a, b) => {
+          const diff = Number(b.value || 0) - Number(a.value || 0);
+          return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+        }); // Ordenar decrescente (maior para menor)
 
       const activitiesData = [...salesData.analyticsTeam.user_performance]
         .map(user => ({
           name: user.user_name,
-          value: user.activities || 0
+          value: Number(user.activities || 0)
         }))
-        .sort((a, b) => b.value - a.value); // Ordenar decrescente (maior para menor)
+        .sort((a, b) => {
+          const diff = Number(b.value || 0) - Number(a.value || 0);
+          return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+        }); // Ordenar decrescente (maior para menor)
 
       const wonDealsData = [...salesData.analyticsTeam.user_performance]
         .map(user => ({
           name: user.user_name,
-          value: user.won_deals || 0
+          value: Number(user.won_deals || 0)
         }))
-        .sort((a, b) => b.value - a.value); // Ordenar decrescente (maior para menor)
+        .sort((a, b) => {
+          const diff = Number(b.value || 0) - Number(a.value || 0);
+          return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+        }); // Ordenar decrescente (maior para menor)
 
       return {
         leadsData,
@@ -859,24 +868,46 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     const originalData = [...salesData.leadsByUser].filter(user => user.name !== 'SA IMOB');
     const filteredData = filterByAdvancedSearch(originalData);
 
+    // Garantir ordenação decrescente consistente - sempre tratar como números
+    // Em caso de empate, ordenar alfabeticamente por nome para consistência
+    const sortedLeads = filteredData.sort((a, b) => {
+      const diff = Number(b.value || 0) - Number(a.value || 0);
+      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+    });
+    
+    const sortedMeetings = filteredData
+      .map(user => ({
+        ...user,
+        meetingsHeld: Number(user.meetingsHeld || user.meetings || 0)
+      }))
+      .sort((a, b) => {
+        const diff = Number(b.meetingsHeld || 0) - Number(a.meetingsHeld || 0);
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
+      
+    const sortedSales = filteredData
+      .sort((a, b) => {
+        const diff = Number(b.sales || 0) - Number(a.sales || 0);
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
+
+    // Debug: log para verificar ordenação
+    console.log('Leads ordenados (decrescente):', sortedLeads.map(u => `${u.name}: ${u.value || 0}`));
+    console.log('Reuniões ordenadas (decrescente):', sortedMeetings.map(u => `${u.name}: ${u.meetingsHeld || 0}`));
+    console.log('Vendas ordenadas (decrescente):', sortedSales.map(u => `${u.name}: ${u.sales || 0}`));
+
     return {
       // Ordenar por total de leads (value) - decrescente
       // Filtrar corretores válidos e por busca avançada
-      sortedLeadsData: filteredData.sort((a, b) => (b.value || 0) - (a.value || 0)),
+      sortedLeadsData: sortedLeads,
         
       // Ordenar por reuniões - decrescente  
       // Usar os mesmos dados filtrados para consistência
-      sortedMeetingsData: filteredData
-        .map(user => ({
-          ...user,
-          meetingsHeld: user.meetingsHeld || user.meetings || 0
-        }))
-        .sort((a, b) => (b.meetingsHeld || 0) - (a.meetingsHeld || 0)),
+      sortedMeetingsData: sortedMeetings,
         
       // Ordenar por vendas - decrescente
       // Usar os mesmos dados filtrados para consistência
-      sortedSalesData: filteredData
-        .sort((a, b) => (b.sales || 0) - (a.sales || 0))
+      sortedSalesData: sortedSales
     };
   }, [salesData?.leadsByUser, searchField, searchValue]);
 
@@ -2295,7 +2326,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalMeetings = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
-                    const totalLeads = salesData.totalLeads || 0;
+                    const totalLeads = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0);
                     const conversionRate = totalLeads > 0 ? (totalMeetings / totalLeads) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
@@ -2327,8 +2358,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalProposals = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
-                    const totalMeetings = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
-                    const conversionRate = totalMeetings > 0 ? (totalProposals / totalMeetings) * 100 : 0;
+                    const totalLeads = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0);
+                    const conversionRate = totalLeads > 0 ? (totalProposals / totalLeads) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
                 </span>
@@ -2360,8 +2391,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                    const totalProposals = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
-                    const conversionRate = totalProposals > 0 ? (totalSales / totalProposals) * 100 : 0;
+                    const totalLeads = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0);
+                    const conversionRate = totalLeads > 0 ? (totalSales / totalLeads) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
                 </span>
