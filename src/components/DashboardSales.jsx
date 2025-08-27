@@ -639,7 +639,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       
       const dataMap = {
         'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
-        'reunioes': tablesData.reunioesDetalhes || [],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
         'propostas': tablesData.propostasDetalhes?.length > 0 ? tablesData.propostasDetalhes : getAllProposals(),
         'vendas': tablesData.vendasDetalhes || []
       };
