@@ -865,7 +865,11 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
     };
 
     // Filtrar dados e aplicar busca avançada
-    const originalData = [...salesData.leadsByUser].filter(user => user.name !== 'SA IMOB');
+    // CORREÇÃO: Incluir SA IMOB mas renomear como "VAZIO"
+    const originalData = [...salesData.leadsByUser].map(user => ({
+      ...user,
+      name: user.name === 'SA IMOB' ? 'Vazio' : user.name
+    }));
     const filteredData = filterByAdvancedSearch(originalData);
 
     // Garantir ordenação decrescente consistente - sempre tratar como números
