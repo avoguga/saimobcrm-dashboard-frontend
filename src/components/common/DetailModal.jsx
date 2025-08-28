@@ -16,7 +16,7 @@ const COLORS = {
 };
 
 // Memoized Modal Component to prevent parent re-renders
-const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error, initialFilterField, initialFilterValue }) => {
+const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error, initialFilterField, initialFilterValue, onFilterChange }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [filterField, setFilterField] = useState(initialFilterField || 'Nome do Lead');
   const [filterValue, setFilterValue] = useState(initialFilterValue || '');
@@ -223,6 +223,10 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
               onChange={(e) => {
                 setFilterField(e.target.value);
                 setFilterValue(''); // Limpar o valor quando mudar o campo
+                // Notificar o componente pai
+                if (onFilterChange) {
+                  onFilterChange(e.target.value, '');
+                }
               }}
               style={{
                 padding: '8px 12px',
@@ -241,7 +245,13 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
             <input
               type="text"
               value={filterValue}
-              onChange={(e) => setFilterValue(e.target.value)}
+              onChange={(e) => {
+                setFilterValue(e.target.value);
+                // Notificar o componente pai
+                if (onFilterChange) {
+                  onFilterChange(filterField, e.target.value);
+                }
+              }}
               placeholder={`Digite para filtrar por ${filterField}...`}
               style={{
                 flex: 1,
@@ -258,7 +268,13 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
             />
             {filterValue && (
               <button
-                onClick={() => setFilterValue('')}
+                onClick={() => {
+                  setFilterValue('');
+                  // Notificar o componente pai
+                  if (onFilterChange) {
+                    onFilterChange(filterField, '');
+                  }
+                }}
                 style={{
                   background: 'none',
                   border: 'none',

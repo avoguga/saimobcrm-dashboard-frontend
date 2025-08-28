@@ -2891,6 +2891,10 @@ const DashboardSales = ({
         error={modalStateRef.current.error}
         initialFilterField={searchField}
         initialFilterValue={searchValue}
+        onFilterChange={(field, value) => {
+          setSearchField(field);
+          setSearchValue(value);
+        }}
       />
 
       {/* Modal de Período Personalizado */}
