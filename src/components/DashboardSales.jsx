@@ -1006,10 +1006,19 @@ const DashboardSales = ({
 
     // Garantir ordenação decrescente consistente - sempre tratar como números
     // Em caso de empate, ordenar alfabeticamente por nome para consistência
-    const sortedLeads = filteredData.sort((a, b) => {
-      const diff = Number(b.value || 0) - Number(a.value || 0);
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
+    const sortedLeads = filteredData
+      .map(user => ({
+        ...user,
+        // Calcular proposalsHeld para cada usuário (igual ao meetingsHeld)
+        proposalsHeld: (user.leads || []).filter(lead => 
+          lead.is_proposta === true || 
+          lead.etapa?.toLowerCase().includes('proposta')
+        ).length
+      }))
+      .sort((a, b) => {
+        const diff = Number(b.value || 0) - Number(a.value || 0);
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
     
     const sortedMeetings = filteredData
       .map(user => ({
@@ -2430,38 +2439,10 @@ const DashboardSales = ({
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: COLORS.secondary }}>
-                  {(() => {
-                    // Usar a mesma lógica do modal para contar propostas
-                    if (!salesData?.leadsByUser) return 0;
-                    
-                    let totalProposals = 0;
-                    salesData.leadsByUser.forEach(user => {
-                      if (user.leads && Array.isArray(user.leads)) {
-                        const userProposals = user.leads.filter(lead => 
-                          lead.is_proposta === true || 
-                          lead.etapa?.toLowerCase().includes('proposta')
-                        );
-                        totalProposals += userProposals.length;
-                      }
-                    });
-                    
-                    return totalProposals;
-                  })()}
+                  {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0)}
                 </div>
                 <TrendIndicator value={(() => {
-                  // Usar a mesma lógica para calcular current
-                  let current = 0;
-                  if (salesData?.leadsByUser) {
-                    salesData.leadsByUser.forEach(user => {
-                      if (user.leads && Array.isArray(user.leads)) {
-                        const userProposals = user.leads.filter(lead => 
-                          lead.is_proposta === true || 
-                          lead.etapa?.toLowerCase().includes('proposta')
-                        );
-                        current += userProposals.length;
-                      }
-                    });
-                  }
+                  const current = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
                   const previous = comparisonData?.previousPeriod?.totalProposals || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -2470,19 +2451,7 @@ const DashboardSales = ({
               <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
-                    // Usar a mesma lógica do modal para contar propostas
-                    let totalProposals = 0;
-                    if (salesData?.leadsByUser) {
-                      salesData.leadsByUser.forEach(user => {
-                        if (user.leads && Array.isArray(user.leads)) {
-                          const userProposals = user.leads.filter(lead => 
-                            lead.is_proposta === true || 
-                            lead.etapa?.toLowerCase().includes('proposta')
-                          );
-                          totalProposals += userProposals.length;
-                        }
-                      });
-                    }
+                    const totalProposals = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
                     const totalLeads = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0);
                     const conversionRate = totalLeads > 0 ? (totalProposals / totalLeads) * 100 : 0;
                     return conversionRate.toFixed(1);
