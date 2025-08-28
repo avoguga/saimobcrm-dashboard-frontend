@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import * as echarts from 'echarts';
+import Select from 'react-select';
 import { KommoAPI } from '../services/api';
 import LoadingSpinner from './LoadingSpinner';
 import SimpleModal from './SimpleModal';
 import DetailModal from './common/DetailModal';
-import MultiSelectFilter from './common/MultiSelectFilter';
 import { COLORS } from '../constants/colors';
 import ExcelExporter from '../utils/excelExport';
 import './Dashboard.css';
@@ -151,9 +151,60 @@ const TrendIndicator = ({ value, showZero = false }) => {
 };
 
 
-const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCorretor, setSelectedCorretor, selectedSource, setSelectedSource, pendingCorretor, setPendingCorretor, pendingSource, setPendingSource, applyFilters, hasPendingFilters, sourceOptions, data, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod }) => {
+// ✅ REFATORAÇÃO: Props simplificadas e organizadas
+const DashboardSales = ({ 
+  period, 
+  setPeriod, 
+  windowSize, 
+  corretores, 
+  filters, 
+  updateFilter, 
+  clearFilter, 
+  clearFilters,
+  hasActiveFilters,
+  sourceOptions, 
+  data, 
+  isLoading, 
+  isUpdating, 
+  customPeriod, 
+  setCustomPeriod, 
+  showCustomPeriod, 
+  setShowCustomPeriod, 
+  handlePeriodChange, 
+  applyCustomPeriod 
+}) => {
   
   const [rawSalesData, setRawSalesData] = useState(data); // Dados originais sem filtro
+
+  // ✅ Preparar dados para React-Select
+  const corretorOptions = useMemo(() => 
+    corretores.map(corretor => ({
+      value: corretor.name,
+      label: corretor.name
+    }))
+  , [corretores]);
+
+  const sourceSelectOptions = useMemo(() => 
+    sourceOptions.filter(opt => opt.value !== '').map(option => ({
+      value: option.value,
+      label: option.label
+    }))
+  , [sourceOptions]);
+
+  // Converter valores dos filtros para formato do React-Select
+  const selectedCorretorValues = useMemo(() => {
+    if (!filters.corretor) return [];
+    return filters.corretor.split(',').map(value => 
+      corretorOptions.find(opt => opt.value === value.trim())
+    ).filter(Boolean);
+  }, [filters.corretor, corretorOptions]);
+
+  const selectedSourceValues = useMemo(() => {
+    if (!filters.source) return [];
+    return filters.source.split(',').map(value => 
+      sourceSelectOptions.find(opt => opt.value === value.trim())
+    ).filter(Boolean);
+  }, [filters.source, sourceSelectOptions]);
 
   // Funções de exportação Excel
   const handleExportMeetings = () => {
@@ -162,9 +213,9 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       return;
     }
 
-    const filters = {
-      corretor: selectedCorretor,
-      fonte: selectedSource
+    const exportFilters = {
+      corretor: filters.corretor,
+      fonte: filters.source
     };
 
     const periodLabel = (() => {
@@ -180,7 +231,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     const result = ExcelExporter.exportMeetingsData(
       sortedChartsData.sortedMeetingsData || salesData.leadsByUser,
-      filters,
+      exportFilters,
       periodLabel
     );
 
@@ -197,9 +248,9 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       return;
     }
 
-    const filters = {
-      corretor: selectedCorretor,
-      fonte: selectedSource
+    const exportFilters = {
+      corretor: filters.corretor,
+      fonte: filters.source
     };
 
     const periodLabel = (() => {
@@ -215,7 +266,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     const result = ExcelExporter.exportSalesData(
       sortedChartsData.sortedSalesData || salesData.leadsByUser,
-      filters,
+      exportFilters,
       periodLabel
     );
 
@@ -232,9 +283,9 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       return;
     }
 
-    const filters = {
-      corretor: selectedCorretor,
-      fonte: selectedSource
+    const exportFilters = {
+      corretor: filters.corretor,
+      fonte: filters.source
     };
 
     const periodLabel = (() => {
@@ -250,7 +301,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
 
     const result = ExcelExporter.exportLeadsData(
       sortedChartsData.sortedLeadsData || salesData.leadsByUser,
-      filters,
+      exportFilters,
       periodLabel
     );
 
@@ -422,21 +473,49 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.days = periodToDays[period] || 30;
       }
 
-      // DEBUG: Log para verificar parâmetros enviados
-      console.log('🔍 Detail Table API Params:', {
-        period,
-        corretorName,
-        selectedSource,
-        extraParams,
-        fullUrl: `/dashboard/detailed-tables?${new URLSearchParams({
-          corretor: corretorName || '',
-          fonte: selectedSource || '',
-          ...extraParams
-        }).toString()}`
-      });
 
-      // Usar o corretor específico clicado e o filtro de fonte selecionado
-      const tablesData = await KommoAPI.getDetailedTables(corretorName, selectedSource || '', extraParams);
+      // ✅ OTIMIZAÇÃO: Tentar usar dados já carregados e filtrar no frontend
+      let tablesData;
+      
+      // Verificar se podemos usar dados já carregados
+      const currentData = data?._rawTablesData;
+      const currentParams = data?._lastParams;
+      
+      const dateParamsMatch = currentParams && (
+        (extraParams.start_date === currentParams.start_date && 
+         extraParams.end_date === currentParams.end_date) ||
+        (extraParams.days === currentParams.days)
+      );
+      
+      if (currentData && dateParamsMatch) {
+        
+        // Filtrar dados no frontend pelo corretor
+        const corretorFilter = corretorName === 'VAZIO' ? 'SA IMOB' : corretorName;
+        
+        tablesData = {
+          leadsDetalhes: currentData.leadsDetalhes?.filter(lead => 
+            lead.Corretor === corretorFilter || lead.Corretor === corretorName
+          ) || [],
+          organicosDetalhes: currentData.organicosDetalhes?.filter(lead => 
+            lead.Corretor === corretorFilter || lead.Corretor === corretorName
+          ) || [],
+          reunioesDetalhes: currentData.reunioesDetalhes?.filter(reuniao => 
+            reuniao.Corretor === corretorFilter || reuniao.Corretor === corretorName
+          ) || [],
+          reunioesOrganicasDetalhes: currentData.reunioesOrganicasDetalhes?.filter(reuniao => 
+            reuniao.Corretor === corretorFilter || reuniao.Corretor === corretorName
+          ) || [],
+          vendasDetalhes: currentData.vendasDetalhes?.filter(venda => 
+            venda.Corretor === corretorFilter || venda.Corretor === corretorName
+          ) || [],
+          propostasDetalhes: currentData.propostasDetalhes?.filter(proposta => 
+            proposta.Corretor === corretorFilter || proposta.Corretor === corretorName
+          ) || []
+        };
+      } else {
+        // Se parâmetros diferentes, fazer nova requisição
+        tablesData = await KommoAPI.getDetailedTables(corretorName, filters.source || '', extraParams);
+      }
       
       // Filtrar dados baseado na série clicada
       const getFilteredData = () => {
@@ -590,16 +669,35 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         extraParams.days = periodToDays[period] || 30;
       }
 
-      // DEBUG: Log para verificar parâmetros enviados
-      console.log('🔍 Detail Table API Params (General):', {
-        period,
-        type,
-        extraParams,
-        fullUrl: `/dashboard/detailed-tables?${new URLSearchParams(extraParams).toString()}`
-      });
 
-      // Buscar dados sem filtros de backend (filtragem será feita no frontend)
-      const tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
+      // ✅ OTIMIZAÇÃO: Reutilizar dados já carregados no dashboard ao invés de nova requisição
+      // Só fazer nova requisição se os parâmetros de período forem diferentes dos atuais
+      let tablesData;
+      
+      // Verificar se podemos usar dados já carregados do dashboard
+      const currentData = data?._rawTablesData; // Dados originais salvos no dashboard
+      
+      // Função helper para verificar se os filtros de data mudaram
+      const hasDateFilterChanged = (newParams) => {
+        const currentParams = data?._lastParams;
+        if (!currentParams) return true;
+        
+        // Comparar parâmetros de data
+        const dateParamsChanged = 
+          newParams.start_date !== currentParams.start_date ||
+          newParams.end_date !== currentParams.end_date ||
+          newParams.days !== currentParams.days;
+          
+        return dateParamsChanged;
+      };
+      
+      const shouldReuseData = currentData && !hasDateFilterChanged(extraParams);
+      
+      if (shouldReuseData) {
+        tablesData = currentData;
+      } else {
+        tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
+      }
       
       // Para propostas, vamos buscar dos leads que têm propostas usando a mesma lógica do leadsByUser
       const getAllProposals = () => {
@@ -644,21 +742,13 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         'vendas': tablesData.vendasDetalhes || []
       };
       
-      // Debug para entender o que está vindo do backend
-      console.log('📊 Modal Data Debug:', {
-        type,
-        propostasFromBackend: tablesData.propostasDetalhes?.length,
-        propostasFromLeads: getAllProposals().length,
-        firstProposal: dataMap.propostas?.[0],
-        totalProposalsInCard: salesData?.totalProposals
-      });
-      
       // Aplicar pré-filtro se houver filtro ativo no dashboard
       let modalData = dataMap[type];
       
       // Não filtrar propostas, pois propostasDetalhes já vem com os dados corretos do backend
       
-      if (searchValue && searchField) {
+      // Aplicar filtro de busca avançada (mesmo comportamento da primeira função)
+      if (searchValue && searchField && searchField !== 'Corretor') {
         modalData = modalData.filter(item => {
           const fieldValue = (item[searchField] || '').toString().toLowerCase();
           return fieldValue.includes(searchValue.toLowerCase().trim());
@@ -799,6 +889,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         const filteredLeads = user.leads.filter(lead => {
           let fieldValue = '';
           
+          // Mapear os nomes dos campos do modal para os campos dos leads
           switch (searchField) {
             case 'Nome do Lead':
               fieldValue = lead.leadName || lead.name || lead.client_name || '';
@@ -810,16 +901,16 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
               fieldValue = lead.anuncio || lead.ad || lead.advertisement || lead.utm_campaign || '';
               break;
             case 'Público':
-              fieldValue = lead.publico || lead.audience || lead.publicoAlvo || lead.target_audience || '';
+              fieldValue = lead['Público'] || lead.publico || lead.audience || lead.publicoAlvo || lead.target_audience || '';
               break;
             case 'Produto':
-              fieldValue = lead.produto || lead.product || lead.empreendimento || '';
+              fieldValue = lead['Produto'] || lead.produto || lead.product || lead.empreendimento || '';
               break;
             case 'Funil':
-              fieldValue = lead.funil || lead.funnel || lead.pipeline || lead.pipeline_name || '';
+              fieldValue = lead['Funil'] || lead.funil || lead.funnel || lead.pipeline || lead.pipeline_name || '';
               break;
             case 'Etapa':
-              fieldValue = lead.etapa || lead.stage || lead.status || lead.stage_name || '';
+              fieldValue = lead['Etapa'] || lead.etapa || lead.stage || lead.status || lead.stage_name || '';
               break;
             default:
               fieldValue = lead.leadName || lead.name || lead.client_name || '';
@@ -833,22 +924,63 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           return null;
         }
         
-        // Recalcular as métricas baseado nos leads filtrados
-        const meetingsHeld = filteredLeads.filter(lead => 
-          lead.etapa?.toLowerCase().includes('reunião') || 
-          lead.status_id === 80689731
-        ).length;
+        // Para reuniões: usar dados do backend (como o modal) se disponível
+        let meetingsHeld = 0;
+        if (searchValue && searchField && searchField !== 'Corretor' && data && data._rawTablesData) {
+          // Com filtro: contar reuniões do backend que passam pelo filtro
+          const allMeetings = [
+            ...(data._rawTablesData.reunioesDetalhes || []),
+            ...(data._rawTablesData.reunioesOrganicasDetalhes || [])
+          ];
+          
+          meetingsHeld = allMeetings.filter(meeting => {
+            // Filtrar por corretor
+            if (meeting.Corretor !== user.name) return false;
+            
+            // Aplicar filtro de busca
+            let fieldValue = '';
+            switch (searchField) {
+              case 'Público':
+                fieldValue = meeting['Público'] || meeting['Público-Alvo'] || meeting.publico || '';
+                break;
+              case 'Produto':
+                fieldValue = meeting.Produto || meeting.produto || '';
+                break;
+              case 'Fonte':
+                fieldValue = meeting.Fonte || meeting.fonte || '';
+                break;
+              case 'Anúncio':
+                fieldValue = meeting.Anúncio || meeting.anuncio || '';
+                break;
+              case 'Funil':
+                fieldValue = meeting.Funil || meeting.funil || '';
+                break;
+              case 'Etapa':
+                fieldValue = meeting.Etapa || meeting.etapa || '';
+                break;
+              default:
+                fieldValue = meeting['Nome do Lead'] || meeting.leadName || '';
+            }
+            
+            return fieldValue.toLowerCase().includes(searchValue.toLowerCase().trim());
+          }).length;
+        } else {
+          // Sem filtro: usar valor original do corretor
+          meetingsHeld = Number(user.meetingsHeld || user.meetings || 0);
+        }
         
         const proposalsHeld = filteredLeads.filter(lead => 
           lead.is_proposta === true || 
           lead.etapa?.toLowerCase().includes('proposta')
         ).length;
         
-        const sales = filteredLeads.filter(lead => 
-          lead.etapa?.toLowerCase().includes('venda') || 
-          lead.etapa?.toLowerCase().includes('vendido') ||
-          lead.etapa?.toLowerCase().includes('ganho')
-        ).length;
+        const sales = filteredLeads.filter(lead => {
+          const etapa = (lead.etapa || '').toLowerCase();
+          // Excluir "venda perdida" explicitamente
+          if (etapa.includes('perdida')) return false;
+          // Incluir apenas vendas válidas
+          return etapa.includes('venda') || etapa.includes('vendido') || etapa.includes('ganho');
+        }).length;
         
         // Retornar o usuário com os leads filtrados e métricas recalculadas
         return {
@@ -896,9 +1028,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
       });
 
     // Debug: log para verificar ordenação
-    console.log('Leads ordenados (decrescente):', sortedLeads.map(u => `${u.name}: ${u.value || 0}`));
-    console.log('Reuniões ordenadas (decrescente):', sortedMeetings.map(u => `${u.name}: ${u.meetingsHeld || 0}`));
-    console.log('Vendas ordenadas (decrescente):', sortedSales.map(u => `${u.name}: ${u.sales || 0}`));
 
     return {
       // Ordenar por total de leads (value) - decrescente
@@ -1016,9 +1145,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         // Adicionar evento de clique se fornecido
         if (onBarClick) {
           chartInstance.current.on('click', function (params) {
-            console.log('🎯 Clique na barra:', params);
-            console.log('🎯 Nome do corretor:', params.name);
-            console.log('🎯 Série clicada:', params.seriesName);
             onBarClick(params.name, params.value, params, params.seriesName);
           });
         }
@@ -1717,153 +1843,97 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           }
         }
 
-        /* Estilos para MultiSelectFilter */
-        .multi-select-container {
+        /* Estilos para React-Select */
+        .react-select-container {
           display: flex;
-          gap: 4px;
-          position: relative;
-          min-width: 200px;
-          flex: 1;
-          max-width: 250px;
-          align-items: center;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 220px;
         }
 
-        .multi-select-wrapper {
-          position: relative;
-        }
-
-        .multi-select-button {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
-          padding: 10px 12px;
-          background: white;
-          border: 2px solid #e2e8f0;
-          border-radius: 8px;
-          font-size: 14px;
-          color: #2d3748;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          min-height: 42px;
-          height: 42px;
-        }
-
-        .multi-select-button:hover {
-          border-color: #4E5859;
-          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
-        }
-
-        .multi-select-button:focus {
-          outline: none;
-          border-color: #4E5859;
-          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
-        }
-
-        .multi-select-text {
-          flex: 1;
-          text-align: left;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .multi-select-arrow {
-          margin-left: 8px;
+        .react-select-label {
           font-size: 12px;
-          transition: transform 0.2s ease;
-          transform-origin: center;
-        }
-
-        .multi-select-arrow.open {
-          transform: rotate(180deg);
-        }
-
-        .multi-select-dropdown {
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          background: white;
-          border: 2px solid #e2e8f0;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          z-index: 1000;
-          max-height: 250px;
-          overflow-y: auto;
-          margin-top: 2px;
-        }
-
-        .multi-select-option {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 12px;
-          cursor: pointer;
-          transition: background-color 0.15s ease;
-          font-size: 14px;
-        }
-
-        .multi-select-option:hover {
-          background-color: #f7fafc;
-        }
-
-        .multi-select-option.selected {
-          background-color: rgba(78, 88, 89, 0.1);
-          color: #4E5859;
-          font-weight: 500;
-        }
-
-        .multi-select-option.select-all {
-          background-color: #f8f9fa;
           font-weight: 600;
           color: #4E5859;
-          border-bottom: 1px solid #e2e8f0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
-        .multi-select-option.select-all:hover {
-          background-color: #e9ecef;
+        /* Customização do React-Select */
+        .react-select__control {
+          min-height: 42px !important;
+          border: 2px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          box-shadow: none !important;
+          transition: all 0.2s ease !important;
         }
 
-        .multi-select-divider {
-          height: 1px;
-          background-color: #e2e8f0;
-          margin: 0;
+        .react-select__control:hover {
+          border-color: #4E5859 !important;
         }
 
-        .multi-select-option input[type="checkbox"] {
-          margin: 0;
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
+        .react-select__control--is-focused {
+          border-color: #4E5859 !important;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1) !important;
         }
 
-        .multi-select-option span {
-          flex: 1;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        .react-select__placeholder {
+          color: #a0aec0 !important;
         }
 
-        /* Responsividade para MultiSelectFilter */
+        .react-select__multi-value {
+          background-color: rgba(78, 88, 89, 0.1) !important;
+          border-radius: 6px !important;
+        }
+
+        .react-select__multi-value__label {
+          color: #4E5859 !important;
+          font-weight: 500 !important;
+        }
+
+        .react-select__multi-value__remove {
+          color: #4E5859 !important;
+          cursor: pointer !important;
+        }
+
+        .react-select__multi-value__remove:hover {
+          background-color: #4E5859 !important;
+          color: white !important;
+        }
+
+        .react-select__menu {
+          border: 2px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+          z-index: 1000 !important;
+        }
+
+        .react-select__option {
+          padding: 12px 16px !important;
+          cursor: pointer !important;
+        }
+
+        .react-select__option:hover {
+          background-color: #f8fafc !important;
+        }
+
+        .react-select__option--is-selected {
+          background-color: rgba(78, 88, 89, 0.1) !important;
+          color: #4E5859 !important;
+        }
+
+        .react-select__option--is-focused {
+          background-color: #f1f5f9 !important;
+        }
+
+        /* Responsividade */
         @media (max-width: 768px) {
-          .multi-select-container {
-            min-width: 150px;
+          .react-select-container {
+            min-width: 180px;
           }
           
-          .multi-select-button {
-            padding: 8px 10px;
-            font-size: 13px;
-            min-height: 38px;
-          }
-          
-          .multi-select-option {
-            padding: 8px 10px;
-            font-size: 13px;
-          }
-          
-          .multi-select-dropdown {
-            max-height: 200px;
+          .react-select__control {
+            min-height: 38px !important;
           }
         }
 
@@ -1873,7 +1943,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             gap: 12px;
           }
           
-          .multi-select-container {
+          .react-select-container {
             min-width: unset;
           }
         }
@@ -1881,22 +1951,37 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
         /* Estilos para filtro de busca avançada */
         .advanced-search-filter {
           display: flex;
+          flex-direction: column;
           gap: 4px;
-          align-items: center;
           min-width: 300px;
-          flex: 1;
-          max-width: 400px;
         }
 
-        .search-field-selector {
-          flex-shrink: 0;
+        .search-filter-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #4E5859;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .search-filter-container {
+          display: flex;
+          gap: 0;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          overflow: hidden;
+          transition: all 0.2s ease;
+        }
+
+        .search-filter-container:focus-within {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
         }
 
         .search-field-select {
           padding: 10px 12px;
-          background: white;
-          border: 2px solid #e2e8f0;
-          border-radius: 8px 0 0 8px;
+          background: #f8f9fa;
+          border: none;
           font-size: 14px;
           color: #2d3748;
           transition: all 0.2s ease;
@@ -1904,14 +1989,12 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           height: 42px;
           box-sizing: border-box;
           outline: none;
+          min-width: 120px;
           border-right: 1px solid #e2e8f0;
-          min-width: 100px;
         }
 
-        .search-field-select:hover,
         .search-field-select:focus {
-          border-color: #4E5859;
-          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
+          background: white;
         }
 
         .search-input-container {
@@ -1925,9 +2008,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           flex: 1;
           padding: 10px 12px;
           background: white;
-          border: 2px solid #e2e8f0;
-          border-radius: 0 8px 8px 0;
-          border-left: none;
+          border: none;
           font-size: 14px;
           color: #2d3748;
           transition: all 0.2s ease;
@@ -1935,12 +2016,6 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           height: 42px;
           box-sizing: border-box;
           outline: none;
-        }
-
-        .search-value-input:hover,
-        .search-value-input:focus {
-          border-color: #4E5859;
-          box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
         }
 
         .search-value-input::placeholder {
@@ -1980,7 +2055,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           }
           
           .search-field-select {
-            min-width: 80px;
+            min-width: 100px;
           }
         }
 
@@ -1988,19 +2063,21 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           .advanced-search-filter {
             min-width: unset;
             max-width: none;
+          }
+          
+          .search-filter-container {
             flex-direction: column;
-            gap: 8px;
+            border-radius: 8px;
           }
           
           .search-field-select {
-            border-radius: 8px;
-            border-right: 2px solid #e2e8f0;
-            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+            border-radius: 0;
           }
           
           .search-value-input {
-            border-radius: 8px;
-            border-left: 2px solid #e2e8f0;
+            border-radius: 0;
           }
         }
 
@@ -2052,6 +2129,8 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           transform: scale(1.1);
         }
 
+        /* ✅ Novos estilos para filtros individuais - melhor UX */
+
         /* Responsividade para indicador de filtros */
         @media (max-width: 768px) {
           .filters-group {
@@ -2061,7 +2140,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             gap: 12px;
           }
           
-          .multi-select-container {
+          .simple-filter {
             max-width: none;
             width: 100%;
           }
@@ -2177,28 +2256,52 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
           </div>
           <div className="dashboard-controls">
             <div className="filters-group">
-              <MultiSelectFilter 
-                label="Corretor"
-                options={corretores.map(corretor => ({
-                  value: corretor.name,
-                  label: corretor.name
-                }))}
-                selectedValues={pendingCorretor ? (pendingCorretor.includes(',') ? pendingCorretor.split(',') : [pendingCorretor]) : []}
-                onChange={(values) => setPendingCorretor(values.length === 0 ? '' : values.join(','))}
-                placeholder="Todos os Corretores"
-              />
+              {/* ✅ REACT-SELECT: Filtro de corretor com múltipla seleção */}
+              <div className="react-select-container">
+                <label className="react-select-label">Corretor</label>
+                <Select
+                  isMulti={true}
+                  isSearchable={true}
+                  closeMenuOnSelect={false}
+                  hideSelectedOptions={false}
+                  value={selectedCorretorValues}
+                  onChange={(selected) => {
+                    const values = selected ? selected.map(opt => opt.value).filter(v => v !== '') : [];
+                    updateFilter('corretor', values.join(','));
+                  }}
+                  options={corretorOptions}
+                  placeholder="Selecionar corretores..."
+                  noOptionsMessage={() => "Nenhuma opção encontrada"}
+                  className="react-select"
+                  classNamePrefix="react-select"
+                />
+              </div>
               
-              <MultiSelectFilter 
-                label="Fonte"
-                options={sourceOptions}
-                selectedValues={pendingSource ? (pendingSource.includes(',') ? pendingSource.split(',') : [pendingSource]) : []}
-                onChange={(values) => setPendingSource(values.length === 0 ? '' : values.join(','))}
-                placeholder="Todas as Fontes"
-              />
+              {/* ✅ REACT-SELECT: Filtro de fonte com múltipla seleção */}
+              <div className="react-select-container">
+                <label className="react-select-label">Fonte</label>
+                <Select
+                  isMulti={true}
+                  isSearchable={true}
+                  closeMenuOnSelect={false}
+                  hideSelectedOptions={false}
+                  value={selectedSourceValues}
+                  onChange={(selected) => {
+                    const values = selected ? selected.map(opt => opt.value).filter(v => v !== '') : [];
+                    updateFilter('source', values.join(','));
+                  }}
+                  options={sourceSelectOptions}
+                  placeholder="Selecionar fontes..."
+                  noOptionsMessage={() => "Nenhuma opção encontrada"}
+                  className="react-select"
+                  classNamePrefix="react-select"
+                />
+              </div>
 
               {/* Filtro de busca avançada */}
               <div className="advanced-search-filter">
-                <div className="search-field-selector">
+                <label className="search-filter-label">Busca Avançada</label>
+                <div className="search-filter-container">
                   <select
                     value={searchField}
                     onChange={(e) => {
@@ -2216,58 +2319,28 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                     <option value="Funil">Funil</option>
                     <option value="Etapa">Etapa</option>
                   </select>
-                </div>
-                <div className="search-input-container">
-                  <input
-                    type="text"
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                    placeholder={`Buscar por ${searchField.toLowerCase()}...`}
-                    className="search-value-input"
-                  />
-                  {searchValue && (
-                    <button
-                      onClick={() => setSearchValue('')}
-                      className="search-clear-button"
-                      title="Limpar busca"
-                    >
-                      ×
-                    </button>
-                  )}
+                  <div className="search-input-container">
+                    <input
+                      type="text"
+                      value={searchValue}
+                      onChange={(e) => setSearchValue(e.target.value)}
+                      placeholder={`Buscar por ${searchField.toLowerCase()}...`}
+                      className="search-value-input"
+                    />
+                    {searchValue && (
+                      <button
+                        onClick={() => setSearchValue('')}
+                        className="search-clear-button"
+                        title="Limpar busca"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Botão para aplicar filtros */}
-              {hasPendingFilters() && (
-                <button 
-                  className="apply-filters-btn"
-                  onClick={applyFilters}
-                  disabled={isUpdating}
-                  title="Aplicar filtros selecionados"
-                >
-                  {isUpdating ? 'Aplicando...' : 'Aplicar Filtros'}
-                </button>
-              )}
-
-              {/* Indicador de filtros ativos */}
-              {(selectedCorretor || selectedSource) && (
-                <div className="filter-indicator">
-                  <span className="filter-icon">🔍</span>
-                  <span className="filter-text">Filtros Ativos</span>
-                  <button 
-                    className="clear-filters-btn"
-                    onClick={() => {
-                      setSelectedCorretor('');
-                      setSelectedSource('');
-                      setPendingCorretor('');
-                      setPendingSource('');
-                    }}
-                    title="Limpar todos os filtros"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
+              {/* React-Select já gerencia as tags e botões de remoção */}
             </div>
             <div className="period-controls" style={{ position: 'relative' }}>
               <div className="period-selector">
@@ -2421,17 +2494,20 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                     let totalSales, totalRevenue, avgDealSize;
                     
                     if (hasFilter) {
-                      // Com filtro: usar o ticket médio global aplicado às vendas filtradas
-                      // (pois não temos dados de receita por lead individual)
+                      // Com filtro: calcular pelos dados filtrados
                       totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                      const globalAvgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
-                      totalRevenue = totalSales * globalAvgDealSize;
-                      avgDealSize = globalAvgDealSize;
+                      // Usar dados do summary ou _rawTablesData
+                      const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                      const summaryRevenue = rawData?.summary?.valor_total_vendas || 0;
+                      const summaryTotalSales = rawData?.summary?.total_vendas || 0;
+                      avgDealSize = summaryTotalSales > 0 ? summaryRevenue / summaryTotalSales : 0;
+                      totalRevenue = totalSales * avgDealSize;
                     } else {
-                      // Sem filtro: usar dados globais da API
-                      totalSales = salesData?.kpis?.sales?.total || 0;
-                      totalRevenue = salesData?.kpis?.sales?.total_revenue || 0;
-                      avgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
+                      // Sem filtro: usar dados do summary
+                      const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                      totalRevenue = rawData?.summary?.valor_total_vendas || salesData?.kpis?.sales?.total_revenue || 0;
+                      totalSales = rawData?.summary?.total_vendas || salesData?.kpis?.sales?.total || 0;
+                      avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
                     }
                     return avgDealSize;
                   })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -2440,12 +2516,17 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                   const hasFilter = searchValue.trim() !== '';
                   
                   let current;
+                  const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                  const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                  const totalSales = rawData?.summary?.total_vendas || 0;
+                  
                   if (hasFilter) {
-                    // Com filtro: manter o ticket médio global (pois não temos dados de receita individual)
-                    current = salesData?.kpis?.sales?.avg_deal_size || 0;
+                    // Com filtro: calcular baseado nas vendas filtradas
+                    const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    current = filteredSales > 0 && totalSales > 0 ? (totalRevenue / totalSales) : 0;
                   } else {
-                    // Sem filtro: usar dados globais da API
-                    current = salesData?.kpis?.sales?.avg_deal_size || 0;
+                    // Sem filtro: usar dados do summary
+                    current = totalSales > 0 ? totalRevenue / totalSales : 0;
                   }
                   const previous = comparisonData?.previousPeriod?.averageDealSize || salesData?.previousAverageDealSize || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
@@ -2460,29 +2541,37 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                     // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
                     const hasFilter = searchValue.trim() !== '';
                     
+                    const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                    const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                    const totalSales = rawData?.summary?.total_vendas || 0;
+                    
                     if (hasFilter) {
-                      // Com filtro: calcular receita estimada (vendas filtradas * ticket médio global)
+                      // Com filtro: calcular receita proporcional às vendas filtradas
                       const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                      const globalAvgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
-                      return filteredSales * globalAvgDealSize;
+                      const avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
+                      return filteredSales * avgDealSize;
                     } else {
-                      // Sem filtro: usar dados globais da API
-                      return salesData?.kpis?.sales?.total_revenue || 0;
+                      // Sem filtro: usar valor total do summary
+                      return totalRevenue;
                     }
                   })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
                   const hasFilter = searchValue.trim() !== '';
                   
+                  const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                  const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                  const totalSales = rawData?.summary?.total_vendas || 0;
+                  
                   let current;
                   if (hasFilter) {
-                    // Com filtro: calcular receita estimada (vendas filtradas * ticket médio global)
+                    // Com filtro: calcular receita proporcional
                     const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                    const globalAvgDealSize = salesData?.kpis?.sales?.avg_deal_size || 0;
-                    current = filteredSales * globalAvgDealSize;
+                    const avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
+                    current = filteredSales * avgDealSize;
                   } else {
-                    // Sem filtro: usar dados globais da API
-                    current = salesData?.kpis?.sales?.total_revenue || 0;
+                    // Sem filtro: usar valor total
+                    current = totalRevenue;
                   }
                   const previous = comparisonData?.previousPeriod?.totalRevenue || (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
@@ -2720,7 +2809,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
             </div>
             
             <div className="card card-full">
-              <div className="card-title">Rank Corretores - Reunião</div>
+              <div className="card-title">Rank Corretores - Atividades</div>
               <CompactChart 
                 type="bar" 
                 data={chartData.activitiesData} 
@@ -2774,7 +2863,7 @@ const DashboardSales = ({ period, setPeriod, windowSize, corretores, selectedCor
                 </div>
               ) : salesData?.totalLeads > 0 ? (
                 <>
-                  <p>Foram encontrados {salesData.totalLeads} leads com as fontes selecionadas: <strong>{selectedSource}</strong></p>
+                  <p>Foram encontrados {salesData.totalLeads} leads com as fontes selecionadas: <strong>{filters.source}</strong></p>
                   <p style={{ marginTop: '10px', fontSize: '14px', color: '#666' }}>
                     Porém, não há dados de desempenho por corretor disponíveis para estas fontes específicas.
                   </p>

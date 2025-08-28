@@ -1,10 +1,152 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { KommoAPI } from '../services/api';
 import { GranularAPI } from '../services/granularAPI'; // API REAL granular
 import DashboardMarketing from './DashboardMarketing';
 import DashboardSales from './DashboardSales';
 import LoadingSpinner from './LoadingSpinner';
 import './Dashboard.css';
+
+// ✅ FUNÇÕES HELPER PARA PROCESSAR DADOS DO ENDPOINT ÚNICO
+const processDetailedTablesData = (tablesData) => {
+  if (!tablesData) return null;
+  
+  const { leadsDetalhes = [], reunioesDetalhes = [], reunioesOrganicasDetalhes = [], vendasDetalhes = [], summary = {} } = tablesData;
+  
+  // 1. Agrupar leads por corretor
+  const leadsByUserMap = {};
+  leadsDetalhes.forEach(lead => {
+    const corretor = lead.Corretor === 'SA IMOB' ? 'VAZIO' : lead.Corretor;
+    if (!leadsByUserMap[corretor]) {
+      leadsByUserMap[corretor] = {
+        name: corretor,
+        value: 0,
+        active: 0,
+        meetingsHeld: 0,
+        sales: 0,
+        revenue: 0,
+        leads: []
+      };
+    }
+    leadsByUserMap[corretor].value++;
+    leadsByUserMap[corretor].leads.push({
+      id: Math.random(), // Fake ID
+      leadName: lead['Nome do Lead'],
+      fonte: lead.Fonte,
+      anuncio: lead.Anúncio,
+      publico: lead.Público,
+      produto: lead.Produto,
+      funil: lead.Funil,
+      etapa: lead.Etapa,
+      createdDate: lead['Data de Criação'],
+      is_proposta: lead['É Proposta'] || false
+    });
+    if (lead.Status === 'Ativo' || lead.Status === 'Em Negociação') {
+      leadsByUserMap[corretor].active++;
+    }
+  });
+  
+  // 2. Adicionar reuniões aos corretores
+  [...reunioesDetalhes, ...reunioesOrganicasDetalhes].forEach(reuniao => {
+    const corretor = reuniao.Corretor === 'SA IMOB' ? 'VAZIO' : reuniao.Corretor;
+    if (!leadsByUserMap[corretor]) {
+      leadsByUserMap[corretor] = {
+        name: corretor,
+        value: 0,
+        active: 0,
+        meetingsHeld: 0,
+        sales: 0,
+        revenue: 0,
+        leads: []
+      };
+    }
+    leadsByUserMap[corretor].meetingsHeld++;
+  });
+  
+  // 3. Adicionar vendas aos corretores
+  vendasDetalhes.forEach(venda => {
+    const corretor = venda.Corretor === 'SA IMOB' ? 'VAZIO' : venda.Corretor;
+    if (!leadsByUserMap[corretor]) {
+      leadsByUserMap[corretor] = {
+        name: corretor,
+        value: 0,
+        active: 0,
+        meetingsHeld: 0,
+        sales: 0,
+        revenue: 0,
+        leads: []
+      };
+    }
+    leadsByUserMap[corretor].sales++;
+    
+    // Extrair valor da venda (remover R$ e pontuação)
+    const valorStr = venda['Valor da Venda'] || '0';
+    const valor = parseFloat(valorStr.replace(/[R$.\s]/g, '').replace(',', '.')) || 0;
+    leadsByUserMap[corretor].revenue += valor;
+  });
+  
+  // 4. Converter para array
+  const leadsByUser = Object.values(leadsByUserMap);
+  
+  // 5. Calcular pipeline status agrupando por etapa
+  const pipelineStatusMap = {};
+  leadsDetalhes.forEach(lead => {
+    const etapa = lead.Etapa || 'Não Definido';
+    if (!pipelineStatusMap[etapa]) {
+      pipelineStatusMap[etapa] = {
+        stage: etapa,
+        count: 0,
+        leads: []
+      };
+    }
+    pipelineStatusMap[etapa].count++;
+    pipelineStatusMap[etapa].leads.push(lead);
+  });
+  
+  const pipelineStatus = Object.values(pipelineStatusMap);
+  
+  // 6. Calcular taxas de conversão
+  const totalLeads = summary.total_leads || leadsDetalhes.length;
+  const totalMeetings = summary.total_reunioes || (reunioesDetalhes.length + reunioesOrganicasDetalhes.length);
+  const totalSales = summary.total_vendas || vendasDetalhes.length;
+  
+  const conversionRates = {
+    leadToMeeting: totalLeads > 0 ? (totalMeetings / totalLeads) * 100 : 0,
+    meetingToSale: totalMeetings > 0 ? (totalSales / totalMeetings) * 100 : 0,
+    overallConversion: totalLeads > 0 ? (totalSales / totalLeads) * 100 : 0
+  };
+  
+  // 7. Dados do funil
+  const funnelData = [
+    { stage: 'Leads', value: totalLeads },
+    { stage: 'Reuniões', value: totalMeetings },
+    { stage: 'Vendas', value: totalSales }
+  ];
+  
+  return {
+    // Dados principais
+    totalLeads,
+    totalMeetings,
+    totalSales: totalSales,
+    totalRevenue: summary.valor_total_vendas || 0,
+    winRate: conversionRates.overallConversion,
+    
+    // Arrays para gráficos
+    leadsByUser,
+    pipelineStatus,
+    conversionRates,
+    funnelData,
+    
+    // ✅ OTIMIZAÇÃO: Salvar dados originais para reutilização nos modals
+    _rawTablesData: tablesData,
+    
+    // Metadados
+    _metadata: { 
+      processedFromDetailedTables: true,
+      originalSummary: summary,
+      ...tablesData._metadata
+    }
+  };
+};
 
 // Função helper para carregar dados do período anterior
 const loadPreviousPeriodData = async (period, originalDays, customPeriod, corretor, fonte) => {
@@ -76,7 +218,17 @@ const loadPreviousPeriodData = async (period, originalDays, customPeriod, corret
     };
   }
   
-  return await GranularAPI.loadSalesDashboard(previousDays, corretor, fonte, previousCustomDates);
+  // ✅ NOVA IMPLEMENTAÇÃO: Usar apenas endpoint detailed-tables
+  const extraParams = {};
+  if (previousCustomDates) {
+    extraParams.start_date = previousCustomDates.start_date;
+    extraParams.end_date = previousCustomDates.end_date;
+  } else {
+    extraParams.days = previousDays;
+  }
+  
+  const tablesData = await KommoAPI.getDetailedTables(corretor, fonte, extraParams);
+  return processDetailedTablesData(tablesData);
 };
 
 // Dashboard principal otimizado
@@ -97,14 +249,32 @@ function Dashboard() {
   const [customPeriod, setCustomPeriod] = useState(getDefaultPeriod());
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
   const [corretores, setCorretores] = useState([]);
-  const [selectedCorretor, setSelectedCorretor] = useState('');
-  const [selectedSource, setSelectedSource] = useState('');
-  const [pendingCorretor, setPendingCorretor] = useState('');
-  const [pendingSource, setPendingSource] = useState('');
+  const [allCorretores, setAllCorretores] = useState([]); // Lista fixa de todos os corretores
+  // ✅ REFATORAÇÃO: Estados únicos para filtros (sem duplicação)
+  const [filters, setFilters] = useState({
+    corretor: '',
+    source: ''
+  });
   const [sourceOptions, setSourceOptions] = useState([{ value: '', label: 'Todas as Fontes' }]);
   
+  // ✅ REFATORAÇÃO: Funções helper simplificadas (sem referências prematuras)
+  const updateFilter = useCallback((key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value || ''
+    }));
+  }, []);
 
+  const clearFilters = useCallback(() => {
+    setFilters({
+      corretor: '',
+      source: ''
+    });
+  }, []);
 
+  const clearFilter = useCallback((key) => {
+    updateFilter(key, '');
+  }, [updateFilter]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMarketing, setIsLoadingMarketing] = useState(false);
@@ -193,9 +363,14 @@ function Dashboard() {
       const corretoresFromData = extractCorretoresFromSalesData(salesData);
       if (corretoresFromData.length > 0) {
         setCorretores(corretoresFromData);
+        
+        // Salvar todos os corretores apenas se não houver filtros ativos (dados originais)
+        if (!filters.corretor && !filters.source && allCorretores.length === 0) {
+          setAllCorretores(corretoresFromData);
+        }
       }
     }
-  }, [salesData]);
+  }, [salesData, filters.corretor, filters.source, allCorretores.length]);
 
   // Função para calcular dias do período
   const calculateDays = () => {
@@ -294,7 +469,6 @@ function Dashboard() {
           
           // Garantir que facebookCampaigns seja sempre um array
           const facebookCampaigns = Array.isArray(facebookCampaignsRaw) ? facebookCampaignsRaw : [];
-          console.log('📋 Facebook campaigns validadas:', { isArray: Array.isArray(facebookCampaigns), length: facebookCampaigns.length });
           
           // Carregar insights de todas as campanhas
           let campaignInsights = null;
@@ -374,11 +548,21 @@ function Dashboard() {
           }
           
           if (activeTab === 'marketing') {
-            const marketingResult = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
+            const marketingResult = await GranularAPI.loadMarketingDashboard(days, filters.source, customDates);
             setMarketingData(marketingResult);
           } else {
-            // Carregar dados com filtros aplicados no backend
-            const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
+            // ✅ NOVA IMPLEMENTAÇÃO: Carregar dados com endpoint único
+            const extraParams = {};
+            if (customDates) {
+              extraParams.start_date = customDates.start_date;
+              extraParams.end_date = customDates.end_date;
+            } else {
+              extraParams.days = days;
+            }
+            const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
+            const salesResult = processDetailedTablesData(tablesData);
+            // ✅ OTIMIZAÇÃO: Salvar parâmetros para reutilização nos modals
+            salesResult._lastParams = extraParams;
             setSalesData(salesResult);
           }
           
@@ -461,13 +645,22 @@ function Dashboard() {
           }
           
           
-          // USAR API GRANULAR V2 - CARREGAMENTO PARALELO OTIMIZADO!
-          // Carregar dados com filtros aplicados no backend
-          const salesResult = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
+          // ✅ NOVA IMPLEMENTAÇÃO: Usar apenas endpoint detailed-tables
+          const extraParams = {};
+          if (customDates) {
+            extraParams.start_date = customDates.start_date;
+            extraParams.end_date = customDates.end_date;
+          } else {
+            extraParams.days = days;
+          }
+          const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
+          const salesResult = processDetailedTablesData(tablesData);
+          // ✅ OTIMIZAÇÃO: Salvar parâmetros para reutilização nos modals
+          salesResult._lastParams = extraParams;
           
           // Buscar dados do período anterior para comparação (2ª requisição)
           try {
-            const previousPeriodData = await loadPreviousPeriodData(period, days, customPeriod, selectedCorretor, selectedSource);
+            const previousPeriodData = await loadPreviousPeriodData(period, days, customPeriod, filters.corretor, filters.source);
             if (previousPeriodData) {
               salesResult.previousPeriodData = previousPeriodData;
             }
@@ -499,11 +692,7 @@ function Dashboard() {
     }
   }, [period, activeTab]);
 
-  // Sincronizar filtros pendentes com os aplicados na inicialização
-  useEffect(() => {
-    setPendingCorretor(selectedCorretor);
-    setPendingSource(selectedSource);
-  }, []);
+  // ✅ REFATORAÇÃO: Removido useEffect desnecessário de sincronização
 
   // Atualizar dados (só executa se período for válido)
   const refreshData = async (forceRefresh = false) => {
@@ -554,14 +743,24 @@ function Dashboard() {
         // Limpar cache da API granular também
         GranularAPI.clearCache();
         
-        const marketingResponse = await GranularAPI.loadMarketingDashboard(days, selectedSource, customDates);
+        const marketingResponse = await GranularAPI.loadMarketingDashboard(days, filters.source, customDates);
         setMarketingData(marketingResponse);
       } else {
         // Limpar cache da API granular também
         GranularAPI.clearCache();
         
-        // Carregar dados com filtros aplicados no backend
-        const salesResponse = await GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates);
+        // ✅ NOVA IMPLEMENTAÇÃO: Carregar dados com endpoint único
+        const extraParams = {};
+        if (customDates) {
+          extraParams.start_date = customDates.start_date;
+          extraParams.end_date = customDates.end_date;
+        } else {
+          extraParams.days = days;
+        }
+        const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
+        const salesResponse = processDetailedTablesData(tablesData);
+        // ✅ OTIMIZAÇÃO: Salvar parâmetros para reutilização nos modals
+        salesResponse._lastParams = extraParams;
         setSalesData(salesResponse);
       }
     } catch (error) {
@@ -572,7 +771,6 @@ function Dashboard() {
       } else {
         setIsLoadingSales(false);
       }
-      setIsLoadingFilters(false); // Parar loading de filtros
     }
   };
 
@@ -601,7 +799,7 @@ function Dashboard() {
       
       const marketingResponse = await GranularAPI.loadMarketingDashboard(
         days, 
-        selectedSource, 
+        filters.source, 
         customDates, 
         campaignFilters
       );
@@ -611,7 +809,6 @@ function Dashboard() {
       setError(`Erro ao aplicar filtros de campanha: ${error.message}`);
     } finally {
       setIsLoadingMarketing(false);
-      setIsLoadingFilters(false);
     }
   };
 
@@ -672,15 +869,27 @@ function Dashboard() {
       };
       
       
-      // Carregar dados em paralelo (COM filtros aplicados)
-      const [marketingResult, salesResult] = await Promise.all([
-        GranularAPI.loadMarketingDashboard(days, selectedSource, customDates),
-        GranularAPI.loadSalesDashboard(days, selectedCorretor, selectedSource, customDates)
+      // ✅ NOVA IMPLEMENTAÇÃO: Carregar dados em paralelo com endpoint único para sales
+      const extraParams = {};
+      if (customDates) {
+        extraParams.start_date = customDates.start_date;
+        extraParams.end_date = customDates.end_date;
+      } else {
+        extraParams.days = days;
+      }
+      
+      const [marketingResult, tablesData] = await Promise.all([
+        GranularAPI.loadMarketingDashboard(days, filters.source, customDates),
+        KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams)
       ]);
+      
+      const salesResult = processDetailedTablesData(tablesData);
+      // ✅ OTIMIZAÇÃO: Salvar parâmetros para reutilização nos modals
+      salesResult._lastParams = extraParams;
       
       // Buscar dados do período anterior para comparação
       try {
-        const previousPeriodData = await loadPreviousPeriodData('custom', days, periodData, selectedCorretor, selectedSource);
+        const previousPeriodData = await loadPreviousPeriodData('custom', days, periodData, filters.corretor, filters.source);
         if (previousPeriodData) {
           salesResult.previousPeriodData = previousPeriodData;
         }
@@ -700,71 +909,151 @@ function Dashboard() {
     }
   };
 
-  // Função para aplicar filtros pendentes
-  const applyFilters = async () => {
-    console.log('🔍 APLICANDO FILTROS:', { pendingCorretor, pendingSource });
-    setSelectedCorretor(pendingCorretor);
-    setSelectedSource(pendingSource);
+  // ✅ REFATORAÇÃO: Função de filtro simplificada e otimizada (memoizada)
+  const applyFilters = useCallback(async () => {
     
     if (!isPeriodValid()) {
-      console.log('❌ Período inválido, cancelando aplicação de filtros');
       return;
     }
 
-    // Mostrar loading para aplicação de filtros
     setIsUpdatingSales(true);
     setError(null);
     
     try {
-      const days = calculateDays();
-      const params = { days };
+      const currentData = salesData?._rawTablesData;
       
-      // Se for período customizado ou mês atual, enviar datas específicas
-      let customDates = null;
-      if (period === 'current_month') {
-        const defaultPeriod = getDefaultPeriod();
-        params.start_date = defaultPeriod.startDate;
-        params.end_date = defaultPeriod.endDate;
-        customDates = {
-          start_date: defaultPeriod.startDate,
-          end_date: defaultPeriod.endDate
-        };
-      } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
-        params.start_date = customPeriod.startDate;
-        params.end_date = customPeriod.endDate;
-        customDates = {
-          start_date: customPeriod.startDate,
-          end_date: customPeriod.endDate
-        };
+      // Se não há dados carregados, fazer requisição inicial
+      if (!currentData) {
+        await loadInitialData();
+        return;
       }
       
-      // Usar filtros pendentes ao invés dos aplicados
-      console.log('📡 CHAMANDO API com filtros:', { days, pendingCorretor, pendingSource, customDates });
-      const salesResult = await GranularAPI.loadSalesDashboard(days, pendingCorretor, pendingSource, customDates);
-      console.log('📊 RESULTADO DA API:', salesResult);
       
-      // Buscar dados do período anterior para comparação (2ª requisição)
-      try {
-        const previousPeriodData = await loadPreviousPeriodData(period, days, customPeriod, pendingCorretor, pendingSource);
-        if (previousPeriodData) {
-          salesResult.previousPeriodData = previousPeriodData;
+      // Se não há filtros ativos, mostrar todos os dados
+      if (!filters.corretor && !filters.source) {
+        const salesResult = processDetailedTablesData(currentData);
+        salesResult._rawTablesData = currentData;
+        salesResult._lastParams = salesData._lastParams;
+        
+        if (salesData?.previousPeriodData) {
+          salesResult.previousPeriodData = salesData.previousPeriodData;
         }
-      } catch (error) {
-        console.warn('Erro ao buscar dados do período anterior:', error);
+        
+        setSalesData(salesResult);
+        return;
       }
+      
+      // Aplicar filtros nos dados
+      const filteredData = applyDataFilters(currentData, filters);
+      const salesResult = processDetailedTablesData(filteredData);
+      
+      // Preservar metadados
+      salesResult._rawTablesData = currentData;
+      salesResult._lastParams = salesData._lastParams;
+      
+      if (salesData?.previousPeriodData) {
+        salesResult.previousPeriodData = salesData.previousPeriodData;
+      }
+      
       
       setSalesData(salesResult);
     } catch (error) {
-      setError(`Falha ao carregar dados de vendas: ${error.message}`);
+      setError(`Falha ao aplicar filtros: ${error.message}`);
     } finally {
       setIsUpdatingSales(false);
     }
-  };
+  }, [filters, period, customPeriod]);
 
-  // Função para verificar se existem filtros pendentes
-  const hasPendingFilters = () => {
-    return pendingCorretor !== selectedCorretor || pendingSource !== selectedSource;
-  };
+  // ✅ REFATORAÇÃO: Função helper para filtrar dados (com suporte a múltiplas seleções)
+  const applyDataFilters = useCallback((data, filters) => {
+    const { corretor, source } = filters;
+
+    const filterByCorretor = (item) => {
+      if (!corretor || corretor === '') return true;
+      
+      // Suporte a múltiplas seleções separadas por vírgula
+      const selectedCorretores = corretor.split(',').map(c => c.trim()).filter(c => c);
+      if (selectedCorretores.length === 0) return true;
+      
+      const itemCorretor = item.Corretor;
+      return selectedCorretores.some(selectedCorretor => 
+        itemCorretor === selectedCorretor || 
+        (selectedCorretor === 'VAZIO' && (itemCorretor === 'Vazio' || itemCorretor === 'SA IMOB')) ||
+        (selectedCorretor === 'SA IMOB' && itemCorretor === 'VAZIO')
+      );
+    };
+
+    const filterBySource = (item) => {
+      if (!source || source === '') return true;
+      
+      // Suporte a múltiplas seleções separadas por vírgula
+      const selectedSources = source.split(',').map(s => s.trim()).filter(s => s);
+      if (selectedSources.length === 0) return true;
+      
+      return selectedSources.includes(item.Fonte);
+    };
+
+    const filterItem = (item) => filterByCorretor(item) && filterBySource(item);
+
+    return {
+      ...data,
+      leadsDetalhes: (data.leadsDetalhes || []).filter(filterItem),
+      organicosDetalhes: (data.organicosDetalhes || []).filter(filterItem),
+      reunioesDetalhes: (data.reunioesDetalhes || []).filter(filterItem),
+      reunioesOrganicasDetalhes: (data.reunioesOrganicasDetalhes || []).filter(filterItem),
+      vendasDetalhes: (data.vendasDetalhes || []).filter(filterItem),
+      propostasDetalhes: data.propostasDetalhes || [],
+      summary: data.summary || {}
+    };
+  }, []);
+
+  // ✅ REFATORAÇÃO: Função helper para carregamento inicial
+  const loadInitialData = useCallback(async () => {
+    const days = calculateDays();
+    let customDates = null;
+    
+    if (period === 'current_month') {
+      const defaultPeriod = getDefaultPeriod();
+      customDates = {
+        start_date: defaultPeriod.startDate,
+        end_date: defaultPeriod.endDate
+      };
+    } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+      customDates = {
+        start_date: customPeriod.startDate,
+        end_date: customPeriod.endDate
+      };
+    }
+
+    const extraParams = {};
+    if (customDates) {
+      extraParams.start_date = customDates.start_date;
+      extraParams.end_date = customDates.end_date;
+    } else {
+      extraParams.days = days;
+    }
+
+    const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
+    const salesResult = processDetailedTablesData(tablesData);
+    salesResult._lastParams = extraParams;
+    setSalesData(salesResult);
+  }, [calculateDays, period, customPeriod, filters.corretor, filters.source, processDetailedTablesData]);
+
+  // ✅ REFATORAÇÃO: Hook para aplicar filtros quando mudarem (com debounce)
+  useEffect(() => {
+    if (salesData && !isInitialSalesLoad && !isLoadingSales && activeTab === 'sales') {
+      const timeoutId = setTimeout(() => {
+        applyFilters();
+      }, 300);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [filters.corretor, filters.source]);
+
+  // ✅ REFATORAÇÃO: Função helper memoizada para verificar se há filtros ativos
+  const hasActiveFilters = useMemo(() => {
+    return Boolean(filters.corretor || filters.source);
+  }, [filters.corretor, filters.source]);
 
   return (
     <div className="dashboard-optimized">
@@ -852,8 +1141,8 @@ function Dashboard() {
           period={period} 
           setPeriod={setPeriod} 
           windowSize={windowSize}
-          selectedSource={selectedSource}
-          setSelectedSource={setSelectedSource}
+          selectedSource={filters.source}
+          setSelectedSource={(value) => updateFilter('source', value)}
           sourceOptions={sourceOptions}
           data={marketingData}
           salesData={salesData}
@@ -872,17 +1161,13 @@ function Dashboard() {
           period={period} 
           setPeriod={setPeriod} 
           windowSize={windowSize}
-          corretores={corretores}
-          selectedCorretor={selectedCorretor}
-          setSelectedCorretor={setSelectedCorretor}
-          selectedSource={selectedSource}
-          setSelectedSource={setSelectedSource}
-          pendingCorretor={pendingCorretor}
-          setPendingCorretor={setPendingCorretor}
-          pendingSource={pendingSource}
-          setPendingSource={setPendingSource}
-          applyFilters={applyFilters}
-          hasPendingFilters={hasPendingFilters}
+          corretores={allCorretores.length > 0 ? allCorretores : corretores}
+          // ✅ REFATORAÇÃO: Props simplificadas para filtros
+          filters={filters}
+          updateFilter={updateFilter}
+          clearFilter={clearFilter}
+          clearFilters={clearFilters}
+          hasActiveFilters={hasActiveFilters}
           sourceOptions={sourceOptions}
           data={salesData}
           isLoading={isLoadingSales || isUpdatingDateFilter}

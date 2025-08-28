@@ -11,7 +11,8 @@
       "Bash(ls:*)",
       "Bash(npm create:*)",
       "Bash(npm install:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Read(/c:\\Users\\avogu\\Documents\\saimob-frontend/**)"
     ],
     "deny": []
   }

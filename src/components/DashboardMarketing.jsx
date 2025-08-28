@@ -3,7 +3,6 @@ import * as echarts from 'echarts';
 import LoadingSpinner from './LoadingSpinner';
 import SimpleModal from './SimpleModal';
 import DetailModal from './common/DetailModal';
-import MultiSelectFilter from './common/MultiSelectFilter';
 import { COLORS } from '../constants/colors';
 import { KommoAPI } from '../services/api';
 import GranularAPI from '../services/granularAPI';
@@ -1978,24 +1977,23 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           transform: translateY(-2px);
         }
 
-        /* Estilos para MultiSelectFilter */
-        .multi-select-container {
+        /* Estilos para filtros simples */
+        .simple-filter {
           display: flex;
+          flex-direction: column;
           gap: 4px;
-          position: relative;
-          min-width: 200px;
-          align-items: center;
+          min-width: 180px;
         }
 
-        .multi-select-wrapper {
-          position: relative;
+        .simple-filter-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #4E5859;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
-        .multi-select-button {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
+        .simple-filter-select {
           padding: 10px 12px;
           background: white;
           border: 2px solid #e2e8f0;
@@ -2005,102 +2003,24 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
           cursor: pointer;
           transition: all 0.2s ease;
           min-height: 42px;
+          height: 42px;
+          appearance: none;
+          background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          background-size: 16px;
+          padding-right: 40px;
         }
 
-        .multi-select-button:hover {
+        .simple-filter-select:hover {
           border-color: #4E5859;
           box-shadow: 0 0 0 1px rgba(78, 88, 89, 0.1);
         }
 
-        .multi-select-button:focus {
+        .simple-filter-select:focus {
           outline: none;
           border-color: #4E5859;
           box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
-        }
-
-        .multi-select-text {
-          flex: 1;
-          text-align: left;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .multi-select-arrow {
-          margin-left: 8px;
-          font-size: 12px;
-          transition: transform 0.2s ease;
-          transform-origin: center;
-        }
-
-        .multi-select-arrow.open {
-          transform: rotate(180deg);
-        }
-
-        .multi-select-dropdown {
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          background: white;
-          border: 2px solid #e2e8f0;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          z-index: 1000;
-          max-height: 250px;
-          overflow-y: auto;
-          margin-top: 2px;
-        }
-
-        .multi-select-option {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 12px;
-          cursor: pointer;
-          transition: background-color 0.15s ease;
-          font-size: 14px;
-        }
-
-        .multi-select-option:hover {
-          background-color: #f7fafc;
-        }
-
-        .multi-select-option.selected {
-          background-color: rgba(78, 88, 89, 0.1);
-          color: #4E5859;
-          font-weight: 500;
-        }
-
-        .multi-select-option.select-all {
-          background-color: #f8f9fa;
-          font-weight: 600;
-          color: #4E5859;
-          border-bottom: 1px solid #e2e8f0;
-        }
-
-        .multi-select-option.select-all:hover {
-          background-color: #e9ecef;
-        }
-
-        .multi-select-divider {
-          height: 1px;
-          background-color: #e2e8f0;
-          margin: 0;
-        }
-
-        .multi-select-option input[type="checkbox"] {
-          margin: 0;
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-        }
-
-        .multi-select-option span {
-          flex: 1;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
 
         /* Estilos para filtro de campanha */
@@ -2172,23 +2092,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             font-size: 13px;
           }
           
-          .multi-select-container {
+          .simple-filter {
             min-width: 150px;
           }
           
-          .multi-select-button {
+          .simple-filter-select {
             padding: 8px 10px;
             font-size: 13px;
             min-height: 38px;
-          }
-          
-          .multi-select-option {
-            padding: 8px 10px;
-            font-size: 13px;
-          }
-          
-          .multi-select-dropdown {
-            max-height: 200px;
+            padding-right: 35px;
+            background-size: 14px;
           }
         }
 
@@ -2198,7 +2111,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             gap: 12px;
           }
           
-          .multi-select-container {
+          .simple-filter {
             min-width: unset;
           }
           
@@ -2642,13 +2555,20 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               📊 Exportar Marketing
             </button>
             <div className="filters-group">
-              <MultiSelectFilter 
-                label="Fonte"
-                options={sourceOptions}
-                selectedValues={selectedSource ? (selectedSource.includes(',') ? selectedSource.split(',') : [selectedSource]) : []}
-                onChange={(values) => setSelectedSource(values.length === 0 ? '' : values.join(','))}
-                placeholder="Todas as Fontes"
-              />
+              <div className="simple-filter">
+                <label className="simple-filter-label">Fonte</label>
+                <select 
+                  className="simple-filter-select"
+                  value={selectedSource || ''}
+                  onChange={(e) => setSelectedSource(e.target.value)}
+                >
+                  {sourceOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Filtros Geográficos - TEMPORARIAMENTE DESABILITADO */}
               {/* <GeographicFilters /> */}

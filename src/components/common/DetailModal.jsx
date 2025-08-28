@@ -111,7 +111,11 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
         borderBottom: `1px solid ${COLORS.light}`,
         cursor: 'pointer',
         userSelect: 'none',
-        position: 'relative'
+        position: 'relative',
+        backgroundColor: COLORS.lightBg,
+        whiteSpace: 'nowrap',
+        fontWeight: '600',
+        color: COLORS.primary
       }}
       onClick={() => handleSort(key)}
     >
@@ -149,23 +153,27 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
         style={{
           backgroundColor: 'white',
           borderRadius: '8px',
-          padding: '24px',
           maxWidth: '120vw',
           maxHeight: '80vh',
           width: '1200px',
-          overflowY: 'auto',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header do modal */}
+        {/* Header do modal - FIXO */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
-          marginBottom: '20px',
+          padding: '24px 24px 12px 24px',
           borderBottom: `2px solid ${COLORS.primary}`,
-          paddingBottom: '12px'
+          backgroundColor: 'white',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100
         }}>
           <h3 style={{ margin: 0, color: COLORS.primary }}>{title}</h3>
           <button 
@@ -188,14 +196,19 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           </button>
         </div>
 
-        {/* Filtro por campo selecionável */}
+        {/* Filtro por campo selecionável - FIXO */}
         {!isLoading && !error && data && data.length > 0 && (
           <div style={{ 
-            marginBottom: '20px',
+            padding: '16px 24px',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
+            backgroundColor: '#f8f9fa',
+            borderBottom: '1px solid #e2e8f0',
+            position: 'sticky',
+            top: '60px',
+            zIndex: 99
           }}>
             <label style={{ 
               fontSize: '14px', 
@@ -273,8 +286,14 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           </div>
         )}
 
-        {/* Conteúdo do modal */}
-        <div>
+        {/* Conteúdo do modal - SCROLLABLE */}
+        <div style={{
+          flex: 1,
+          overflow: 'hidden',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
           {isLoading ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
@@ -298,13 +317,27 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
               </div>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ 
+              overflow: 'auto',
+              flex: 1,
+              position: 'relative',
+              border: '1px solid #e2e8f0',
+              borderRadius: '4px'
+            }}>
               <table style={{ 
                 width: '100%', 
-                borderCollapse: 'collapse',
-                fontSize: '14px'
+                borderCollapse: 'separate',
+                borderSpacing: 0,
+                fontSize: '14px',
+                position: 'relative'
               }}>
-                <thead>
+                <thead style={{
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 5,
+                  backgroundColor: COLORS.lightBg,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
                   <tr style={{ backgroundColor: COLORS.lightBg }}>
                     {type === 'leads' && (
                       <>
