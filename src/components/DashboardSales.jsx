@@ -9,6 +9,31 @@ import { COLORS } from '../constants/colors';
 import ExcelExporter from '../utils/excelExport';
 import './Dashboard.css';
 
+// Função para normalizar texto removendo acentos e caracteres especiais
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text.toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/ç/g, 'c') // Trata ç especificamente
+    .trim();
+};
+
+// Função para verificar se o texto contém o termo de busca (flexível)
+const flexibleSearch = (fieldValue, searchValue) => {
+  const normalizedField = normalizeText(fieldValue);
+  const normalizedSearch = normalizeText(searchValue);
+  
+  // Divide o termo de busca em palavras
+  const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+  
+  // Verifica se alguma palavra do termo está contida no campo
+  // OU se o campo contém o termo completo
+  return searchWords.some(word => normalizedField.includes(word)) || 
+         normalizedField.includes(normalizedSearch);
+};
+
 // Componente de métrica com seta e fundo colorido (como na imagem)
 const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'number' }) => {
   // Função para formatar valores
@@ -588,8 +613,8 @@ const DashboardSales = ({
       // Aplicar pré-filtro se houver filtro ativo no dashboard (exceto para filtro de corretor)
       if (searchValue && searchField && searchField !== 'Corretor') {
         modalData = modalData.filter(item => {
-          const fieldValue = (item[searchField] || '').toString().toLowerCase();
-          return fieldValue.includes(searchValue.toLowerCase().trim());
+          const fieldValue = item[searchField] || '';
+          return flexibleSearch(fieldValue, searchValue);
         });
       }
 
@@ -750,8 +775,8 @@ const DashboardSales = ({
       // Aplicar filtro de busca avançada (mesmo comportamento da primeira função)
       if (searchValue && searchField && searchField !== 'Corretor') {
         modalData = modalData.filter(item => {
-          const fieldValue = (item[searchField] || '').toString().toLowerCase();
-          return fieldValue.includes(searchValue.toLowerCase().trim());
+          const fieldValue = item[searchField] || '';
+          return flexibleSearch(fieldValue, searchValue);
         });
       }
 
@@ -874,7 +899,7 @@ const DashboardSales = ({
       if (searchField === 'Corretor') {
         return users.filter(user => {
           const corretorName = user.name || '';
-          return corretorName.toLowerCase().includes(searchValue.toLowerCase().trim());
+          return flexibleSearch(corretorName, searchValue);
         });
       }
       
@@ -916,7 +941,7 @@ const DashboardSales = ({
               fieldValue = lead.leadName || lead.name || lead.client_name || '';
           }
           
-          return fieldValue.toLowerCase().includes(searchValue.toLowerCase().trim());
+          return flexibleSearch(fieldValue, searchValue);
         });
         
         // Se não há leads filtrados, remover o usuário
@@ -962,7 +987,7 @@ const DashboardSales = ({
                 fieldValue = meeting['Nome do Lead'] || meeting.leadName || '';
             }
             
-            return fieldValue.toLowerCase().includes(searchValue.toLowerCase().trim());
+            return flexibleSearch(fieldValue, searchValue);
           }).length;
         } else {
           // Sem filtro: usar valor original do corretor

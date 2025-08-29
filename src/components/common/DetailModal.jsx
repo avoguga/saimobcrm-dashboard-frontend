@@ -1,6 +1,31 @@
 import React, { memo, useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
+// Função para normalizar texto removendo acentos e caracteres especiais
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text.toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/ç/g, 'c') // Trata ç especificamente
+    .trim();
+};
+
+// Função para verificar se o texto contém o termo de busca (flexível)
+const flexibleSearch = (fieldValue, searchValue) => {
+  const normalizedField = normalizeText(fieldValue);
+  const normalizedSearch = normalizeText(searchValue);
+  
+  // Divide o termo de busca em palavras
+  const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+  
+  // Verifica se alguma palavra do termo está contida no campo
+  // OU se o campo contém o termo completo
+  return searchWords.some(word => normalizedField.includes(word)) || 
+         normalizedField.includes(normalizedSearch);
+};
+
 // Paleta de cores da SA IMOB
 const COLORS = {
   primary: '#4E5859',
@@ -80,8 +105,8 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           return propostaText.includes(filterLower);
         }
         
-        const fieldValue = (item[filterField] || '').toString().toLowerCase();
-        return fieldValue.includes(filterValue.toLowerCase());
+        const fieldValue = item[filterField] || '';
+        return flexibleSearch(fieldValue, filterValue);
       });
     }
     
