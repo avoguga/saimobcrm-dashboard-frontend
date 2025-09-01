@@ -25,13 +25,20 @@ const flexibleSearch = (fieldValue, searchValue) => {
   const normalizedField = normalizeText(fieldValue);
   const normalizedSearch = normalizeText(searchValue);
   
+  // Se o termo de busca está vazio, não deve filtrar nada
+  if (!normalizedSearch.trim()) return true;
+  
   // Divide o termo de busca em palavras
   const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
   
-  // Verifica se alguma palavra do termo está contida no campo
-  // OU se o campo contém o termo completo
-  return searchWords.some(word => normalizedField.includes(word)) || 
-         normalizedField.includes(normalizedSearch);
+  // Se há apenas uma palavra, verifica se está contida no campo
+  if (searchWords.length === 1) {
+    return normalizedField.includes(normalizedSearch);
+  }
+  
+  // Para múltiplas palavras, TODAS as palavras devem estar presentes no campo
+  // Isso permite buscar "Ricardo Gramowski" e encontrar apenas nomes que contenham ambas as palavras
+  return searchWords.every(word => normalizedField.includes(word));
 };
 
 // Componente de métrica com seta e fundo colorido (como na imagem)
@@ -232,115 +239,301 @@ const DashboardSales = ({
   }, [filters.source, sourceSelectOptions]);
 
   // Funções de exportação Excel
-  const handleExportMeetings = () => {
-    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
-      alert('Não há dados de reuniões para exportar');
-      return;
-    }
+  const handleExportMeetings = async () => {
+    try {
+      // Usar dados cached se disponível, como faz o modal
+      let tablesData;
+      const currentData = data?._rawTablesData;
+      
+      if (currentData) {
+        // Usar dados em cache para exportação instantânea
+        tablesData = currentData;
+      } else {
+        // Fallback: fazer nova requisição se não tiver cache
+        const extraParams = {
+          period: period,
+          ...(period === 'custom' && customPeriod?.startDate && customPeriod?.endDate && {
+            startDate: customPeriod.startDate,
+            endDate: customPeriod.endDate
+          }),
+          ...(filters.corretor && { corretor: filters.corretor }),
+          ...(filters.source && { fonte: filters.source })
+        };
+        
+        if (searchField && searchValue) {
+          if (searchField === 'Corretor') {
+            extraParams.corretor = searchValue;
+          } else {
+            extraParams[searchField.toLowerCase().replace(/\s+/g, '_')] = searchValue;
+          }
+        }
 
-    const exportFilters = {
-      corretor: filters.corretor,
-      fonte: filters.source
-    };
-
-    const periodLabel = (() => {
-      if (period === 'current_month') return 'Mês Atual';
-      if (period === 'previous_month') return 'Mês Anterior';
-      if (period === 'year') return 'Anual';
-      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
-        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
-      if (period === '7d') return '7 dias';
-      return period;
-    })();
+      
+      const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta']
+          })) : [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
+      
+      let modalData = dataMap['reunioes'];
+      
+      // Aplicar filtro de busca avançada se houver
+      if (searchValue && searchField && searchField !== 'Corretor') {
+        modalData = modalData.filter(item => {
+          const fieldValue = item[searchField] || '';
+          return fieldValue.toString().toLowerCase().includes(searchValue.toLowerCase());
+        });
+      }
 
-    const result = ExcelExporter.exportMeetingsData(
-      sortedChartsData.sortedMeetingsData || salesData.leadsByUser,
-      exportFilters,
-      periodLabel
-    );
+      if (!modalData || modalData.length === 0) {
+        alert('Não há dados de reuniões para exportar');
+        return;
+      }
 
-    if (result.success) {
-      alert(`Relatório de reuniões exportado com sucesso: ${result.fileName}`);
-    } else {
-      alert(`Erro ao exportar: ${result.error}`);
+      const exportFilters = {
+        corretor: filters.corretor,
+        fonte: filters.source,
+        ...(searchField && searchValue && { [searchField]: searchValue })
+      };
+
+      const periodLabel = (() => {
+        if (period === 'current_month') return 'Mês Atual';
+        if (period === 'previous_month') return 'Mês Anterior';
+        if (period === 'year') return 'Anual';
+        if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+          return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        }
+        if (period === '7d') return '7 dias';
+        return period;
+      })();
+
+      const result = ExcelExporter.exportDetailedModalData(
+        modalData,
+        'reunioes',
+        exportFilters,
+        periodLabel
+      );
+
+      if (result.success) {
+        alert(`Relatório de reuniões exportado com sucesso: ${result.fileName}`);
+      } else {
+        alert(`Erro ao exportar: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao exportar reuniões:', error);
+      alert(`Erro ao exportar reuniões: ${error.message}`);
     }
   };
 
-  const handleExportSales = () => {
-    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
-      alert('Não há dados de vendas para exportar');
-      return;
-    }
+  const handleExportSales = async () => {
+    try {
+      // Usar dados cached se disponível, como faz o modal
+      let tablesData;
+      const currentData = data?._rawTablesData;
+      
+      if (currentData) {
+        // Usar dados em cache para exportação instantânea
+        tablesData = currentData;
+      } else {
+        // Fallback: fazer nova requisição se não tiver cache
+        const extraParams = {
+          period: period,
+          ...(period === 'custom' && customPeriod?.startDate && customPeriod?.endDate && {
+            startDate: customPeriod.startDate,
+            endDate: customPeriod.endDate
+          }),
+          ...(filters.corretor && { corretor: filters.corretor }),
+          ...(filters.source && { fonte: filters.source })
+        };
+        
+        if (searchField && searchValue) {
+          if (searchField === 'Corretor') {
+            extraParams.corretor = searchValue;
+          } else {
+            extraParams[searchField.toLowerCase().replace(/\s+/g, '_')] = searchValue;
+          }
+        }
 
-    const exportFilters = {
-      corretor: filters.corretor,
-      fonte: filters.source
-    };
-
-    const periodLabel = (() => {
-      if (period === 'current_month') return 'Mês Atual';
-      if (period === 'previous_month') return 'Mês Anterior';
-      if (period === 'year') return 'Anual';
-      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
-        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
-      if (period === '7d') return '7 dias';
-      return period;
-    })();
+      
+      const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta']
+          })) : [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
+      
+      let modalData = dataMap['vendas'];
+      
+      // Aplicar filtro de busca avançada se houver
+      if (searchValue && searchField && searchField !== 'Corretor') {
+        modalData = modalData.filter(item => {
+          const fieldValue = item[searchField] || '';
+          return fieldValue.toString().toLowerCase().includes(searchValue.toLowerCase());
+        });
+      }
 
-    const result = ExcelExporter.exportSalesData(
-      sortedChartsData.sortedSalesData || salesData.leadsByUser,
-      exportFilters,
-      periodLabel
-    );
+      if (!modalData || modalData.length === 0) {
+        alert('Não há dados de vendas para exportar');
+        return;
+      }
 
-    if (result.success) {
-      alert(`Relatório de vendas exportado com sucesso: ${result.fileName}`);
-    } else {
-      alert(`Erro ao exportar: ${result.error}`);
+      const exportFilters = {
+        corretor: filters.corretor,
+        fonte: filters.source,
+        ...(searchField && searchValue && { [searchField]: searchValue })
+      };
+
+      const periodLabel = (() => {
+        if (period === 'current_month') return 'Mês Atual';
+        if (period === 'previous_month') return 'Mês Anterior';
+        if (period === 'year') return 'Anual';
+        if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+          return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        }
+        if (period === '7d') return '7 dias';
+        return period;
+      })();
+
+      const result = ExcelExporter.exportDetailedModalData(
+        modalData,
+        'vendas',
+        exportFilters,
+        periodLabel
+      );
+
+      if (result.success) {
+        alert(`Relatório de vendas exportado com sucesso: ${result.fileName}`);
+      } else {
+        alert(`Erro ao exportar: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao exportar vendas:', error);
+      alert(`Erro ao exportar vendas: ${error.message}`);
     }
   };
 
-  const handleExportLeads = () => {
-    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
-      alert('Não há dados de leads para exportar');
-      return;
-    }
+  const handleExportLeads = async () => {
+    try {
+      // Usar dados cached se disponível, como faz o modal
+      let tablesData;
+      const currentData = data?._rawTablesData;
+      
+      if (currentData) {
+        // Usar dados em cache para exportação instantânea
+        tablesData = currentData;
+      } else {
+        // Fallback: fazer nova requisição se não tiver cache
+        const extraParams = {
+          period: period,
+          ...(period === 'custom' && customPeriod?.startDate && customPeriod?.endDate && {
+            startDate: customPeriod.startDate,
+            endDate: customPeriod.endDate
+          }),
+          ...(filters.corretor && { corretor: filters.corretor }),
+          ...(filters.source && { fonte: filters.source })
+        };
+        
+        if (searchField && searchValue) {
+          if (searchField === 'Corretor') {
+            extraParams.corretor = searchValue;
+          } else {
+            extraParams[searchField.toLowerCase().replace(/\s+/g, '_')] = searchValue;
+          }
+        }
 
-    const exportFilters = {
-      corretor: filters.corretor,
-      fonte: filters.source
-    };
-
-    const periodLabel = (() => {
-      if (period === 'current_month') return 'Mês Atual';
-      if (period === 'previous_month') return 'Mês Anterior';
-      if (period === 'year') return 'Anual';
-      if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
-        return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
-      if (period === '7d') return '7 dias';
-      return period;
-    })();
+      
+      const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta']
+          })) : [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
+      
+      let modalData = dataMap['leads'];
+      
+      // Aplicar filtro de busca avançada se houver
+      if (searchValue && searchField && searchField !== 'Corretor') {
+        modalData = modalData.filter(item => {
+          const fieldValue = item[searchField] || '';
+          return fieldValue.toString().toLowerCase().includes(searchValue.toLowerCase());
+        });
+      }
 
-    const result = ExcelExporter.exportLeadsData(
-      sortedChartsData.sortedLeadsData || salesData.leadsByUser,
-      exportFilters,
-      periodLabel
-    );
+      if (!modalData || modalData.length === 0) {
+        alert('Não há dados de leads para exportar');
+        return;
+      }
 
-    if (result.success) {
-      alert(`Relatório de leads exportado com sucesso: ${result.fileName}`);
-    } else {
-      alert(`Erro ao exportar: ${result.error}`);
+      const exportFilters = {
+        corretor: filters.corretor,
+        fonte: filters.source,
+        ...(searchField && searchValue && { [searchField]: searchValue })
+      };
+
+      const periodLabel = (() => {
+        if (period === 'current_month') return 'Mês Atual';
+        if (period === 'previous_month') return 'Mês Anterior';
+        if (period === 'year') return 'Anual';
+        if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+          return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        }
+        if (period === '7d') return '7 dias';
+        return period;
+      })();
+
+      const result = ExcelExporter.exportDetailedModalData(
+        modalData,
+        'leads',
+        exportFilters,
+        periodLabel
+      );
+
+      if (result.success) {
+        alert(`Relatório de leads exportado com sucesso: ${result.fileName}`);
+      } else {
+        alert(`Erro ao exportar: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao exportar leads:', error);
+      alert(`Erro ao exportar leads: ${error.message}`);
     }
   };
   const [salesData, setSalesData] = useState(data); // Dados filtrados
   const [comparisonData, setComparisonData] = useState(null);
   
   // Estados para filtro de busca avançada
-  const [searchField, setSearchField] = useState('Corretor');
+  const [searchField, setSearchField] = useState('Nome do Lead');
   const [searchValue, setSearchValue] = useState('');
   
   // Estado do modal usando ref para não causar re-renders
@@ -571,11 +764,19 @@ const DashboardSales = ({
 
       let modalData = getFilteredData();
       
-      // Se é tipo propostas ou vendas, usar os dados específicos
+      // Se é tipo propostas, filtrar dos leadsDetalhes
       if (type === 'propostas') {
-        // Para propostas, buscar dos leads se não vier do backend
-        if (tablesData.propostasDetalhes && tablesData.propostasDetalhes.length > 0) {
-          modalData = tablesData.propostasDetalhes;
+        // Buscar propostas dos leadsDetalhes do backend
+        if (tablesData.leadsDetalhes && tablesData.leadsDetalhes.length > 0) {
+          modalData = tablesData.leadsDetalhes
+            .filter(lead => 
+              lead['É Proposta'] === true || 
+              lead['Etapa']?.toLowerCase().includes('proposta')
+            )
+            .map(lead => ({
+              ...lead,
+              'is_proposta': lead['É Proposta'] // Mapear o campo para o formato esperado pelo modal
+            }));
         } else {
           // Buscar propostas dos leads do corretor específico
           if (!salesData?.leadsByUser) {
@@ -598,7 +799,7 @@ const DashboardSales = ({
                   'Público': lead.publico || lead.audience || 'N/A',
                   'is_proposta': lead.is_proposta,
                   'Etapa': lead.etapa || lead.stage || 'N/A'
-                }));
+                }))
             } else {
               modalData = [];
             }
@@ -763,7 +964,15 @@ const DashboardSales = ({
       const dataMap = {
         'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
         'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
-        'propostas': tablesData.propostasDetalhes?.length > 0 ? tablesData.propostasDetalhes : getAllProposals(),
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta'] // Mapear o campo para o formato esperado pelo modal
+          })) : getAllProposals(),
         'vendas': tablesData.vendasDetalhes || []
       };
       

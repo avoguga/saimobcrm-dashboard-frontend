@@ -284,6 +284,97 @@ export class ExcelExporter {
 
     return this.exportChartData(tableData, filename, tableName, { metadata });
   }
+
+  /**
+   * Exporta dados detalhados dos modais para Excel com colunas personalizadas
+   * @param {Array} modalData - Dados do modal
+   * @param {string} modalType - Tipo do modal (leads, reunioes, propostas, vendas)
+   * @param {Object} filters - Filtros aplicados
+   * @param {string} period - Período dos dados
+   */
+  static exportDetailedModalData(modalData, modalType, filters = {}, period = '') {
+    try {
+      if (!modalData || !Array.isArray(modalData) || modalData.length === 0) {
+        throw new Error('Dados inválidos ou vazios para exportação');
+      }
+
+      const filename = `relatorio_detalhado_${modalType}`;
+
+      // Função para determinar se é reunião baseada na etapa
+      const isReuniaoRealizada = (etapa) => {
+        return etapa && (
+          etapa.toLowerCase().includes('reunião') || 
+          etapa.toLowerCase().includes('reuniao') ||
+          etapa.toLowerCase().includes('meeting')
+        );
+      };
+
+      // Função para determinar se é proposta
+      const isPropostaRealizada = (item) => {
+        return item['is_proposta'] === true || item['É Proposta'] === true;
+      };
+
+      // Função para obter data de fechamento (data da venda)
+      const getDataFechamento = (item) => {
+        // Para vendas, usar a data da venda se disponível
+        if (item['Data da Venda']) return item['Data da Venda'];
+        // Se tem status de venda concluída, usar data da proposta ou criação
+        if (item['Status']?.toLowerCase().includes('venda') || 
+            item['Etapa']?.toLowerCase().includes('venda')) {
+          return item['Data da Proposta'] !== 'N/A' ? item['Data da Proposta'] : item['Data de Criação'];
+        }
+        return 'N/A';
+      };
+
+      // Função para formatar data corretamente
+      const formatDate = (dateString) => {
+        if (!dateString || dateString === 'N/A') return 'N/A';
+        
+        // Se já está no formato brasileiro (dd/mm/yyyy), retornar como está
+        if (dateString.includes('/')) return dateString;
+        
+        // Se está no formato ISO (yyyy-mm-dd), converter para brasileiro
+        if (dateString.includes('-') && dateString.length === 10) {
+          const [year, month, day] = dateString.split('-');
+          return `${day}/${month}/${year}`;
+        }
+        
+        return dateString;
+      };
+
+      // Preparar dados para exportação com as colunas solicitadas
+      const exportData = modalData.map(item => ({
+        'Data de Criação': formatDate(item['Data de Criação'] || item['Data da Criação']),
+        'Data de Fechamento': formatDate(getDataFechamento(item)),
+        'Data da Proposta': formatDate(item['Data da Proposta']),
+        'Nome do Lead': item['Nome do Lead'] || item['Nome'] || 'N/A',
+        'Corretor': item['Corretor'] || 'N/A',
+        'Reunião (Sim ou não)': isReuniaoRealizada(item['Etapa']) ? 'Sim' : 'Não',
+        'Proposta (Sim ou não)': isPropostaRealizada(item) ? 'Sim' : 'Não',
+        'Fonte': item['Fonte'] || 'N/A',
+        'Produto': item['Produto'] || 'N/A',
+        'Anúncio': item['Anúncio'] || 'N/A',
+        'Público Alvo': item['Público'] || item['Público-Alvo'] || 'N/A',
+        'Funil': item['Funil'] || 'N/A',
+        'Etapa': item['Etapa'] || 'N/A',
+        'Status': item['Status'] || 'N/A'
+      }));
+
+      // Preparar metadados
+      const metadata = {
+        'Relatório': `Dados Detalhados - ${modalType.charAt(0).toUpperCase() + modalType.slice(1)}`,
+        'Data de Geração': new Date().toLocaleString('pt-BR'),
+        'Total de Registros': exportData.length,
+        ...(period && { 'Período': period }),
+        ...(filters && this.formatFilters(filters))
+      };
+
+      return this.exportChartData(exportData, filename, `${modalType.charAt(0).toUpperCase() + modalType.slice(1)} Detalhados`, { metadata });
+    } catch (error) {
+      console.error('Erro ao exportar dados detalhados para Excel:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 export default ExcelExporter;

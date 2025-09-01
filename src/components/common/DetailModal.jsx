@@ -1,5 +1,6 @@
 import React, { memo, useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import ExcelExporter from '../../utils/excelExport';
 
 // Função para normalizar texto removendo acentos e caracteres especiais
 const normalizeText = (text) => {
@@ -17,13 +18,36 @@ const flexibleSearch = (fieldValue, searchValue) => {
   const normalizedField = normalizeText(fieldValue);
   const normalizedSearch = normalizeText(searchValue);
   
+  // Se o termo de busca está vazio, não deve filtrar nada
+  if (!normalizedSearch.trim()) return true;
+  
   // Divide o termo de busca em palavras
   const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
   
-  // Verifica se alguma palavra do termo está contida no campo
-  // OU se o campo contém o termo completo
-  return searchWords.some(word => normalizedField.includes(word)) || 
-         normalizedField.includes(normalizedSearch);
+  // Se há apenas uma palavra, verifica se está contida no campo
+  if (searchWords.length === 1) {
+    return normalizedField.includes(normalizedSearch);
+  }
+  
+  // Para múltiplas palavras, TODAS as palavras devem estar presentes no campo
+  // Isso permite buscar "Ricardo Gramowski" e encontrar apenas nomes que contenham ambas as palavras
+  return searchWords.every(word => normalizedField.includes(word));
+};
+
+// Função para formatar data corretamente
+const formatDate = (dateString) => {
+  if (!dateString || dateString === 'N/A') return 'N/A';
+  
+  // Se já está no formato brasileiro (dd/mm/yyyy), retornar como está
+  if (dateString.includes('/')) return dateString;
+  
+  // Se está no formato ISO (yyyy-mm-dd), converter para brasileiro
+  if (dateString.includes('-') && dateString.length === 10) {
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  
+  return dateString;
 };
 
 // Paleta de cores da SA IMOB
@@ -45,6 +69,27 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [filterField, setFilterField] = useState(initialFilterField || 'Nome do Lead');
   const [filterValue, setFilterValue] = useState(initialFilterValue || '');
+
+  // Função para exportar dados para Excel
+  const handleExportToExcel = () => {
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      alert('Não há dados para exportar');
+      return;
+    }
+
+    const result = ExcelExporter.exportDetailedModalData(
+      sortedData || data,
+      type,
+      { [filterField]: filterValue },
+      'Período Atual'
+    );
+
+    if (result.success) {
+      console.log(`Exportação concluída: ${result.fileName}`);
+    } else {
+      alert(`Erro na exportação: ${result.error}`);
+    }
+  };
   
   // Atualizar os filtros quando o modal abrir com novos valores iniciais
   useEffect(() => {
@@ -201,24 +246,61 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
           zIndex: 100
         }}>
           <h3 style={{ margin: 0, color: COLORS.primary }}>{title}</h3>
-          <button 
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: COLORS.tertiary,
-              padding: '0',
-              width: '30px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            ×
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Botão de exportar para Excel */}
+            <button 
+              onClick={handleExportToExcel}
+              disabled={!data || data.length === 0}
+              style={{
+                backgroundColor: COLORS.success,
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '8px 16px',
+                cursor: !data || data.length === 0 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: !data || data.length === 0 ? 0.5 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (data && data.length > 0) {
+                  e.target.style.backgroundColor = '#45b649';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (data && data.length > 0) {
+                  e.target.style.backgroundColor = COLORS.success;
+                }
+              }}
+              title="Exportar dados para Excel"
+            >
+              📊 Excel
+            </button>
+            
+            {/* Botão de fechar */}
+            <button 
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: COLORS.tertiary,
+                padding: '0',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Filtro por campo selecionável - FIXO */}
@@ -447,7 +529,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                       }}>
                         {type === 'leads' && (
                           <>
-                            <td style={{ padding: '12px' }}>{item['Data de Criação']}</td>
+                            <td style={{ padding: '12px' }}>{formatDate(item['Data de Criação'])}</td>
                             <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                             <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                             <td style={{ padding: '12px' }}>{item['Fonte']}</td>
@@ -460,7 +542,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         )}
                         {type === 'reunioes' && (
                           <>
-                            <td style={{ padding: '12px' }}>{item['Data da Reunião']}</td>
+                            <td style={{ padding: '12px' }}>{formatDate(item['Data da Reunião'])}</td>
                             <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                             <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                             <td style={{ padding: '12px' }}>{item['Fonte']}</td>
@@ -473,7 +555,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         )}
                         {type === 'propostas' && (
                         <>
-                          <td style={{ padding: '12px' }}>{item['Data da Proposta']}</td>
+                          <td style={{ padding: '12px' }}>{formatDate(item['Data da Proposta'])}</td>
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
@@ -509,7 +591,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                       )}
                       {type === 'vendas' && (
                         <>
-                          <td style={{ padding: '12px' }}>{item['Data da Venda']}</td>
+                          <td style={{ padding: '12px' }}>{formatDate(item['Data da Venda'])}</td>
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
                           <td style={{ padding: '12px' }}>{item['Corretor']}</td>
                           <td style={{ padding: '12px' }}>{item['Fonte']}</td>
