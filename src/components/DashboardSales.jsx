@@ -65,20 +65,119 @@ const parseBrazilianCurrency = (value) => {
   return isNaN(num) ? 0 : num;
 };
 
-const createDataMap = (tablesData) => ({
-  'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
-  'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
-  'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
-    .filter(lead => 
-      lead['É Proposta'] === true || 
-      lead['Etapa']?.toLowerCase().includes('proposta')
-    )
-    .map(lead => ({
-      ...lead,
-      'is_proposta': lead['É Proposta']
-    })) : [],
-  'vendas': tablesData.vendasDetalhes || []
-});
+// Função para verificar se uma proposta está no período correto
+const isPropostaInPeriod = (proposta, period, customPeriod) => {
+  const dataPropostaStr = proposta['Data da Proposta'];
+  if (!dataPropostaStr || dataPropostaStr === 'N/A') return false;
+  
+  // Converter data da proposta para Date object
+  let dataProposta;
+  try {
+    // Formato esperado: "28/08/2025 14:16" ou "2025-08-28"
+    if (dataPropostaStr.includes('/')) {
+      const [datePart] = dataPropostaStr.split(' ');
+      const [day, month, year] = datePart.split('/');
+      dataProposta = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    } else {
+      dataProposta = new Date(dataPropostaStr);
+    }
+    
+    // Verificar se a data é válida
+    if (isNaN(dataProposta.getTime())) {
+      console.warn('Data da proposta inválida:', dataPropostaStr);
+      return false;
+    }
+  } catch (e) {
+    console.warn('Erro ao fazer parsing da data da proposta:', dataPropostaStr, e);
+    return false;
+  }
+  
+  // Definir período de comparação
+  const now = new Date();
+  let startDate, endDate;
+  
+  if (period === 'current_month') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  } else if (period === '7d') {
+    endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    startDate.setHours(0, 0, 0, 0);
+  } else if (period === 'previous_month') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  } else if (period === 'year') {
+    startDate = new Date(now.getFullYear(), 0, 1);
+    endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+  } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+    startDate = new Date(customPeriod.startDate + 'T00:00:00');
+    endDate = new Date(customPeriod.endDate + 'T23:59:59');
+  } else {
+    // Para períodos específicos como agosto de 2025
+    console.warn('Período não reconhecido:', period);
+    return true; // Se não conseguir determinar período, inclui a proposta
+  }
+  
+  // Debug: log das datas para verificação
+  const isInPeriod = dataProposta >= startDate && dataProposta <= endDate;
+  
+  // Log apenas para propostas para debug
+  if (proposta['É Proposta'] === true || proposta.is_proposta === true) {
+    console.log('Proposta debug:', {
+      nome: proposta['Nome do Lead'],
+      dataPropostaStr,
+      dataProposta: dataProposta.toISOString().split('T')[0],
+      period,
+      startDate: startDate.toISOString().split('T')[0], 
+      endDate: endDate.toISOString().split('T')[0],
+      isInPeriod
+    });
+  }
+  
+  return isInPeriod;
+};
+
+const createDataMap = (tablesData, period = null, customPeriod = null) => {
+  // 🆕 USAR PROPOSTAS DO BACKEND: Se propostasDetalhes existir, usar diretamente
+  let propostas = [];
+  
+  if (tablesData.propostasDetalhes && tablesData.propostasDetalhes.length > 0) {
+    // ✅ Usar dados já processados pelo backend
+    propostas = tablesData.propostasDetalhes.map(proposta => ({
+      ...proposta,
+      'is_proposta': true // Garantir flag de proposta
+    }));
+    
+    console.log('✅ Usando propostasDetalhes do backend:', propostas.length, 'propostas');
+  } else {
+    // 🔄 FALLBACK: Filtrar manualmente se propostasDetalhes não existir
+    console.log('⚠️ propostasDetalhes não encontrado, usando fallback manual');
+    
+    propostas = tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+      .filter(lead => 
+        lead['É Proposta'] === true || 
+        lead['Etapa']?.toLowerCase().includes('proposta')
+      )
+      .map(lead => ({
+        ...lead,
+        'is_proposta': lead['É Proposta']
+      })) : [];
+      
+    // Se período foi fornecido, filtrar pela Data da Proposta
+    if (period) {
+      propostas = propostas.filter(proposta => isPropostaInPeriod(proposta, period, customPeriod));
+    }
+  }
+  
+  return {
+    'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+    'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+    'propostas': propostas,
+    'vendas': tablesData.vendasDetalhes || []
+  };
+};
 
 
 
@@ -163,7 +262,7 @@ const DashboardSales = ({
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
-      const dataMap = createDataMap(tablesData);
+      const dataMap = createDataMap(tablesData, period, customPeriod);
       
       let modalData = dataMap['reunioes'];
       
@@ -238,7 +337,7 @@ const DashboardSales = ({
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
-      const dataMap = createDataMap(tablesData);
+      const dataMap = createDataMap(tablesData, period, customPeriod);
       
       let modalData = dataMap['vendas'];
       
@@ -313,7 +412,7 @@ const DashboardSales = ({
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
-      const dataMap = createDataMap(tablesData);
+      const dataMap = createDataMap(tablesData, period, customPeriod);
       
       let modalData = dataMap['leads'];
       
@@ -534,7 +633,7 @@ const DashboardSales = ({
             if (selectedSources.length > 0) {
               filtered = filtered.filter(item => {
                 const itemFonte = item.fonte || item.Fonte || item.source || item.utm_source || '';
-                return selectedSources.includes(itemFonte);
+                return selectedSources.some(source => flexibleSearch(itemFonte, source));
               });
             }
           }
@@ -584,10 +683,19 @@ const DashboardSales = ({
 
       let modalData = getFilteredData();
       
-      // Se é tipo propostas, filtrar dos leadsDetalhes
+      // Se é tipo propostas, usar propostasDetalhes do backend
       if (type === 'propostas') {
-        // Buscar propostas dos leadsDetalhes do backend
-        if (tablesData.leadsDetalhes && tablesData.leadsDetalhes.length > 0) {
+        // 🆕 PRIORIDADE: Usar propostasDetalhes se existir
+        if (tablesData.propostasDetalhes && tablesData.propostasDetalhes.length > 0) {
+          modalData = tablesData.propostasDetalhes.map(proposta => ({
+            ...proposta,
+            'is_proposta': true // Garantir flag
+          }));
+          console.log('✅ Modal usando propostasDetalhes do backend:', modalData.length);
+        }
+        // 🔄 FALLBACK 1: Usar leadsDetalhes e filtrar manualmente
+        else if (tablesData.leadsDetalhes && tablesData.leadsDetalhes.length > 0) {
+          console.log('⚠️ Modal usando fallback: filtrar leadsDetalhes');
           modalData = tablesData.leadsDetalhes
             .filter(lead => 
               lead['É Proposta'] === true || 
@@ -595,10 +703,12 @@ const DashboardSales = ({
             )
             .map(lead => ({
               ...lead,
-              'is_proposta': lead['É Proposta'] // Mapear o campo para o formato esperado pelo modal
+              'is_proposta': lead['É Proposta']
             }));
-        } else {
-          // Buscar propostas dos leads do corretor específico
+        } 
+        // 🔄 FALLBACK 2: Usar leadsByUser (antigo)
+        else {
+          console.log('⚠️ Modal usando fallback: leadsByUser');
           if (!salesData?.leadsByUser) {
             modalData = [];
           } else {
@@ -610,7 +720,7 @@ const DashboardSales = ({
                   lead.etapa?.toLowerCase().includes('proposta')
                 )
                 .map(lead => ({
-                  'Data da Proposta': lead.createdDate || lead.created_date || 'N/A',
+                  'Data da Proposta': lead['Data da Proposta'] || lead.createdDate || lead.created_date || 'N/A',
                   'Nome do Lead': lead.leadName || lead.name || lead.client_name || 'N/A',
                   'Corretor': corretorName,
                   'Fonte': lead.fonte || lead.source || 'N/A',
@@ -750,7 +860,7 @@ const DashboardSales = ({
             // Adicionar informações do corretor em cada lead
             userProposals.forEach(lead => {
               allProposals.push({
-                'Data da Proposta': lead.createdDate || lead.created_date || 'N/A',
+                'Data da Proposta': lead['Data da Proposta'] || lead.createdDate || lead.created_date || 'N/A',
                 'Nome do Lead': lead.leadName || lead.name || lead.client_name || 'N/A',
                 'Corretor': user.name || 'N/A',
                 'Fonte': lead.fonte || lead.source || 'N/A',
@@ -770,15 +880,34 @@ const DashboardSales = ({
       const dataMap = {
         'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
         'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
-        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
-          .filter(lead => 
-            lead['É Proposta'] === true || 
-            lead['Etapa']?.toLowerCase().includes('proposta')
-          )
-          .map(lead => ({
-            ...lead,
-            'is_proposta': lead['É Proposta'] // Mapear o campo para o formato esperado pelo modal
-          })) : getAllProposals(),
+        'propostas': (() => {
+          // 🆕 PRIORIDADE: Usar propostasDetalhes se existir
+          if (tablesData.propostasDetalhes && tablesData.propostasDetalhes.length > 0) {
+            console.log('✅ openModalByCorretor usando propostasDetalhes:', tablesData.propostasDetalhes.length);
+            return tablesData.propostasDetalhes.map(proposta => ({
+              ...proposta,
+              'is_proposta': true
+            }));
+          }
+          // 🔄 FALLBACK 1: Usar leadsDetalhes
+          else if (tablesData.leadsDetalhes) {
+            console.log('⚠️ openModalByCorretor usando fallback: leadsDetalhes');
+            return tablesData.leadsDetalhes
+              .filter(lead => 
+                lead['É Proposta'] === true || 
+                lead['Etapa']?.toLowerCase().includes('proposta')
+              )
+              .map(lead => ({
+                ...lead,
+                'is_proposta': lead['É Proposta']
+              }));
+          }
+          // 🔄 FALLBACK 2: Usar getAllProposals (leadsByUser)
+          else {
+            console.log('⚠️ openModalByCorretor usando fallback: leadsByUser');
+            return getAllProposals();
+          }
+        })(),
         'vendas': tablesData.vendasDetalhes || []
       };
       
@@ -806,7 +935,7 @@ const DashboardSales = ({
         if (selectedSources.length > 0) {
           modalData = modalData.filter(item => {
             const itemFonte = item.fonte || item.Fonte || item.source || item.utm_source || '';
-            return selectedSources.includes(itemFonte);
+            return selectedSources.some(source => flexibleSearch(itemFonte, source));
           });
         }
       }
@@ -973,17 +1102,17 @@ const DashboardSales = ({
       if (selectedSources.length > 0) {
         allLeads = allLeads.filter(lead => {
           const leadFonte = lead.fonte || lead.Fonte || lead.source || lead.utm_source || '';
-          return selectedSources.includes(leadFonte);
+          return selectedSources.some(source => flexibleSearch(leadFonte, source));
         });
         
         allMeetings = allMeetings.filter(meeting => {
           const meetingFonte = meeting.fonte || meeting.Fonte || meeting.source || meeting.utm_source || '';
-          return selectedSources.includes(meetingFonte);
+          return selectedSources.some(source => flexibleSearch(meetingFonte, source));
         });
         
         allSales = allSales.filter(sale => {
           const saleFonte = sale.fonte || sale.Fonte || sale.source || sale.utm_source || '';
-          return selectedSources.includes(saleFonte);
+          return selectedSources.some(source => flexibleSearch(saleFonte, source));
         });
       }
     }
@@ -1061,24 +1190,91 @@ const DashboardSales = ({
       corretorStats[corretorName].meetingsHeld++;
     });
     
-    // Processar propostas dos leads
-    allLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
+    // Processar propostas usando propostasDetalhes do backend (já filtradas por Data da Proposta!)
+    // 🆕 NOVA LÓGICA: Usar dados já processados pelo backend + aplicar filtros do frontend
+    let propostas = [];
+    
+    if (tablesData.propostasDetalhes && tablesData.propostasDetalhes.length > 0) {
+      // ✅ Usar dados já filtrados pelo backend por Data da Proposta
+      propostas = [...tablesData.propostasDetalhes]; // Clone para não modificar original
+      console.log('📊 Processando propostas do backend para gráficos:', propostas.length);
       
-      // Calcular propostas
-      if (lead['É Proposta'] === true || lead.is_proposta === true || 
-          (lead.Etapa && lead.Etapa.toLowerCase().includes('proposta'))) {
-        if (!corretorStats[corretorName]) {
-          corretorStats[corretorName] = {
-            name: corretorName,
-            value: 0,
-            meetingsHeld: 0,
-            proposalsHeld: 0,
-            sales: 0
-          };
+      // 🔧 APLICAR FILTROS DE FRONTEND nas propostas do backend
+      console.log('🔧 Aplicando filtros de frontend nas propostas...');
+      
+      // Aplicar filtros de corretor
+      if (filters.corretor && filters.corretor.trim() !== '') {
+        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
+        if (selectedCorretores.length > 0) {
+          propostas = propostas.filter(proposta => {
+            const propostaCorretor = proposta.Corretor || '';
+            return selectedCorretores.some(corretor => 
+              propostaCorretor === corretor || 
+              (corretor === 'VAZIO' && (propostaCorretor === 'Vazio' || propostaCorretor === 'SA IMOB')) ||
+              (corretor === 'Vazio' && propostaCorretor === 'SA IMOB')
+            );
+          });
         }
-        corretorStats[corretorName].proposalsHeld++;
       }
+      
+      // Aplicar filtros de fonte
+      if (filters.source && filters.source.trim() !== '') {
+        const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
+        if (selectedSources.length > 0) {
+          propostas = propostas.filter(proposta => {
+            const propostaFonte = proposta.fonte || proposta.Fonte || proposta.source || proposta.utm_source || '';
+            return selectedSources.some(source => flexibleSearch(propostaFonte, source));
+          });
+        }
+      }
+      
+      // Aplicar filtro de busca avançada
+      if (searchValue && searchField && searchField !== 'Corretor') {
+        propostas = propostas.filter(proposta => {
+          const fieldValue = proposta[searchField] || '';
+          return flexibleSearch(fieldValue, searchValue);
+        });
+      }
+      
+      // Aplicar filtro de busca avançada por Corretor
+      if (searchValue && searchField === 'Corretor') {
+        propostas = propostas.filter(proposta => {
+          const corretorName = proposta.Corretor || '';
+          return flexibleSearch(corretorName, searchValue);
+        });
+      }
+      
+      console.log('📊 Propostas após filtros frontend:', propostas.length);
+    } else {
+      // 🔄 FALLBACK: Filtrar manualmente
+      console.log('⚠️ Usando fallback manual para propostas nos gráficos');
+      const allPropostasCandidates = [
+        ...(tablesData.leadsDetalhes || []),
+        ...(tablesData.organicosDetalhes || [])
+      ];
+      
+      propostas = allPropostasCandidates.filter(lead => 
+        (lead['É Proposta'] === true || lead.is_proposta === true || 
+         (lead.Etapa && lead.Etapa.toLowerCase().includes('proposta'))) &&
+        isPropostaInPeriod(lead, period, customPeriod)
+      );
+    }
+    
+    // Contar propostas por corretor
+    propostas.forEach(proposta => {
+      const corretorName = proposta.Corretor === 'SA IMOB' ? 'Vazio' : (proposta.Corretor || 'Desconhecido');
+      
+      if (!corretorStats[corretorName]) {
+        corretorStats[corretorName] = {
+          name: corretorName,
+          value: 0,
+          meetingsHeld: 0,
+          proposalsHeld: 0,
+          sales: 0
+        };
+      }
+      
+      corretorStats[corretorName].proposalsHeld++;
     });
     
     // Processar vendas usando dados específicos de vendas
@@ -1849,7 +2045,7 @@ const DashboardSales = ({
                         const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
                         vendasFiltradas = vendasFiltradas.filter(venda => {
                           const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                          return selectedSources.includes(vendaFonte);
+                          return selectedSources.some(source => flexibleSearch(vendaFonte, source));
                         });
                       }
                       
@@ -1913,7 +2109,7 @@ const DashboardSales = ({
                       const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
                       vendasFiltradas = vendasFiltradas.filter(venda => {
                         const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                        return selectedSources.includes(vendaFonte);
+                        return selectedSources.some(source => flexibleSearch(vendaFonte, source));
                       });
                     }
                     
@@ -1983,7 +2179,7 @@ const DashboardSales = ({
                         const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
                         vendasFiltradas = vendasFiltradas.filter(venda => {
                           const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                          return selectedSources.includes(vendaFonte);
+                          return selectedSources.some(source => flexibleSearch(vendaFonte, source));
                         });
                       }
                       
@@ -2039,7 +2235,7 @@ const DashboardSales = ({
                       const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
                       vendasFiltradas = vendasFiltradas.filter(venda => {
                         const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                        return selectedSources.includes(vendaFonte);
+                        return selectedSources.some(source => flexibleSearch(vendaFonte, source));
                       });
                     }
                     
