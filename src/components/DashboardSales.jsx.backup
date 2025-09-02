@@ -7,79 +7,180 @@ import SimpleModal from './SimpleModal';
 import DetailModal from './common/DetailModal';
 import { COLORS } from '../constants/colors';
 import ExcelExporter from '../utils/excelExport';
-import { flexibleSearch } from '../utils/textUtils';
-import { getChartHeight, getChartConfigs } from '../constants/dashboardConfig';
-import ComparisonMetricCard from './dashboard/sales/components/ComparisonMetricCard';
-import TrendIndicator from './dashboard/sales/components/TrendIndicator';
-import { useSalesData } from './dashboard/sales/hooks/useSalesData';
-import { useAdvancedSearch } from './dashboard/sales/hooks/useAdvancedSearch';
 import './Dashboard.css';
-import './dashboard/sales/styles/SalesDashboard.css';
 
-// Funções utilitárias para consolidar código duplicado
-const getPeriodLabel = (period, customPeriod) => {
-  if (period === 'current_month') return 'Mês Atual';
-  if (period === 'previous_month') return 'Mês Anterior';
-  if (period === 'year') return 'Anual';
-  if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
-    return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+// Função para normalizar texto removendo acentos e caracteres especiais
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text.toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/ç/g, 'c') // Trata ç especificamente
+    .trim();
+};
+
+// Função para verificar se o texto contém o termo de busca (flexível)
+const flexibleSearch = (fieldValue, searchValue) => {
+  const normalizedField = normalizeText(fieldValue);
+  const normalizedSearch = normalizeText(searchValue);
+  
+  // Se o termo de busca está vazio, não deve filtrar nada
+  if (!normalizedSearch.trim()) return true;
+  
+  // Divide o termo de busca em palavras
+  const searchWords = normalizedSearch.split(/\s+/).filter(word => word.length > 0);
+  
+  // Se há apenas uma palavra, verifica se está contida no campo
+  if (searchWords.length === 1) {
+    return normalizedField.includes(normalizedSearch);
   }
-  if (period === '7d') return '7 dias';
-  return period;
+  
+  // Para múltiplas palavras, TODAS as palavras devem estar presentes no campo
+  // Isso permite buscar "Ricardo Gramowski" e encontrar apenas nomes que contenham ambas as palavras
+  return searchWords.every(word => normalizedField.includes(word));
 };
 
-// Função para formatar valores monetários no padrão brasileiro
-const formatCurrency = (value) => {
-  // Garantir que temos um número válido
-  const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-  
-  // Usar o formatador nativo do JavaScript com locale pt-BR
-  return new Intl.NumberFormat('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    // Não usar style: 'currency' porque já adicionamos R$ manualmente
-  }).format(numValue);
+// Componente de métrica com seta e fundo colorido (como na imagem)
+const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'number' }) => {
+  // Função para formatar valores
+  const formatValue = (value) => {
+    if (!value && value !== 0) return '0';
+    
+    switch (format) {
+      case 'percentage':
+        return `${value.toFixed(1)}%`;
+      case 'currency':
+        return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      case 'time':
+        return `${value} dias`;
+      default:
+        return value.toLocaleString('pt-BR');
+    }
+  };
+
+  // Calcular diferença e tendência
+  const calculateTrend = () => {
+    if (!previousValue || previousValue === 0) {
+      return { percentage: 0, trend: 'neutral', difference: 0 };
+    }
+
+    const difference = currentValue - previousValue;
+    const percentage = (difference / previousValue) * 100;
+    
+    let trend = 'neutral';
+    if (percentage > 1) trend = 'up';
+    else if (percentage < -1) trend = 'down';
+
+    return { percentage, trend, difference };
+  };
+
+  const { percentage, trend, difference } = calculateTrend();
+
+  // Estilo baseado na tendência (como na imagem)
+  const getTrendStyle = () => {
+    switch (trend) {
+      case 'up':
+        return {
+          backgroundColor: 'rgba(76, 224, 179, 0.25)', // Verde com mais opacidade
+          color: '#374151', // Cinza escuro
+          icon: '↑',
+          sign: '+'
+        };
+      case 'down':
+        return {
+          backgroundColor: 'rgba(255, 58, 94, 0.25)', // Vermelho com mais opacidade
+          color: '#374151', // Cinza escuro
+          icon: '↓',
+          sign: ''
+        };
+      default:
+        return {
+          backgroundColor: 'rgba(117, 119, 123, 0.15)', // Cinza claro
+          color: '#374151', // Cinza escuro
+          icon: '→',
+          sign: ''
+        };
+    }
+  };
+
+  const trendStyle = getTrendStyle();
+
+  return (
+    <div className="comparison-metric-new">
+      <div className="metric-header-new">
+        <h3 className="metric-title-new">{title}</h3>
+      </div>
+      
+      <div className="metric-main-value">
+        {formatValue(currentValue)}
+      </div>
+      
+      <div className="metric-previous">
+        <span className="previous-label-new">PERÍODO ANTERIOR:</span>
+        <div className="previous-value-new">{formatValue(previousValue)}</div>
+      </div>
+      
+      <div 
+        className="trend-indicator-new"
+        style={{ 
+          backgroundColor: trendStyle.backgroundColor,
+          color: trendStyle.color 
+        }}
+      >
+        <span className="trend-icon-new">{trendStyle.icon}</span>
+        <span className="trend-text-new">
+          {trendStyle.sign}{Math.abs(percentage).toFixed(1)}%
+        </span>
+        {format === 'currency' && difference !== 0 && (
+          <span className="trend-extra">
+            ({trendStyle.sign}R$ {Math.abs(difference).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+          </span>
+        )}
+        {format === 'time' && difference !== 0 && (
+          <span className="trend-extra">
+            ({trendStyle.sign}{Math.abs(difference).toFixed(1)} dias)
+          </span>
+        )}
+      </div>
+    </div>
+  );
 };
 
-// Função para converter string monetária brasileira para número
-const parseBrazilianCurrency = (value) => {
-  if (typeof value === 'number') return value;
-  if (!value) return 0;
+
+// Componente para exibir indicador de tendência
+const TrendIndicator = ({ value, showZero = false }) => {
+  // Se o valor for null, undefined ou 0 e showZero for false, não exibir nada
+  if ((value === null || value === undefined || (value === 0 && !showZero))) {
+    return null;
+  }
   
-  // Converter para string se necessário
-  let str = value.toString();
+  // Determinar se o valor é positivo, negativo ou zero
+  const isPositive = value > 0;
   
-  // Remover R$, espaços e outros caracteres não numéricos (exceto vírgula e ponto)
-  str = str.replace(/[R$\s]/g, '');
+  // Estilo para o indicador de tendência com setas diagonais
+  const style = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '4px',
+    padding: '4px 10px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: '600',
+    backgroundColor: isPositive 
+      ? 'rgba(76, 224, 179, 0.25)'  // Verde com mais opacidade
+      : 'rgba(255, 58, 94, 0.25)',  // Vermelho com mais opacidade
+    color: '#374151', // Cinza escuro
+    marginLeft: '8px'
+  };
   
-  // Remover pontos (separadores de milhares) 
-  str = str.replace(/\./g, '');
-  
-  // Substituir vírgula (separador decimal) por ponto
-  str = str.replace(',', '.');
-  
-  // Converter para número
-  const num = parseFloat(str);
-  
-  // Retornar 0 se não for um número válido
-  return isNaN(num) ? 0 : num;
+  return (
+    <div style={style} className="trend-indicator-square">
+      {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{Math.abs(value).toFixed(1)}%
+    </div>
+  );
 };
-
-const createDataMap = (tablesData) => ({
-  'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
-  'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
-  'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
-    .filter(lead => 
-      lead['É Proposta'] === true || 
-      lead['Etapa']?.toLowerCase().includes('proposta')
-    )
-    .map(lead => ({
-      ...lead,
-      'is_proposta': lead['É Proposta']
-    })) : [],
-  'vendas': tablesData.vendasDetalhes || []
-});
-
 
 
 // ✅ REFATORAÇÃO: Props simplificadas e organizadas
@@ -105,15 +206,62 @@ const DashboardSales = ({
   applyCustomPeriod 
 }) => {
   
-  // Hooks customizados para gerenciar estado
-  const salesDataHook = useSalesData(data);
-  const searchHook = useAdvancedSearch();
+  const [rawSalesData, setRawSalesData] = useState(data); // Dados originais sem filtro
+  const [salesData, setSalesData] = useState(data); // Dados filtrados
+  const [comparisonData, setComparisonData] = useState(null);
   
-  // Desestruturação para facilitar uso
-  const { rawSalesData, salesData, comparisonData, setRawSalesData, setSalesData, setComparisonData, corretorOptions, sourceSelectOptions } = salesDataHook;
-  const { searchField, searchValue, setSearchField, setSearchValue } = searchHook;
+  // Estados para filtro de busca avançada
+  const [searchField, setSearchField] = useState('Nome do Lead');
+  const [searchValue, setSearchValue] = useState('');
 
+  // ✅ Extrair dados dinamicamente do frontend (como o filtro de Busca Avançada)
+  // SEMPRE usar os dados ORIGINAIS COMPLETOS para ter TODOS os corretores disponíveis
+  const corretorOptions = useMemo(() => {
+    if (!data?._rawTablesData) return [];
+    
+    // Extrair nomes únicos dos corretores dos dados ORIGINAIS COMPLETOS (igual ao sourceSelectOptions)
+    const allLeads = [
+      ...(data._rawTablesData.leadsDetalhes || []),
+      ...(data._rawTablesData.organicosDetalhes || []),
+      ...(data._rawTablesData.reunioesDetalhes || []),
+      ...(data._rawTablesData.reunioesOrganicasDetalhes || []),
+      ...(data._rawTablesData.vendasDetalhes || [])
+    ];
+    
+    const uniqueCorretores = [...new Set(allLeads.map(item => {
+      // Renomear 'SA IMOB' para 'Vazio' (como no filtro de busca avançada)
+      const corretor = item.Corretor;
+      return corretor === 'SA IMOB' ? 'Vazio' : corretor;
+    }).filter(name => name && name.trim() !== ''))].sort();
+    
+    return uniqueCorretores.map(name => ({
+      value: name,
+      label: name
+    }));
+  }, [data?._rawTablesData]);
 
+  const sourceSelectOptions = useMemo(() => {
+    if (!data?._rawTablesData) return [];
+    
+    // Extrair fontes únicas de todos os dados ORIGINAIS COMPLETOS
+    const allLeads = [
+      ...(data._rawTablesData.leadsDetalhes || []),
+      ...(data._rawTablesData.organicosDetalhes || []),
+      ...(data._rawTablesData.reunioesDetalhes || []),
+      ...(data._rawTablesData.reunioesOrganicasDetalhes || []),
+      ...(data._rawTablesData.vendasDetalhes || [])
+    ];
+    
+    const uniqueFontes = [...new Set(allLeads.map(item => {
+      // Tentar diferentes campos possíveis para fonte
+      return item.fonte || item.Fonte || item.source || item.utm_source || '';
+    }).filter(fonte => fonte && fonte.trim() !== ''))].sort();
+    
+    return uniqueFontes.map(fonte => ({
+      value: fonte,
+      label: fonte
+    }));
+  }, [data?._rawTablesData]);
 
   // Converter valores dos filtros para formato do React-Select
   const selectedCorretorValues = useMemo(() => {
@@ -163,7 +311,20 @@ const DashboardSales = ({
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
-      const dataMap = createDataMap(tablesData);
+      const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta']
+          })) : [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
       
       let modalData = dataMap['reunioes'];
       
@@ -186,7 +347,16 @@ const DashboardSales = ({
         ...(searchField && searchValue && { [searchField]: searchValue })
       };
 
-      const periodLabel = getPeriodLabel(period, customPeriod);
+      const periodLabel = (() => {
+        if (period === 'current_month') return 'Mês Atual';
+        if (period === 'previous_month') return 'Mês Anterior';
+        if (period === 'year') return 'Anual';
+        if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+          return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        }
+        if (period === '7d') return '7 dias';
+        return period;
+      })();
 
       const result = ExcelExporter.exportDetailedModalData(
         modalData,
@@ -238,7 +408,20 @@ const DashboardSales = ({
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
-      const dataMap = createDataMap(tablesData);
+      const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta']
+          })) : [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
       
       let modalData = dataMap['vendas'];
       
@@ -261,7 +444,16 @@ const DashboardSales = ({
         ...(searchField && searchValue && { [searchField]: searchValue })
       };
 
-      const periodLabel = getPeriodLabel(period, customPeriod);
+      const periodLabel = (() => {
+        if (period === 'current_month') return 'Mês Atual';
+        if (period === 'previous_month') return 'Mês Anterior';
+        if (period === 'year') return 'Anual';
+        if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+          return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        }
+        if (period === '7d') return '7 dias';
+        return period;
+      })();
 
       const result = ExcelExporter.exportDetailedModalData(
         modalData,
@@ -313,7 +505,20 @@ const DashboardSales = ({
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
-      const dataMap = createDataMap(tablesData);
+      const dataMap = {
+        'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
+        'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
+        'propostas': tablesData.leadsDetalhes ? tablesData.leadsDetalhes
+          .filter(lead => 
+            lead['É Proposta'] === true || 
+            lead['Etapa']?.toLowerCase().includes('proposta')
+          )
+          .map(lead => ({
+            ...lead,
+            'is_proposta': lead['É Proposta']
+          })) : [],
+        'vendas': tablesData.vendasDetalhes || []
+      };
       
       let modalData = dataMap['leads'];
       
@@ -336,7 +541,16 @@ const DashboardSales = ({
         ...(searchField && searchValue && { [searchField]: searchValue })
       };
 
-      const periodLabel = getPeriodLabel(period, customPeriod);
+      const periodLabel = (() => {
+        if (period === 'current_month') return 'Mês Atual';
+        if (period === 'previous_month') return 'Mês Anterior';
+        if (period === 'year') return 'Anual';
+        if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+          return `${customPeriod.startDate} a ${customPeriod.endDate}`;
+        }
+        if (period === '7d') return '7 dias';
+        return period;
+      })();
 
       const result = ExcelExporter.exportDetailedModalData(
         modalData,
@@ -512,14 +726,22 @@ const DashboardSales = ({
       }
 
 
-      // ✅ OTIMIZAÇÃO: SEMPRE usar dados já carregados e filtrar no frontend
+      // ✅ OTIMIZAÇÃO: Tentar usar dados já carregados e filtrar no frontend
       let tablesData;
       
-      // Verificar se temos dados já carregados
-      const currentData = salesData?._rawTablesData || data?._rawTablesData;
+      // Verificar se podemos usar dados já carregados
+      const currentData = data?._rawTablesData;
+      const currentParams = data?._lastParams;
       
-      if (currentData) {
-        // SEMPRE usar dados carregados e filtrar pelo corretor no frontend
+      const dateParamsMatch = currentParams && (
+        (extraParams.start_date === currentParams.start_date && 
+         extraParams.end_date === currentParams.end_date) ||
+        (extraParams.days === currentParams.days)
+      );
+      
+      if (currentData && dateParamsMatch) {
+        
+        // Filtrar dados no frontend pelo corretor
         const corretorFilter = corretorName === 'VAZIO' ? 'SA IMOB' : corretorName;
         
         tablesData = {
@@ -543,7 +765,7 @@ const DashboardSales = ({
           ) || []
         };
       } else {
-        // Só fazer requisição se não temos dados carregados
+        // Se parâmetros diferentes, fazer nova requisição
         tablesData = await KommoAPI.getDetailedTables(corretorName, filters.source || '', extraParams);
       }
       
@@ -708,18 +930,32 @@ const DashboardSales = ({
       }
 
 
-      // ✅ OTIMIZAÇÃO: SEMPRE reutilizar dados já carregados no dashboard
-      // Os dados já foram carregados com os filtros de período corretos
+      // ✅ OTIMIZAÇÃO: Reutilizar dados já carregados no dashboard ao invés de nova requisição
+      // Só fazer nova requisição se os parâmetros de período forem diferentes dos atuais
       let tablesData;
       
-      // Verificar se temos dados já carregados do dashboard
-      const currentData = salesData?._rawTablesData || data?._rawTablesData;
+      // Verificar se podemos usar dados já carregados do dashboard
+      const currentData = data?._rawTablesData; // Dados originais salvos no dashboard
       
-      if (currentData) {
-        // SEMPRE usar os dados já carregados - eles já estão com o período correto
+      // Função helper para verificar se os filtros de data mudaram
+      const hasDateFilterChanged = (newParams) => {
+        const currentParams = data?._lastParams;
+        if (!currentParams) return true;
+        
+        // Comparar parâmetros de data
+        const dateParamsChanged = 
+          newParams.start_date !== currentParams.start_date ||
+          newParams.end_date !== currentParams.end_date ||
+          newParams.days !== currentParams.days;
+          
+        return dateParamsChanged;
+      };
+      
+      const shouldReuseData = currentData && !hasDateFilterChanged(extraParams);
+      
+      if (shouldReuseData) {
         tablesData = currentData;
       } else {
-        // Só fazer requisição se não temos dados carregados
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
@@ -821,10 +1057,25 @@ const DashboardSales = ({
 
 
   // Helpers responsivos - memoizados
-  // Configurações dos gráficos memoizadas para evitar hooks condicionais
-  const chartConfigs = useMemo(() => getChartConfigs(COLORS), []);
+  const getChartHeight = useMemo(() => (size = 'medium') => {
+    if (size === 'small') {
+      return isMobile ? '280px' : '320px';
+    } else if (size === 'medium') {
+      return isMobile ? '320px' : '380px';
+    } else {
+      return isMobile ? '380px' : '420px';
+    }
+  }, [isMobile]);
 
-  const chartStyle = useMemo(() => ({ height: getChartHeight('small', isMobile) }), [isMobile]);
+  // Configurações dos gráficos memoizadas para evitar hooks condicionais
+  const chartConfigs = useMemo(() => ({
+    leadsConfig: { xKey: 'name', yKey: 'value', color: COLORS.primary },
+    meetingsConfig: { xKey: 'name', yKey: 'meetingsHeld', color: COLORS.secondary },
+    salesConfig: { xKey: 'name', yKey: 'sales', color: COLORS.success },
+    activitiesConfig: { xKey: 'name', yKey: 'value', color: COLORS.secondary }
+  }), []);
+
+  const chartStyle = useMemo(() => ({ height: getChartHeight('small') }), [getChartHeight]);
 
   // Dados dos gráficos memoizados (ORDENADOS DECRESCENTE)
   const chartData = useMemo(() => {
@@ -874,224 +1125,196 @@ const DashboardSales = ({
   // Dados ordenados para gráficos de corretores (DECRESCENTE - maior para menor)
   // SEMPRE MOSTRA TODOS OS CORRETORES, mesmo com valor 0
   const sortedChartsData = useMemo(() => {
-    if (!salesData?._rawTablesData) {
+    if (!salesData?.leadsByUser || salesData.leadsByUser.length === 0) {
       return {
         sortedLeadsData: [],
         sortedMeetingsData: [],
         sortedSalesData: []
       };
     }
-    
-    // Usar os mesmos dados que o modal usa para garantir consistência
-    const tablesData = salesData._rawTablesData;
-    
-    // Buscar todos os leads da mesma forma que o modal
-    let allLeads = [
-      ...(tablesData.leadsDetalhes || []),
-      ...(tablesData.organicosDetalhes || [])
-    ];
-    
-    // Buscar todas as reuniões separadamente
-    let allMeetings = [
-      ...(tablesData.reunioesDetalhes || []),
-      ...(tablesData.reunioesOrganicasDetalhes || [])
-    ];
-    
-    // Buscar todas as vendas separadamente para calcular vendas corretas
-    let allSales = [
-      ...(tablesData.vendasDetalhes || [])
-    ];
-    
-    // Aplicar filtros de corretor se houver
-    if (filters.corretor && filters.corretor.trim() !== '') {
-      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-      if (selectedCorretores.length > 0) {
-        allLeads = allLeads.filter(lead => {
-          const leadCorretor = lead.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            leadCorretor === corretor || 
-            (corretor === 'VAZIO' && (leadCorretor === 'Vazio' || leadCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && leadCorretor === 'SA IMOB')
-          );
-        });
-        
-        allMeetings = allMeetings.filter(meeting => {
-          const meetingCorretor = meeting.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            meetingCorretor === corretor || 
-            (corretor === 'VAZIO' && (meetingCorretor === 'Vazio' || meetingCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && meetingCorretor === 'SA IMOB')
-          );
-        });
-        
-        allSales = allSales.filter(sale => {
-          const saleCorretor = sale.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            saleCorretor === corretor || 
-            (corretor === 'VAZIO' && (saleCorretor === 'Vazio' || saleCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && saleCorretor === 'SA IMOB')
-          );
-        });
-      }
-    }
-    
-    // Aplicar filtros de fonte se houver
-    if (filters.source && filters.source.trim() !== '') {
-      const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-      if (selectedSources.length > 0) {
-        allLeads = allLeads.filter(lead => {
-          const leadFonte = lead.fonte || lead.Fonte || lead.source || lead.utm_source || '';
-          return selectedSources.includes(leadFonte);
-        });
-        
-        allMeetings = allMeetings.filter(meeting => {
-          const meetingFonte = meeting.fonte || meeting.Fonte || meeting.source || meeting.utm_source || '';
-          return selectedSources.includes(meetingFonte);
-        });
-        
-        allSales = allSales.filter(sale => {
-          const saleFonte = sale.fonte || sale.Fonte || sale.source || sale.utm_source || '';
-          return selectedSources.includes(saleFonte);
-        });
-      }
-    }
-    
-    // Aplicar filtros de busca avançada se houver
-    if (searchValue && searchField && searchField !== 'Corretor') {
-      allLeads = allLeads.filter(lead => {
-        const fieldValue = lead[searchField] || '';
-        return flexibleSearch(fieldValue, searchValue);
-      });
-      
-      allMeetings = allMeetings.filter(meeting => {
-        const fieldValue = meeting[searchField] || '';
-        return flexibleSearch(fieldValue, searchValue);
-      });
-      
-      allSales = allSales.filter(sale => {
-        const fieldValue = sale[searchField] || '';
-        return flexibleSearch(fieldValue, searchValue);
-      });
-    }
-    
-    // Se filtro de busca avançada é por Corretor, aplicar filtro específico
-    if (searchValue && searchField === 'Corretor') {
-      allLeads = allLeads.filter(lead => {
-        const corretorName = lead.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
-      
-      allMeetings = allMeetings.filter(meeting => {
-        const corretorName = meeting.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
-      
-      allSales = allSales.filter(sale => {
-        const corretorName = sale.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
-    }
 
-    // Nova lógica: Agrupar por corretor e calcular métricas (mesma base de dados do modal)
-    const corretorStats = {};
-    
-    // Processar leads
-    allLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
+
+    // Função para filtrar por busca avançada E filtros de corretor/fonte
+    const filterByAdvancedSearch = (users) => {
+      let filteredUsers = users;
       
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
-          name: corretorName,
-          value: 0, // total leads
-          meetingsHeld: 0,
-          proposalsHeld: 0,
-          sales: 0
-        };
-      }
-      
-      corretorStats[corretorName].value++;
-    });
-    
-    // Processar reuniões separadamente
-    allMeetings.forEach(meeting => {
-      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Vazio' : (meeting.Corretor || 'Desconhecido');
-      
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
-          name: corretorName,
-          value: 0,
-          meetingsHeld: 0,
-          proposalsHeld: 0,
-          sales: 0
-        };
-      }
-      
-      corretorStats[corretorName].meetingsHeld++;
-    });
-    
-    // Processar propostas dos leads
-    allLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
-      
-      // Calcular propostas
-      if (lead['É Proposta'] === true || lead.is_proposta === true || 
-          (lead.Etapa && lead.Etapa.toLowerCase().includes('proposta'))) {
-        if (!corretorStats[corretorName]) {
-          corretorStats[corretorName] = {
-            name: corretorName,
-            value: 0,
-            meetingsHeld: 0,
-            proposalsHeld: 0,
-            sales: 0
-          };
+      // 1. Aplicar filtro de busca avançada (se houver)
+      if (searchValue.trim()) {
+        // Se o campo de busca é "Corretor", filtrar apenas pelos corretores
+        if (searchField === 'Corretor') {
+          filteredUsers = filteredUsers.filter(user => {
+            const corretorName = user.name || '';
+            return flexibleSearch(corretorName, searchValue);
+          });
+        } else {
+          // Para outros campos, filtrar pelos leads dos usuários (lógica original)
+          filteredUsers = filteredUsers.map(user => {
+            if (!user.leads || !Array.isArray(user.leads)) return user;
+            
+            const filteredLeads = user.leads.filter(lead => {
+              let fieldValue = '';
+              switch (searchField) {
+                case 'Nome do Lead':
+                  fieldValue = lead.leadName || lead.name || lead.client_name || '';
+                  break;
+                case 'Fonte':
+                  fieldValue = lead.fonte || lead.source || lead.utm_source || '';
+                  break;
+                case 'Anúncio':
+                  fieldValue = lead.anuncio || lead.ad || lead.advertisement || lead.utm_campaign || '';
+                  break;
+                case 'Público':
+                  fieldValue = lead.publico || lead.audience || lead.utm_audience || '';
+                  break;
+                case 'Produto':
+                  fieldValue = lead.produto || lead.product || lead.produto_interesse || '';
+                  break;
+                case 'Funil':
+                  fieldValue = lead.funil || lead.funnel || '';
+                  break;
+                case 'Etapa':
+                  fieldValue = lead.etapa || lead.stage || '';
+                  break;
+                default:
+                  fieldValue = '';
+              }
+              return flexibleSearch(fieldValue, searchValue);
+            });
+            
+            if (filteredLeads.length === 0) return null;
+            
+            // Recalcular métricas baseadas nos leads filtrados
+            const proposalsHeld = filteredLeads.filter(lead => 
+              lead.is_proposta === true || 
+              lead.etapa?.toLowerCase().includes('proposta')
+            ).length;
+            
+            const sales = filteredLeads.filter(lead => {
+              const etapa = (lead.etapa || '').toLowerCase();
+              if (etapa.includes('perdida')) return false;
+              return etapa.includes('venda') || etapa.includes('vendido') || etapa.includes('ganho');
+            }).length;
+            
+            return {
+              ...user,
+              leads: filteredLeads,
+              value: filteredLeads.length,
+              active: filteredLeads.length,
+              proposalsHeld: proposalsHeld,
+              sales: sales
+            };
+          }).filter(user => user !== null);
         }
-        corretorStats[corretorName].proposalsHeld++;
-      }
-    });
-    
-    // Processar vendas usando dados específicos de vendas
-    allSales.forEach(sale => {
-      const corretorName = sale.Corretor === 'SA IMOB' ? 'Vazio' : (sale.Corretor || 'Desconhecido');
-      
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
-          name: corretorName,
-          value: 0,
-          meetingsHeld: 0,
-          proposalsHeld: 0,
-          sales: 0
-        };
       }
       
-      // Cada venda filtrada é uma venda válida
-      corretorStats[corretorName].sales++;
-    });
-    
-    // Converter para array
-    const finalData = Object.values(corretorStats);
+      // 2. Aplicar filtros de corretor (se houver)
+      if (filters.corretor && filters.corretor.trim()) {
+        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
+        if (selectedCorretores.length > 0) {
+          filteredUsers = filteredUsers.filter(user => {
+            const userName = user.name === 'SA IMOB' ? 'Vazio' : user.name;
+            return selectedCorretores.includes(userName);
+          });
+        }
+      }
+      
+      // 3. Aplicar filtros de fonte (se houver)
+      if (filters.source && filters.source.trim()) {
+        const selectedFontes = filters.source.split(',').map(f => f.trim()).filter(f => f);
+        if (selectedFontes.length > 0) {
+          filteredUsers = filteredUsers.map(user => {
+            if (!user.leads || !Array.isArray(user.leads)) return user;
+            
+            const filteredLeads = user.leads.filter(lead => {
+              const fonte = lead.fonte || lead.source || lead.utm_source || '';
+              return selectedFontes.includes(fonte);
+            });
+            
+            if (filteredLeads.length === 0) return null;
+            
+            // Recalcular métricas baseadas nos leads filtrados
+            const proposalsHeld = filteredLeads.filter(lead => 
+              lead.is_proposta === true || 
+              lead.etapa?.toLowerCase().includes('proposta')
+            ).length;
+            
+            const sales = filteredLeads.filter(lead => {
+              const etapa = (lead.etapa || '').toLowerCase();
+              if (etapa.includes('perdida')) return false;
+              return etapa.includes('venda') || etapa.includes('vendido') || etapa.includes('ganho');
+            }).length;
+            
+            return {
+              ...user,
+              leads: filteredLeads,
+              value: filteredLeads.length,
+              active: filteredLeads.length,
+              proposalsHeld: proposalsHeld,
+              sales: sales
+            };
+          }).filter(user => user !== null);
+        }
+      }
+      
+      return filteredUsers;
+    };
 
-    // Usar nova lógica baseada nos mesmos dados do modal
-    const sortedLeads = [...finalData].sort((a, b) => {
-      const diff = Number(b.value || 0) - Number(a.value || 0);
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
+    // Filtrar dados e aplicar busca avançada
+    // CORREÇÃO: Incluir SA IMOB mas renomear como "VAZIO"
+    const originalData = [...salesData.leadsByUser].map(user => ({
+      ...user,
+      name: user.name === 'SA IMOB' ? 'Vazio' : user.name
+    }));
+    const filteredData = filterByAdvancedSearch(originalData);
+
+    // Garantir ordenação decrescente consistente - sempre tratar como números
+    // Em caso de empate, ordenar alfabeticamente por nome para consistência
+    const sortedLeads = filteredData
+      .map(user => ({
+        ...user,
+        // Calcular proposalsHeld para cada usuário (igual ao meetingsHeld)
+        proposalsHeld: (user.leads || []).filter(lead => 
+          lead.is_proposta === true || 
+          lead.etapa?.toLowerCase().includes('proposta')
+        ).length
+      }))
+      .sort((a, b) => {
+        const diff = Number(b.value || 0) - Number(a.value || 0);
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
     
-    const sortedMeetings = [...finalData].sort((a, b) => {
-      const diff = Number(b.meetingsHeld || 0) - Number(a.meetingsHeld || 0);
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
-    
-    const sortedSales = [...finalData].sort((a, b) => {
-      const diff = Number(b.sales || 0) - Number(a.sales || 0);
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
+    const sortedMeetings = filteredData
+      .map(user => ({
+        ...user,
+        meetingsHeld: Number(user.meetingsHeld || user.meetings || 0)
+      }))
+      .sort((a, b) => {
+        const diff = Number(b.meetingsHeld || 0) - Number(a.meetingsHeld || 0);
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
+      
+    const sortedSales = filteredData
+      .sort((a, b) => {
+        const diff = Number(b.sales || 0) - Number(a.sales || 0);
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
+
+    // Debug: log para verificar ordenação
 
     return {
+      // Ordenar por total de leads (value) - decrescente
+      // Filtrar corretores válidos e por busca avançada
       sortedLeadsData: sortedLeads,
+        
+      // Ordenar por reuniões - decrescente  
+      // Usar os mesmos dados filtrados para consistência
       sortedMeetingsData: sortedMeetings,
+        
+      // Ordenar por vendas - decrescente
+      // Usar os mesmos dados filtrados para consistência
       sortedSalesData: sortedSales
     };
-  }, [salesData?._rawTablesData, searchField, searchValue, filters.corretor, filters.source]);
+  }, [salesData?.leadsByUser, searchField, searchValue, filters.corretor, filters.source]);
 
   // Mini Metric Card Component
   const MiniMetricCard = ({ title, value, subtitle, color = COLORS.primary }) => (
@@ -1506,6 +1729,757 @@ const DashboardSales = ({
 
   return (
     <div className={`dashboard-content ${isUpdating ? 'updating' : ''}`}>
+      {/* CSS dos novos componentes de comparação e filtros de período */}
+      <style>{`
+        /* Estilos para o indicador de tendência */
+        .trend-indicator {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          margin-left: 8px;
+        }
+        
+        .trend-indicator.positive {
+          background-color: rgba(0, 200, 83, 0.15);
+          color: #00c853;
+        }
+        
+        .trend-indicator.negative {
+          background-color: rgba(255, 82, 82, 0.15);
+          color: #ff5252;
+        }
+        
+        .trend-indicator.neutral {
+          background-color: rgba(158, 158, 158, 0.15);
+          color: #9e9e9e;
+        }
+        
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        .trend-tag-square:hover {
+          transform: scale(1.1);
+          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .trend-tag-square {
+          cursor: default;
+          user-select: none;
+          flex-shrink: 0;
+        }
+        
+        .trend-indicator-square {
+          background-color: rgba(255, 82, 82, 0.15);
+          color: #ff3a5e;
+          border-radius: 8px;
+          padding: 4px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          display: inline-block;
+          text-align: center;
+        }
+
+        /* Estilização moderna dos controles de período */
+        .period-controls {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          align-items: flex-end;
+          position: relative;
+        }
+
+        .period-selector {
+          display: flex;
+          gap: 4px;
+          background: rgba(255, 255, 255, 0.9);
+          padding: 6px;
+          border-radius: 12px;
+          border: 1px solid #e0e6ed;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          backdrop-filter: blur(10px);
+        }
+
+        .period-selector button {
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          background: transparent;
+          color: #64748b;
+          font-weight: 500;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          white-space: nowrap;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .period-selector button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+          transition: left 0.5s ease;
+        }
+
+        .period-selector button:hover::before {
+          left: 100%;
+        }
+
+        .period-selector button:hover {
+          background: rgba(78, 88, 89, 0.1);
+          color: #4E5859;
+          transform: translateY(-1px);
+        }
+
+        .period-selector button.active {
+          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
+          color: white;
+          box-shadow: 0 4px 12px rgba(78, 88, 89, 0.3);
+          transform: translateY(-1px);
+        }
+
+        .period-selector button.active:hover {
+          background: linear-gradient(135deg, #3a4344 0%, #7a6b5a 100%);
+          transform: translateY(-2px);
+        }
+
+        /* Estilos para as tabelas de detalhes */
+        .details-tabs {
+          display: flex;
+          gap: 2px;
+          border-bottom: 2px solid #e0e0e0;
+          margin-bottom: 20px;
+        }
+
+        .details-tab {
+          padding: 12px 20px;
+          border: none;
+          background: #f8f9fa;
+          color: #75777B;
+          cursor: pointer;
+          border-radius: 8px 8px 0 0;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          border-bottom: 3px solid transparent;
+        }
+
+        .details-tab:hover {
+          background: #e9ecef;
+          color: #4E5859;
+        }
+
+        .details-tab.active {
+          background: #ffffff;
+          color: #4E5859;
+          font-weight: 600;
+          border-bottom-color: #4E5859;
+        }
+
+        .details-table-container {
+          width: 100%;
+        }
+
+        .details-table-wrapper {
+          overflow-x: auto;
+          border-radius: 8px;
+          border: 1px solid #e0e0e0;
+        }
+
+        .details-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+        }
+
+        .details-table th {
+          background: #f8f9fa;
+          padding: 16px 12px;
+          text-align: left;
+          font-weight: 600;
+          color: #4E5859;
+          border-bottom: 2px solid #e0e0e0;
+          white-space: nowrap;
+        }
+
+        .details-table td {
+          padding: 14px 12px;
+          border-bottom: 1px solid #f0f0f0;
+          color: #212121;
+        }
+
+        .details-table tr:hover {
+          background: #f8f9fa;
+        }
+
+        .details-table tr:last-child td {
+          border-bottom: none;
+        }
+
+        .card-full {
+          width: 100%;
+          grid-column: 1 / -1;
+        }
+
+        /* Responsividade para tabelas */
+        @media (max-width: 768px) {
+          .details-tabs {
+            flex-direction: column;
+            gap: 4px;
+          }
+          
+          .details-tab {
+            border-radius: 6px;
+            text-align: center;
+          }
+          
+          .details-table th,
+          .details-table td {
+            padding: 10px 8px;
+            font-size: 14px;
+          }
+          
+          .details-table-wrapper {
+            overflow-x: scroll;
+          }
+        }
+        .comparison-metric-new {
+          background: #ffffff;
+          border-radius: 8px;
+          padding: 20px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          border: 1px solid #e0e0e0;
+          transition: all 0.3s ease;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .comparison-metric-new:hover {
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+          transform: translateY(-2px);
+        }
+
+        .metric-header-new {
+          margin-bottom: 8px;
+        }
+
+        .metric-title-new {
+          font-size: 16px;
+          font-weight: 600;
+          color: #4E5859;
+          margin: 0;
+          line-height: 1.3;
+        }
+
+        .metric-main-value {
+          font-size: 32px;
+          font-weight: 700;
+          color: #212121;
+          line-height: 1.1;
+          margin-bottom: 12px;
+        }
+
+        .metric-previous {
+          margin-bottom: 12px;
+        }
+
+        .previous-label-new {
+          font-size: 12px;
+          color: #75777B;
+          font-weight: 500;
+          letter-spacing: 0.5px;
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .previous-value-new {
+          font-size: 14px;
+          color: #555;
+          font-weight: 600;
+        }
+
+        .trend-indicator-new {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 14px;
+          margin-top: auto;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .trend-icon-new {
+          font-size: 16px;
+          font-weight: bold;
+          min-width: 16px;
+          text-align: center;
+        }
+
+        .trend-text-new {
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .trend-extra {
+          font-size: 12px;
+          opacity: 0.9;
+          margin-left: 4px;
+        }
+
+        .comparison-grid-new {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .comparison-summary-new {
+          text-align: center;
+          padding-top: 16px;
+          border-top: 1px solid #e0e0e0;
+        }
+
+        .summary-badge-new {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          background: #f8f9fa;
+          padding: 12px 20px;
+          border-radius: 8px;
+          border: 1px solid #e0e0e0;
+        }
+
+        .summary-icon-new {
+          font-size: 18px;
+        }
+
+        .summary-text-new {
+          font-size: 16px;
+          font-weight: 600;
+          color: #4E5859;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+          .comparison-grid-new {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          
+          .comparison-metric-new {
+            padding: 16px;
+          }
+          
+          .metric-title-new {
+            font-size: 14px;
+          }
+          
+          .metric-main-value {
+            font-size: 24px;
+          }
+          
+          .trend-indicator-new {
+            font-size: 13px;
+            padding: 6px 10px;
+          }
+          
+          .trend-icon-new {
+            font-size: 14px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .comparison-metric-new {
+            padding: 12px;
+          }
+          
+          .metric-main-value {
+            font-size: 20px;
+          }
+          
+          .metric-title-new {
+            font-size: 13px;
+          }
+        }
+
+        /* Estilos para React-Select */
+        .react-select-container {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 220px;
+        }
+
+        .react-select-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #4E5859;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        /* Customização do React-Select */
+        .react-select__control {
+          min-height: 42px !important;
+          border: 2px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          box-shadow: none !important;
+          transition: all 0.2s ease !important;
+        }
+
+        .react-select__control:hover {
+          border-color: #4E5859 !important;
+        }
+
+        .react-select__control--is-focused {
+          border-color: #4E5859 !important;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1) !important;
+        }
+
+        .react-select__placeholder {
+          color: #a0aec0 !important;
+        }
+
+        .react-select__multi-value {
+          background-color: rgba(78, 88, 89, 0.1) !important;
+          border-radius: 6px !important;
+        }
+
+        .react-select__multi-value__label {
+          color: #4E5859 !important;
+          font-weight: 500 !important;
+        }
+
+        .react-select__multi-value__remove {
+          color: #4E5859 !important;
+          cursor: pointer !important;
+        }
+
+        .react-select__multi-value__remove:hover {
+          background-color: #4E5859 !important;
+          color: white !important;
+        }
+
+        .react-select__menu {
+          border: 2px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+          z-index: 1000 !important;
+        }
+
+        .react-select__option {
+          padding: 12px 16px !important;
+          cursor: pointer !important;
+        }
+
+        .react-select__option:hover {
+          background-color: #f8fafc !important;
+        }
+
+        .react-select__option--is-selected {
+          background-color: rgba(78, 88, 89, 0.1) !important;
+          color: #4E5859 !important;
+        }
+
+        .react-select__option--is-focused {
+          background-color: #f1f5f9 !important;
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+          .react-select-container {
+            min-width: 180px;
+          }
+          
+          .react-select__control {
+            min-height: 38px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .filters-group {
+            flex-direction: column;
+            gap: 12px;
+          }
+          
+          .react-select-container {
+            min-width: unset;
+          }
+        }
+
+        /* Estilos para filtro de busca avançada */
+        .advanced-search-filter {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 300px;
+        }
+
+        .search-filter-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #4E5859;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .search-filter-container {
+          display: flex;
+          gap: 0;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          overflow: hidden;
+          transition: all 0.2s ease;
+        }
+
+        .search-filter-container:focus-within {
+          border-color: #4E5859;
+          box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.1);
+        }
+
+        .search-field-select {
+          padding: 10px 12px;
+          background: #f8f9fa;
+          border: none;
+          font-size: 14px;
+          color: #2d3748;
+          transition: all 0.2s ease;
+          min-height: 42px;
+          height: 42px;
+          box-sizing: border-box;
+          outline: none;
+          min-width: 120px;
+          border-right: 1px solid #e2e8f0;
+        }
+
+        .search-field-select:focus {
+          background: white;
+        }
+
+        .search-input-container {
+          display: flex;
+          align-items: center;
+          position: relative;
+          flex: 1;
+        }
+
+        .search-value-input {
+          flex: 1;
+          padding: 10px 12px;
+          background: white;
+          border: none;
+          font-size: 14px;
+          color: #2d3748;
+          transition: all 0.2s ease;
+          min-height: 42px;
+          height: 42px;
+          box-sizing: border-box;
+          outline: none;
+        }
+
+        .search-value-input::placeholder {
+          color: #a0aec0;
+        }
+
+        .search-clear-button {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #a0aec0;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px;
+          line-height: 1;
+          transition: color 0.2s ease;
+        }
+
+        .search-clear-button:hover {
+          color: #4E5859;
+        }
+
+        /* Responsividade para filtro de busca avançada */
+        @media (max-width: 768px) {
+          .advanced-search-filter {
+            min-width: 250px;
+          }
+          
+          .search-field-select,
+          .search-value-input {
+            padding: 8px 10px;
+            font-size: 13px;
+            min-height: 38px;
+          }
+          
+          .search-field-select {
+            min-width: 100px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .advanced-search-filter {
+            min-width: unset;
+            max-width: none;
+          }
+          
+          .search-filter-container {
+            flex-direction: column;
+            border-radius: 8px;
+          }
+          
+          .search-field-select {
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+            border-radius: 0;
+          }
+          
+          .search-value-input {
+            border-radius: 0;
+          }
+        }
+
+        /* Estilos para o indicador de filtros ativos */
+        .filter-indicator {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          background: rgba(78, 88, 89, 0.1);
+          border: 2px solid #4E5859;
+          border-radius: 8px;
+          font-size: 14px;
+          color: #4E5859;
+          font-weight: 600;
+          white-space: nowrap;
+          margin-left: 8px;
+          height: 42px;
+          align-self: flex-end;
+        }
+
+        .filter-icon {
+          font-size: 16px;
+        }
+
+        .filter-text {
+          font-size: 13px;
+        }
+
+        .clear-filters-btn {
+          background: none;
+          border: none;
+          color: #4E5859;
+          font-size: 18px;
+          font-weight: bold;
+          cursor: pointer;
+          padding: 0;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: all 0.2s ease;
+        }
+
+        .clear-filters-btn:hover {
+          background: rgba(78, 88, 89, 0.2);
+          transform: scale(1.1);
+        }
+
+        /* ✅ Novos estilos para filtros individuais - melhor UX */
+
+        /* Responsividade para indicador de filtros */
+        @media (max-width: 768px) {
+          .filters-group {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          
+          .simple-filter {
+            max-width: none;
+            width: 100%;
+          }
+          
+          .apply-filters-btn {
+            align-self: stretch;
+            width: 100%;
+            justify-content: center;
+            margin-left: 0;
+          }
+          
+          .filter-indicator {
+            padding: 6px 10px;
+            font-size: 12px;
+            margin-left: 0;
+            margin-top: 0;
+            align-self: stretch;
+            width: 100%;
+            justify-content: center;
+          }
+          
+          .filter-icon {
+            font-size: 14px;
+          }
+          
+          .filter-text {
+            font-size: 12px;
+          }
+        }
+
+        /* Indicador de status global */
+        .global-status-indicator {
+          position: fixed;
+          top: 300px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 1000;
+          background: linear-gradient(135deg, #4E5859 0%, #96856F 100%);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .status-icon {
+          animation: statusSpin 1s linear infinite;
+        }
+
+        @keyframes statusSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+          font-size: 34px;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+      `}</style>
 
       <div className="dashboard-row row-header">
         <div className="section-title">
@@ -1785,132 +2759,47 @@ const DashboardSales = ({
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  R$ {formatCurrency((() => {
-                    // Verificar se há algum filtro ativo (corretor, fonte ou busca avançada)
-                    const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                    const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                    const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                    const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  R$ {(() => {
+                    // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
+                    const hasFilter = searchValue.trim() !== '';
                     
-                    if (hasAnyFilter) {
-                      // Com filtro: calcular ticket médio baseado nas vendas filtradas
+                    let totalSales, totalRevenue, avgDealSize;
+                    
+                    if (hasFilter) {
+                      // Com filtro: calcular pelos dados filtrados
+                      totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                      // Usar dados do summary ou _rawTablesData
                       const rawData = salesData?._rawTablesData || data?._rawTablesData;
-                      
-                      // Buscar vendas detalhadas e aplicar TODOS os filtros
-                      let vendasFiltradas = rawData?.vendasDetalhes || [];
-                      
-                      // Aplicar filtro de corretor se houver
-                      if (hasCorretorFilter) {
-                        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaCorretor = venda.Corretor || '';
-                          return selectedCorretores.some(corretor => 
-                            vendaCorretor === corretor || 
-                            (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                            (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                          );
-                        });
-                      }
-                      
-                      // Aplicar filtro de fonte se houver
-                      if (hasSourceFilter) {
-                        const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                          return selectedSources.includes(vendaFonte);
-                        });
-                      }
-                      
-                      // Aplicar filtro de busca avançada se houver
-                      if (hasSearchFilter && searchField) {
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const fieldValue = venda[searchField] || '';
-                          return flexibleSearch(fieldValue, searchValue);
-                        });
-                      }
-                      
-                      // Calcular receita total das vendas filtradas
-                      const receitaFiltrada = vendasFiltradas.reduce((sum, venda) => {
-                        const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                        return sum + parseBrazilianCurrency(valor);
-                      }, 0);
-                      
-                      // Calcular número de vendas filtradas
-                      const numeroVendasFiltradas = vendasFiltradas.length;
-                      
-                      // Calcular ticket médio
-                      return numeroVendasFiltradas > 0 ? receitaFiltrada / numeroVendasFiltradas : 0;
+                      const summaryRevenue = rawData?.summary?.valor_total_vendas || 0;
+                      const summaryTotalSales = rawData?.summary?.total_vendas || 0;
+                      avgDealSize = summaryTotalSales > 0 ? summaryRevenue / summaryTotalSales : 0;
+                      totalRevenue = totalSales * avgDealSize;
                     } else {
                       // Sem filtro: usar dados do summary
                       const rawData = salesData?._rawTablesData || data?._rawTablesData;
-                      const totalRevenue = rawData?.summary?.valor_total_vendas || salesData?.kpis?.sales?.total_revenue || 0;
-                      const totalSales = rawData?.summary?.total_vendas || salesData?.kpis?.sales?.total || 0;
-                      return totalSales > 0 ? totalRevenue / totalSales : 0;
+                      totalRevenue = rawData?.summary?.valor_total_vendas || salesData?.kpis?.sales?.total_revenue || 0;
+                      totalSales = rawData?.summary?.total_vendas || salesData?.kpis?.sales?.total || 0;
+                      avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
                     }
-                  })())}
+                    return avgDealSize;
+                  })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  // Mesma lógica de filtros do valor principal
-                  const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                  const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                  const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                  const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  const hasFilter = searchValue.trim() !== '';
                   
                   let current;
                   const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                  const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                  const totalSales = rawData?.summary?.total_vendas || 0;
                   
-                  if (hasAnyFilter) {
-                    // Com filtro: calcular ticket médio baseado nas vendas filtradas
-                    let vendasFiltradas = rawData?.vendasDetalhes || [];
-                    
-                    // Aplicar filtro de corretor se houver
-                    if (hasCorretorFilter) {
-                      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaCorretor = venda.Corretor || '';
-                        return selectedCorretores.some(corretor => 
-                          vendaCorretor === corretor || 
-                          (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                          (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                        );
-                      });
-                    }
-                    
-                    // Aplicar filtro de fonte se houver
-                    if (hasSourceFilter) {
-                      const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                        return selectedSources.includes(vendaFonte);
-                      });
-                    }
-                    
-                    // Aplicar filtro de busca avançada se houver
-                    if (hasSearchFilter && searchField) {
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const fieldValue = venda[searchField] || '';
-                        return flexibleSearch(fieldValue, searchValue);
-                      });
-                    }
-                    
-                    // Calcular receita total das vendas filtradas
-                    const receitaFiltrada = vendasFiltradas.reduce((sum, venda) => {
-                      const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                      return sum + parseBrazilianCurrency(valor);
-                    }, 0);
-                    
-                    // Calcular número de vendas filtradas
-                    const numeroVendasFiltradas = vendasFiltradas.length;
-                    
-                    // Calcular ticket médio atual
-                    current = numeroVendasFiltradas > 0 ? receitaFiltrada / numeroVendasFiltradas : 0;
+                  if (hasFilter) {
+                    // Com filtro: calcular baseado nas vendas filtradas
+                    const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    current = filteredSales > 0 && totalSales > 0 ? (totalRevenue / totalSales) : 0;
                   } else {
                     // Sem filtro: usar dados do summary
-                    const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
-                    const totalSales = rawData?.summary?.total_vendas || 0;
                     current = totalSales > 0 ? totalRevenue / totalSales : 0;
                   }
-                  
                   const previous = comparisonData?.previousPeriod?.averageDealSize || salesData?.previousAverageDealSize || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -1920,115 +2809,42 @@ const DashboardSales = ({
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  R$ {formatCurrency((() => {
-                    // Verificar se há algum filtro ativo (corretor, fonte ou busca avançada)
-                    const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                    const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                    const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                    const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  R$ {(() => {
+                    // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
+                    const hasFilter = searchValue.trim() !== '';
                     
                     const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                    const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                    const totalSales = rawData?.summary?.total_vendas || 0;
                     
-                    if (hasAnyFilter) {
-                      // Com filtro: calcular receita total das vendas filtradas
-                      let vendasFiltradas = rawData?.vendasDetalhes || [];
-                      
-                      // Aplicar filtro de corretor se houver
-                      if (hasCorretorFilter) {
-                        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaCorretor = venda.Corretor || '';
-                          return selectedCorretores.some(corretor => 
-                            vendaCorretor === corretor || 
-                            (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                            (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                          );
-                        });
-                      }
-                      
-                      // Aplicar filtro de fonte se houver
-                      if (hasSourceFilter) {
-                        const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                          return selectedSources.includes(vendaFonte);
-                        });
-                      }
-                      
-                      // Aplicar filtro de busca avançada se houver
-                      if (hasSearchFilter && searchField) {
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const fieldValue = venda[searchField] || '';
-                          return flexibleSearch(fieldValue, searchValue);
-                        });
-                      }
-                      
-                      // Calcular receita total das vendas filtradas
-                      return vendasFiltradas.reduce((sum, venda) => {
-                        const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                        return sum + parseBrazilianCurrency(valor);
-                      }, 0);
+                    if (hasFilter) {
+                      // Com filtro: calcular receita proporcional às vendas filtradas
+                      const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                      const avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
+                      return filteredSales * avgDealSize;
                     } else {
                       // Sem filtro: usar valor total do summary
-                      const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
                       return totalRevenue;
                     }
-                  })())}
+                  })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  // Mesma lógica de filtros do valor principal
-                  const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                  const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                  const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                  const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  const hasFilter = searchValue.trim() !== '';
                   
                   const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                  const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                  const totalSales = rawData?.summary?.total_vendas || 0;
                   
                   let current;
-                  if (hasAnyFilter) {
-                    // Com filtro: calcular receita total das vendas filtradas
-                    let vendasFiltradas = rawData?.vendasDetalhes || [];
-                    
-                    // Aplicar filtro de corretor se houver
-                    if (hasCorretorFilter) {
-                      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaCorretor = venda.Corretor || '';
-                        return selectedCorretores.some(corretor => 
-                          vendaCorretor === corretor || 
-                          (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                          (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                        );
-                      });
-                    }
-                    
-                    // Aplicar filtro de fonte se houver
-                    if (hasSourceFilter) {
-                      const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                        return selectedSources.includes(vendaFonte);
-                      });
-                    }
-                    
-                    // Aplicar filtro de busca avançada se houver
-                    if (hasSearchFilter && searchField) {
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const fieldValue = venda[searchField] || '';
-                        return flexibleSearch(fieldValue, searchValue);
-                      });
-                    }
-                    
-                    // Calcular receita total das vendas filtradas
-                    current = vendasFiltradas.reduce((sum, venda) => {
-                      const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                      return sum + parseBrazilianCurrency(valor);
-                    }, 0);
+                  if (hasFilter) {
+                    // Com filtro: calcular receita proporcional
+                    const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    const avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
+                    current = filteredSales * avgDealSize;
                   } else {
                     // Sem filtro: usar valor total
-                    current = rawData?.summary?.valor_total_vendas || 0;
+                    current = totalRevenue;
                   }
-                  
                   const previous = comparisonData?.previousPeriod?.totalRevenue || (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />

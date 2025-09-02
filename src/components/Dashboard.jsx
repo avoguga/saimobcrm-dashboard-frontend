@@ -990,7 +990,10 @@ function Dashboard() {
       const selectedSources = source.split(',').map(s => s.trim()).filter(s => s);
       if (selectedSources.length === 0) return true;
       
-      return selectedSources.includes(item.Fonte);
+      // Tentar diferentes campos possíveis para fonte (mesma lógica do hook)
+      const itemFonte = item.fonte || item.Fonte || item.source || item.utm_source || '';
+      
+      return selectedSources.includes(itemFonte);
     };
 
     const filterItem = (item) => filterByCorretor(item) && filterBySource(item);

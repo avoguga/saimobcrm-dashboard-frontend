@@ -28,43 +28,6 @@ const getPeriodLabel = (period, customPeriod) => {
   return period;
 };
 
-// Função para formatar valores monetários no padrão brasileiro
-const formatCurrency = (value) => {
-  // Garantir que temos um número válido
-  const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-  
-  // Usar o formatador nativo do JavaScript com locale pt-BR
-  return new Intl.NumberFormat('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    // Não usar style: 'currency' porque já adicionamos R$ manualmente
-  }).format(numValue);
-};
-
-// Função para converter string monetária brasileira para número
-const parseBrazilianCurrency = (value) => {
-  if (typeof value === 'number') return value;
-  if (!value) return 0;
-  
-  // Converter para string se necessário
-  let str = value.toString();
-  
-  // Remover R$, espaços e outros caracteres não numéricos (exceto vírgula e ponto)
-  str = str.replace(/[R$\s]/g, '');
-  
-  // Remover pontos (separadores de milhares) 
-  str = str.replace(/\./g, '');
-  
-  // Substituir vírgula (separador decimal) por ponto
-  str = str.replace(',', '.');
-  
-  // Converter para número
-  const num = parseFloat(str);
-  
-  // Retornar 0 se não for um número válido
-  return isNaN(num) ? 0 : num;
-};
-
 const createDataMap = (tablesData) => ({
   'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
   'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
@@ -512,14 +475,22 @@ const DashboardSales = ({
       }
 
 
-      // ✅ OTIMIZAÇÃO: SEMPRE usar dados já carregados e filtrar no frontend
+      // ✅ OTIMIZAÇÃO: Tentar usar dados já carregados e filtrar no frontend
       let tablesData;
       
-      // Verificar se temos dados já carregados
-      const currentData = salesData?._rawTablesData || data?._rawTablesData;
+      // Verificar se podemos usar dados já carregados
+      const currentData = data?._rawTablesData;
+      const currentParams = data?._lastParams;
       
-      if (currentData) {
-        // SEMPRE usar dados carregados e filtrar pelo corretor no frontend
+      const dateParamsMatch = currentParams && (
+        (extraParams.start_date === currentParams.start_date && 
+         extraParams.end_date === currentParams.end_date) ||
+        (extraParams.days === currentParams.days)
+      );
+      
+      if (currentData && dateParamsMatch) {
+        
+        // Filtrar dados no frontend pelo corretor
         const corretorFilter = corretorName === 'VAZIO' ? 'SA IMOB' : corretorName;
         
         tablesData = {
@@ -543,7 +514,7 @@ const DashboardSales = ({
           ) || []
         };
       } else {
-        // Só fazer requisição se não temos dados carregados
+        // Se parâmetros diferentes, fazer nova requisição
         tablesData = await KommoAPI.getDetailedTables(corretorName, filters.source || '', extraParams);
       }
       
@@ -708,18 +679,32 @@ const DashboardSales = ({
       }
 
 
-      // ✅ OTIMIZAÇÃO: SEMPRE reutilizar dados já carregados no dashboard
-      // Os dados já foram carregados com os filtros de período corretos
+      // ✅ OTIMIZAÇÃO: Reutilizar dados já carregados no dashboard ao invés de nova requisição
+      // Só fazer nova requisição se os parâmetros de período forem diferentes dos atuais
       let tablesData;
       
-      // Verificar se temos dados já carregados do dashboard
-      const currentData = salesData?._rawTablesData || data?._rawTablesData;
+      // Verificar se podemos usar dados já carregados do dashboard
+      const currentData = data?._rawTablesData; // Dados originais salvos no dashboard
       
-      if (currentData) {
-        // SEMPRE usar os dados já carregados - eles já estão com o período correto
+      // Função helper para verificar se os filtros de data mudaram
+      const hasDateFilterChanged = (newParams) => {
+        const currentParams = data?._lastParams;
+        if (!currentParams) return true;
+        
+        // Comparar parâmetros de data
+        const dateParamsChanged = 
+          newParams.start_date !== currentParams.start_date ||
+          newParams.end_date !== currentParams.end_date ||
+          newParams.days !== currentParams.days;
+          
+        return dateParamsChanged;
+      };
+      
+      const shouldReuseData = currentData && !hasDateFilterChanged(extraParams);
+      
+      if (shouldReuseData) {
         tablesData = currentData;
       } else {
-        // Só fazer requisição se não temos dados carregados
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
@@ -897,66 +882,7 @@ const DashboardSales = ({
       ...(tablesData.reunioesOrganicasDetalhes || [])
     ];
     
-    // Buscar todas as vendas separadamente para calcular vendas corretas
-    let allSales = [
-      ...(tablesData.vendasDetalhes || [])
-    ];
-    
-    // Aplicar filtros de corretor se houver
-    if (filters.corretor && filters.corretor.trim() !== '') {
-      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-      if (selectedCorretores.length > 0) {
-        allLeads = allLeads.filter(lead => {
-          const leadCorretor = lead.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            leadCorretor === corretor || 
-            (corretor === 'VAZIO' && (leadCorretor === 'Vazio' || leadCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && leadCorretor === 'SA IMOB')
-          );
-        });
-        
-        allMeetings = allMeetings.filter(meeting => {
-          const meetingCorretor = meeting.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            meetingCorretor === corretor || 
-            (corretor === 'VAZIO' && (meetingCorretor === 'Vazio' || meetingCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && meetingCorretor === 'SA IMOB')
-          );
-        });
-        
-        allSales = allSales.filter(sale => {
-          const saleCorretor = sale.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            saleCorretor === corretor || 
-            (corretor === 'VAZIO' && (saleCorretor === 'Vazio' || saleCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && saleCorretor === 'SA IMOB')
-          );
-        });
-      }
-    }
-    
-    // Aplicar filtros de fonte se houver
-    if (filters.source && filters.source.trim() !== '') {
-      const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-      if (selectedSources.length > 0) {
-        allLeads = allLeads.filter(lead => {
-          const leadFonte = lead.fonte || lead.Fonte || lead.source || lead.utm_source || '';
-          return selectedSources.includes(leadFonte);
-        });
-        
-        allMeetings = allMeetings.filter(meeting => {
-          const meetingFonte = meeting.fonte || meeting.Fonte || meeting.source || meeting.utm_source || '';
-          return selectedSources.includes(meetingFonte);
-        });
-        
-        allSales = allSales.filter(sale => {
-          const saleFonte = sale.fonte || sale.Fonte || sale.source || sale.utm_source || '';
-          return selectedSources.includes(saleFonte);
-        });
-      }
-    }
-    
-    // Aplicar filtros de busca avançada se houver
+    // Aplicar filtros da mesma forma que o modal
     if (searchValue && searchField && searchField !== 'Corretor') {
       allLeads = allLeads.filter(lead => {
         const fieldValue = lead[searchField] || '';
@@ -967,14 +893,9 @@ const DashboardSales = ({
         const fieldValue = meeting[searchField] || '';
         return flexibleSearch(fieldValue, searchValue);
       });
-      
-      allSales = allSales.filter(sale => {
-        const fieldValue = sale[searchField] || '';
-        return flexibleSearch(fieldValue, searchValue);
-      });
     }
     
-    // Se filtro de busca avançada é por Corretor, aplicar filtro específico
+    // Se filtro é por Corretor, filtrar pelos corretores
     if (searchValue && searchField === 'Corretor') {
       allLeads = allLeads.filter(lead => {
         const corretorName = lead.Corretor || '';
@@ -983,11 +904,6 @@ const DashboardSales = ({
       
       allMeetings = allMeetings.filter(meeting => {
         const corretorName = meeting.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
-      
-      allSales = allSales.filter(sale => {
-        const corretorName = sale.Corretor || '';
         return flexibleSearch(corretorName, searchValue);
       });
     }
@@ -1029,46 +945,37 @@ const DashboardSales = ({
       corretorStats[corretorName].meetingsHeld++;
     });
     
-    // Processar propostas dos leads
+    // Processar propostas e vendas dos leads
     allLeads.forEach(lead => {
       const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
       
       // Calcular propostas
       if (lead['É Proposta'] === true || lead.is_proposta === true || 
           (lead.Etapa && lead.Etapa.toLowerCase().includes('proposta'))) {
-        if (!corretorStats[corretorName]) {
-          corretorStats[corretorName] = {
-            name: corretorName,
-            value: 0,
-            meetingsHeld: 0,
-            proposalsHeld: 0,
-            sales: 0
-          };
-        }
         corretorStats[corretorName].proposalsHeld++;
       }
-    });
-    
-    // Processar vendas usando dados específicos de vendas
-    allSales.forEach(sale => {
-      const corretorName = sale.Corretor === 'SA IMOB' ? 'Vazio' : (sale.Corretor || 'Desconhecido');
       
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
-          name: corretorName,
-          value: 0,
-          meetingsHeld: 0,
-          proposalsHeld: 0,
-          sales: 0
-        };
+      // Calcular vendas
+      if (lead.Etapa) {
+        const etapa = lead.Etapa.toLowerCase();
+        if (!etapa.includes('perdida') && 
+            (etapa.includes('venda') || etapa.includes('vendido') || etapa.includes('ganho'))) {
+          corretorStats[corretorName].sales++;
+        }
       }
-      
-      // Cada venda filtrada é uma venda válida
-      corretorStats[corretorName].sales++;
     });
     
     // Converter para array
-    const finalData = Object.values(corretorStats);
+    const newFilteredData = Object.values(corretorStats);
+    
+    // Aplicar filtro de corretor se houver
+    let finalData = newFilteredData;
+    if (filters.corretor && filters.corretor.trim()) {
+      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
+      if (selectedCorretores.length > 0) {
+        finalData = finalData.filter(user => selectedCorretores.includes(user.name));
+      }
+    }
 
     // Usar nova lógica baseada nos mesmos dados do modal
     const sortedLeads = [...finalData].sort((a, b) => {
@@ -1785,132 +1692,47 @@ const DashboardSales = ({
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  R$ {formatCurrency((() => {
-                    // Verificar se há algum filtro ativo (corretor, fonte ou busca avançada)
-                    const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                    const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                    const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                    const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  R$ {(() => {
+                    // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
+                    const hasFilter = searchValue.trim() !== '';
                     
-                    if (hasAnyFilter) {
-                      // Com filtro: calcular ticket médio baseado nas vendas filtradas
+                    let totalSales, totalRevenue, avgDealSize;
+                    
+                    if (hasFilter) {
+                      // Com filtro: calcular pelos dados filtrados
+                      totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                      // Usar dados do summary ou _rawTablesData
                       const rawData = salesData?._rawTablesData || data?._rawTablesData;
-                      
-                      // Buscar vendas detalhadas e aplicar TODOS os filtros
-                      let vendasFiltradas = rawData?.vendasDetalhes || [];
-                      
-                      // Aplicar filtro de corretor se houver
-                      if (hasCorretorFilter) {
-                        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaCorretor = venda.Corretor || '';
-                          return selectedCorretores.some(corretor => 
-                            vendaCorretor === corretor || 
-                            (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                            (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                          );
-                        });
-                      }
-                      
-                      // Aplicar filtro de fonte se houver
-                      if (hasSourceFilter) {
-                        const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                          return selectedSources.includes(vendaFonte);
-                        });
-                      }
-                      
-                      // Aplicar filtro de busca avançada se houver
-                      if (hasSearchFilter && searchField) {
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const fieldValue = venda[searchField] || '';
-                          return flexibleSearch(fieldValue, searchValue);
-                        });
-                      }
-                      
-                      // Calcular receita total das vendas filtradas
-                      const receitaFiltrada = vendasFiltradas.reduce((sum, venda) => {
-                        const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                        return sum + parseBrazilianCurrency(valor);
-                      }, 0);
-                      
-                      // Calcular número de vendas filtradas
-                      const numeroVendasFiltradas = vendasFiltradas.length;
-                      
-                      // Calcular ticket médio
-                      return numeroVendasFiltradas > 0 ? receitaFiltrada / numeroVendasFiltradas : 0;
+                      const summaryRevenue = rawData?.summary?.valor_total_vendas || 0;
+                      const summaryTotalSales = rawData?.summary?.total_vendas || 0;
+                      avgDealSize = summaryTotalSales > 0 ? summaryRevenue / summaryTotalSales : 0;
+                      totalRevenue = totalSales * avgDealSize;
                     } else {
                       // Sem filtro: usar dados do summary
                       const rawData = salesData?._rawTablesData || data?._rawTablesData;
-                      const totalRevenue = rawData?.summary?.valor_total_vendas || salesData?.kpis?.sales?.total_revenue || 0;
-                      const totalSales = rawData?.summary?.total_vendas || salesData?.kpis?.sales?.total || 0;
-                      return totalSales > 0 ? totalRevenue / totalSales : 0;
+                      totalRevenue = rawData?.summary?.valor_total_vendas || salesData?.kpis?.sales?.total_revenue || 0;
+                      totalSales = rawData?.summary?.total_vendas || salesData?.kpis?.sales?.total || 0;
+                      avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
                     }
-                  })())}
+                    return avgDealSize;
+                  })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  // Mesma lógica de filtros do valor principal
-                  const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                  const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                  const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                  const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  const hasFilter = searchValue.trim() !== '';
                   
                   let current;
                   const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                  const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                  const totalSales = rawData?.summary?.total_vendas || 0;
                   
-                  if (hasAnyFilter) {
-                    // Com filtro: calcular ticket médio baseado nas vendas filtradas
-                    let vendasFiltradas = rawData?.vendasDetalhes || [];
-                    
-                    // Aplicar filtro de corretor se houver
-                    if (hasCorretorFilter) {
-                      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaCorretor = venda.Corretor || '';
-                        return selectedCorretores.some(corretor => 
-                          vendaCorretor === corretor || 
-                          (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                          (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                        );
-                      });
-                    }
-                    
-                    // Aplicar filtro de fonte se houver
-                    if (hasSourceFilter) {
-                      const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                        return selectedSources.includes(vendaFonte);
-                      });
-                    }
-                    
-                    // Aplicar filtro de busca avançada se houver
-                    if (hasSearchFilter && searchField) {
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const fieldValue = venda[searchField] || '';
-                        return flexibleSearch(fieldValue, searchValue);
-                      });
-                    }
-                    
-                    // Calcular receita total das vendas filtradas
-                    const receitaFiltrada = vendasFiltradas.reduce((sum, venda) => {
-                      const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                      return sum + parseBrazilianCurrency(valor);
-                    }, 0);
-                    
-                    // Calcular número de vendas filtradas
-                    const numeroVendasFiltradas = vendasFiltradas.length;
-                    
-                    // Calcular ticket médio atual
-                    current = numeroVendasFiltradas > 0 ? receitaFiltrada / numeroVendasFiltradas : 0;
+                  if (hasFilter) {
+                    // Com filtro: calcular baseado nas vendas filtradas
+                    const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    current = filteredSales > 0 && totalSales > 0 ? (totalRevenue / totalSales) : 0;
                   } else {
                     // Sem filtro: usar dados do summary
-                    const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
-                    const totalSales = rawData?.summary?.total_vendas || 0;
                     current = totalSales > 0 ? totalRevenue / totalSales : 0;
                   }
-                  
                   const previous = comparisonData?.previousPeriod?.averageDealSize || salesData?.previousAverageDealSize || 0;
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
@@ -1920,115 +1742,42 @@ const DashboardSales = ({
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  R$ {formatCurrency((() => {
-                    // Verificar se há algum filtro ativo (corretor, fonte ou busca avançada)
-                    const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                    const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                    const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                    const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  R$ {(() => {
+                    // Se há filtro ativo, calcular pelos dados filtrados, senão usar dados globais da API
+                    const hasFilter = searchValue.trim() !== '';
                     
                     const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                    const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                    const totalSales = rawData?.summary?.total_vendas || 0;
                     
-                    if (hasAnyFilter) {
-                      // Com filtro: calcular receita total das vendas filtradas
-                      let vendasFiltradas = rawData?.vendasDetalhes || [];
-                      
-                      // Aplicar filtro de corretor se houver
-                      if (hasCorretorFilter) {
-                        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaCorretor = venda.Corretor || '';
-                          return selectedCorretores.some(corretor => 
-                            vendaCorretor === corretor || 
-                            (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                            (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                          );
-                        });
-                      }
-                      
-                      // Aplicar filtro de fonte se houver
-                      if (hasSourceFilter) {
-                        const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                          return selectedSources.includes(vendaFonte);
-                        });
-                      }
-                      
-                      // Aplicar filtro de busca avançada se houver
-                      if (hasSearchFilter && searchField) {
-                        vendasFiltradas = vendasFiltradas.filter(venda => {
-                          const fieldValue = venda[searchField] || '';
-                          return flexibleSearch(fieldValue, searchValue);
-                        });
-                      }
-                      
-                      // Calcular receita total das vendas filtradas
-                      return vendasFiltradas.reduce((sum, venda) => {
-                        const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                        return sum + parseBrazilianCurrency(valor);
-                      }, 0);
+                    if (hasFilter) {
+                      // Com filtro: calcular receita proporcional às vendas filtradas
+                      const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                      const avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
+                      return filteredSales * avgDealSize;
                     } else {
                       // Sem filtro: usar valor total do summary
-                      const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
                       return totalRevenue;
                     }
-                  })())}
+                  })().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
                 <TrendIndicator value={(() => {
-                  // Mesma lógica de filtros do valor principal
-                  const hasCorretorFilter = filters.corretor && filters.corretor.trim() !== '';
-                  const hasSourceFilter = filters.source && filters.source.trim() !== '';
-                  const hasSearchFilter = searchValue && searchValue.trim() !== '';
-                  const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
+                  const hasFilter = searchValue.trim() !== '';
                   
                   const rawData = salesData?._rawTablesData || data?._rawTablesData;
+                  const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
+                  const totalSales = rawData?.summary?.total_vendas || 0;
                   
                   let current;
-                  if (hasAnyFilter) {
-                    // Com filtro: calcular receita total das vendas filtradas
-                    let vendasFiltradas = rawData?.vendasDetalhes || [];
-                    
-                    // Aplicar filtro de corretor se houver
-                    if (hasCorretorFilter) {
-                      const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaCorretor = venda.Corretor || '';
-                        return selectedCorretores.some(corretor => 
-                          vendaCorretor === corretor || 
-                          (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                          (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
-                        );
-                      });
-                    }
-                    
-                    // Aplicar filtro de fonte se houver
-                    if (hasSourceFilter) {
-                      const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const vendaFonte = venda.fonte || venda.Fonte || venda.source || venda.utm_source || '';
-                        return selectedSources.includes(vendaFonte);
-                      });
-                    }
-                    
-                    // Aplicar filtro de busca avançada se houver
-                    if (hasSearchFilter && searchField) {
-                      vendasFiltradas = vendasFiltradas.filter(venda => {
-                        const fieldValue = venda[searchField] || '';
-                        return flexibleSearch(fieldValue, searchValue);
-                      });
-                    }
-                    
-                    // Calcular receita total das vendas filtradas
-                    current = vendasFiltradas.reduce((sum, venda) => {
-                      const valor = venda['Valor da Venda'] || venda.valor || venda.ValorVenda || 0;
-                      return sum + parseBrazilianCurrency(valor);
-                    }, 0);
+                  if (hasFilter) {
+                    // Com filtro: calcular receita proporcional
+                    const filteredSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
+                    const avgDealSize = totalSales > 0 ? totalRevenue / totalSales : 0;
+                    current = filteredSales * avgDealSize;
                   } else {
                     // Sem filtro: usar valor total
-                    current = rawData?.summary?.valor_total_vendas || 0;
+                    current = totalRevenue;
                   }
-                  
                   const previous = comparisonData?.previousPeriod?.totalRevenue || (salesData?.previousWonLeads || 0) * (salesData?.previousAverageDealSize || 0);
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />

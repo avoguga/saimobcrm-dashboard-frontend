@@ -65,20 +65,6 @@ export class GranularAPI {
         // Adicionar timestamp para evitar cache do browser
         params.append('_t', Date.now().toString());
 
-        // DEBUG: Log what's being sent to API
-        console.log('🔍 Sales API Params:', {
-          corretor,
-          fonte,
-          paramsString: params.toString(),
-          decodedParams: decodeURIComponent(params.toString()),
-          fullUrls: [
-            `${API_URL}/api/v2/sales/kpis?${params}`,
-            `${API_URL}/api/v2/charts/leads-by-user?${params}`,
-            `${API_URL}/api/v2/sales/conversion-rates?${params}`,
-            `${API_URL}/api/v2/sales/pipeline-status?${params}`
-          ]
-        });
-
         const [kpis, leadsByUser, conversionRates, pipelineStatus] = await Promise.all([
           fetch(`${API_URL}/api/v2/sales/kpis?${params}`).then(r => r.json()),
           fetch(`${API_URL}/api/v2/charts/leads-by-user?${params}`).then(r => r.json()),
@@ -86,21 +72,6 @@ export class GranularAPI {
           fetch(`${API_URL}/api/v2/sales/pipeline-status?${params}`).then(r => r.json())
         ]);
 
-        console.timeEnd('Sales Dashboard V2 Load');
-        
-        // DEBUG: Log API responses
-        console.log('📊 Sales API Responses:', {
-          kpis,
-          leadsByUser,
-          fonte: fonte || 'none',
-          totalLeads: kpis.totalLeads,
-          userCount: leadsByUser.leadsByUser?.length,
-          metadata: {
-            kpisMetadata: kpis._metadata,
-            leadsByUserMetadata: leadsByUser._metadata
-          }
-        });
-        
 
         return {
           ...kpis,
@@ -138,14 +109,6 @@ export class GranularAPI {
       
       if (fonte) params.append('fonte', fonte);
 
-      // DEBUG: Log marketing params before adding campaign filters
-      console.log('🔍 Marketing API Base Params:', {
-        fonte,
-        days,
-        customDates,
-        paramsString: params.toString()
-      });
-
       // Adicionar filtros de campanhas Facebook
       if (campaignFilters.campaignIds && campaignFilters.campaignIds.length > 0) {
         campaignFilters.campaignIds.forEach(id => {
@@ -168,9 +131,6 @@ export class GranularAPI {
       if (campaignFilters.searchTerm) {
         params.append('campaign_search', campaignFilters.searchTerm);
       }
-
-      // DEBUG: Log final marketing API call
-      console.log('🔍 Marketing API Final URL:', `${API_URL}/dashboard/marketing-complete?${params}`);
 
       // Mapear periodo para preset WhatsApp
       let whatsappPreset = 'last_30d';
@@ -220,26 +180,6 @@ export class GranularAPI {
         }
       };
 
-      console.log('✅ Dados integrados:', {
-        whatsapp: {
-          conversations: whatsappSummary.total_conversations,
-          profileVisits: whatsappSummary.total_profile_visits,
-          spend: whatsappSummary.total_spend
-        },
-        gender: {
-          raw: genderSegments,
-          segments: genderSegments.length,
-          totalLeads: genderData.summary?.total_leads || 0,
-          formatted: genderData_formatted,
-          byGender: genderData.summary?.by_gender
-        },
-        campaigns: {
-          raw: campaignsData,
-          count: (campaignsData.campaigns || campaignsData.data || []).length,
-          campaigns: campaignsData.campaigns || campaignsData.data || []
-        }
-      });
-
       return enhancedData;
     } catch (error) {
       console.error('❌ Erro no carregamento do dashboard de marketing:', error);
@@ -260,11 +200,9 @@ export class GranularAPI {
       const cached = this.getCached(cacheKey);
       
       if (cached) {
-        console.log('🎯 Usando métricas WhatsApp/Perfil do cache');
         return cached;
       }
 
-      console.log('📱 Buscando métricas WhatsApp e perfil dos insights...');
 
       // Buscar insights padrão
       const params = new URLSearchParams({
@@ -323,7 +261,6 @@ export class GranularAPI {
       // Cache por 5 minutos
       this.setCache(cacheKey, result);
 
-      console.log('✅ Métricas WhatsApp/Perfil extraídas:', result);
 
       return result;
 
@@ -353,20 +290,10 @@ export class GranularAPI {
       const since = dateRange?.start || '2025-06-01';
       const until = dateRange?.end || '2025-06-09';
       
-      // Log dos filtros recebidos
-      console.log('📊 getFacebookCampaignInsights chamado com:', {
-        campaignIds,
-        dateRange,
-        adsetIds,
-        adIds
-      });
-      
       // Se há filtros de adsets ou ads, tentar endpoint direto primeiro
       if (adsetIds.length > 0 || adIds.length > 0) {
-        console.log('🎯 Detectados filtros de adsets/ads, tentando endpoint direto...');
         const directResult = await this.getFacebookInsightsWithFilters(campaignIds, adsetIds, adIds, dateRange);
         if (directResult) {
-          console.log('✅ Endpoint direto funcionou, retornando resultado filtrado');
           return directResult;
         }
       }
@@ -381,7 +308,6 @@ export class GranularAPI {
       }
       const filterQuery = filterParams.toString() ? `&${filterParams.toString()}` : '';
       
-      console.log('🔗 Query de filtros (método padrão):', filterQuery);
       
       // Buscar insights de cada campanha em paralelo (conforme recomendação do backend)
       const campaignInsights = await Promise.all(
@@ -395,7 +321,6 @@ export class GranularAPI {
 
           try {
             const url = `${API_URL}/facebook-ads/campaigns/${id}/insights?since=${since}&until=${until}${filterQuery}`;
-            console.log('🚀 Fazendo requisição para:', url);
             const response = await fetch(url);
             const insightData = await response.json();
             
@@ -772,7 +697,7 @@ export class GranularAPI {
     const cached = this.getCached(cacheKey);
     
     if (cached) {
-      console.log('📋 Facebook campaigns (cached):', { isArray: Array.isArray(cached), length: cached?.length });
+      ('📋 Facebook campaigns (cached):', { isArray: Array.isArray(cached), length: cached?.length });
       return Array.isArray(cached) ? cached : [];
     }
 
@@ -784,7 +709,6 @@ export class GranularAPI {
       }
       
       const campaigns = await response.json();
-      console.log('📋 Facebook campaigns recebidas:', { isArray: Array.isArray(campaigns), length: campaigns?.length, type: typeof campaigns });
       
       // Garantir que sempre retornamos um array
       const validCampaigns = Array.isArray(campaigns) ? campaigns : [];
@@ -870,10 +794,6 @@ export class GranularAPI {
       const since = dateRange?.start || '2025-06-01';
       const until = dateRange?.end || '2025-06-09';
       
-      console.log('🔍 Tentando endpoint direto de insights com filtros:', {
-        campaignIds, adsetIds, adIds, dateRange
-      });
-      
       // Construir parâmetros
       const params = new URLSearchParams({
         since,
@@ -891,7 +811,6 @@ export class GranularAPI {
       }
       
       const url = `${API_URL}/facebook-ads/insights?${params.toString()}`;
-      console.log('🚀 URL alternativa:', url);
       
       const response = await fetch(url);
       
@@ -900,7 +819,6 @@ export class GranularAPI {
       }
       
       const data = await response.json();
-      console.log('📦 Resposta do endpoint direto:', data);
       
       return data;
     } catch (error) {
@@ -922,11 +840,9 @@ export class GranularAPI {
       const cached = this.getCached(cacheKey);
       
       if (cached) {
-        console.log('🎯 Usando dados geográficos do cache para:', breakdown);
         return cached;
       }
 
-      console.log('🌍 Buscando dados geográficos via API única para:', breakdown);
 
       // OTIMIZAÇÃO: Usar endpoint geral ao invés de breakdown específico
       // Para evitar múltiplas requisições que causam rate limit
@@ -948,12 +864,6 @@ export class GranularAPI {
       
       // Cache por 10 minutos para evitar requisições repetidas
       this.setCache(cacheKey, data);
-      
-      console.log('✅ Dados geográficos obtidos:', {
-        breakdown,
-        totalItems: data.data?.length || 0,
-        cached: true
-      });
       
       return data;
     } catch (error) {
@@ -1076,7 +986,6 @@ export class GranularAPI {
       }
       
       const data = await response.json();
-      console.log('📱 WhatsApp metrics recebidos:', data);
       
       return data;
     } catch (error) {
@@ -1104,7 +1013,6 @@ export class GranularAPI {
       }
       
       const data = await response.json();
-      console.log('👥 Gender segmentation recebido:', data);
       
       return data;
     } catch (error) {

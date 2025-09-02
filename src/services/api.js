@@ -77,13 +77,6 @@ export const KommoAPI = {
       const url = new URL(`${API_URL}${endpoint}`);
       Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
 
-      // DEBUG: Log API calls
-      console.log('🔍 KommoAPI GET:', {
-        endpoint,
-        params,
-        finalUrl: url.toString()
-      });
-
       const response = await fetch(url, {
         method: 'GET',
         headers: {
