@@ -522,25 +522,33 @@ const DashboardSales = ({
         // SEMPRE usar dados carregados e filtrar pelo corretor no frontend
         const corretorFilter = corretorName === 'VAZIO' ? 'SA IMOB' : corretorName;
         
+        // Aplicar filtro de corretor e fonte se houver
+        const applyFilters = (items) => {
+          let filtered = items?.filter(item => 
+            item.Corretor === corretorFilter || item.Corretor === corretorName
+          ) || [];
+          
+          // Aplicar filtro de fonte se estiver ativo
+          if (filters.source && filters.source.trim() !== '') {
+            const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
+            if (selectedSources.length > 0) {
+              filtered = filtered.filter(item => {
+                const itemFonte = item.fonte || item.Fonte || item.source || item.utm_source || '';
+                return selectedSources.includes(itemFonte);
+              });
+            }
+          }
+          
+          return filtered;
+        };
+        
         tablesData = {
-          leadsDetalhes: currentData.leadsDetalhes?.filter(lead => 
-            lead.Corretor === corretorFilter || lead.Corretor === corretorName
-          ) || [],
-          organicosDetalhes: currentData.organicosDetalhes?.filter(lead => 
-            lead.Corretor === corretorFilter || lead.Corretor === corretorName
-          ) || [],
-          reunioesDetalhes: currentData.reunioesDetalhes?.filter(reuniao => 
-            reuniao.Corretor === corretorFilter || reuniao.Corretor === corretorName
-          ) || [],
-          reunioesOrganicasDetalhes: currentData.reunioesOrganicasDetalhes?.filter(reuniao => 
-            reuniao.Corretor === corretorFilter || reuniao.Corretor === corretorName
-          ) || [],
-          vendasDetalhes: currentData.vendasDetalhes?.filter(venda => 
-            venda.Corretor === corretorFilter || venda.Corretor === corretorName
-          ) || [],
-          propostasDetalhes: currentData.propostasDetalhes?.filter(proposta => 
-            proposta.Corretor === corretorFilter || proposta.Corretor === corretorName
-          ) || []
+          leadsDetalhes: applyFilters(currentData.leadsDetalhes),
+          organicosDetalhes: applyFilters(currentData.organicosDetalhes),
+          reunioesDetalhes: applyFilters(currentData.reunioesDetalhes),
+          reunioesOrganicasDetalhes: applyFilters(currentData.reunioesOrganicasDetalhes),
+          vendasDetalhes: applyFilters(currentData.vendasDetalhes),
+          propostasDetalhes: applyFilters(currentData.propostasDetalhes)
         };
       } else {
         // Só fazer requisição se não temos dados carregados
@@ -777,7 +785,31 @@ const DashboardSales = ({
       // Aplicar pré-filtro se houver filtro ativo no dashboard
       let modalData = dataMap[type];
       
-      // Não filtrar propostas, pois propostasDetalhes já vem com os dados corretos do backend
+      // Aplicar filtros de corretor se houver
+      if (filters.corretor && filters.corretor.trim() !== '') {
+        const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
+        if (selectedCorretores.length > 0) {
+          modalData = modalData.filter(item => {
+            const itemCorretor = item.Corretor || '';
+            return selectedCorretores.some(corretor => 
+              itemCorretor === corretor || 
+              (corretor === 'VAZIO' && (itemCorretor === 'Vazio' || itemCorretor === 'SA IMOB')) ||
+              (corretor === 'Vazio' && itemCorretor === 'SA IMOB')
+            );
+          });
+        }
+      }
+      
+      // Aplicar filtros de fonte se houver
+      if (filters.source && filters.source.trim() !== '') {
+        const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
+        if (selectedSources.length > 0) {
+          modalData = modalData.filter(item => {
+            const itemFonte = item.fonte || item.Fonte || item.source || item.utm_source || '';
+            return selectedSources.includes(itemFonte);
+          });
+        }
+      }
       
       // Aplicar filtro de busca avançada (mesmo comportamento da primeira função)
       if (searchValue && searchField && searchField !== 'Corretor') {
@@ -2043,7 +2075,7 @@ const DashboardSales = ({
 
       {/* Linha 5: Gráficos de Corretores - Layout Vertical */}
       <div className="dashboard-row" style={{ flexDirection: 'column' }}>
-        {salesData?.leadsByUser && salesData.leadsByUser.length > 0 && sortedChartsData.sortedLeadsData.length > 0 ? (
+        {sortedChartsData.sortedLeadsData.length > 0 ? (
           <>
             <div className="card card-full" key={`leads-${searchField}-${searchValue}`}>
               <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
