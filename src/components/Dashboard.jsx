@@ -310,9 +310,6 @@ function Dashboard() {
     height: window.innerHeight
   });
   
-  const isMobile = windowSize.width < 768;
-  const isSmallMobile = windowSize.width < 480;
-
   // Hook para atualizar o tamanho da janela
   useEffect(() => {
     const handleResize = () => {
@@ -461,26 +458,12 @@ function Dashboard() {
           }
           
           
-          // CARREGAMENTO PARALELO: Dashboard geral + Insights de campanhas Facebook
-          const [marketingResult, facebookCampaignsRaw] = await Promise.all([
-            GranularAPI.loadMarketingDashboard(days, null, customDates),
-            GranularAPI.getFacebookCampaigns()
-          ]);
+          // CARREGAMENTO: Dashboard geral de marketing
+          const marketingResult = await GranularAPI.loadMarketingDashboard(days, null, customDates);
           
-          // Garantir que facebookCampaigns seja sempre um array
-          const facebookCampaigns = Array.isArray(facebookCampaignsRaw) ? facebookCampaignsRaw : [];
-          
-          // Carregar insights de todas as campanhas
-          let campaignInsights = null;
-          if (facebookCampaigns && Array.isArray(facebookCampaigns) && facebookCampaigns.length > 0) {
-            const allCampaignIds = facebookCampaigns.map(campaign => campaign.id);
-            const dateRange = customDates ? {
-              start: customDates.start_date,
-              end: customDates.end_date
-            } : null;
-            
-            campaignInsights = await GranularAPI.getFacebookCampaignInsights(allCampaignIds, dateRange);
-          }
+          // Mock dados do Facebook para desenvolvimento
+          const facebookCampaigns = [];
+          const campaignInsights = null;
           
           // Integrar insights das campanhas nos dados do marketing
           const enrichedMarketingData = {
@@ -841,11 +824,6 @@ function Dashboard() {
     } else {
       alert('Por favor, selecione ambas as datas');
     }
-  };
-
-  // Função para carregar dados do período customizado manualmente
-  const loadCustomPeriodData = async () => {
-    return await loadCustomPeriodDataWithPeriod(customPeriod);
   };
 
   // Função para carregar dados usando período específico (com loading)
