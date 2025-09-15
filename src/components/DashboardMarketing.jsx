@@ -109,7 +109,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   const isMobile = windowSize.width < 768;
   const isSmallMobile = windowSize.width < 480;
 
-  // Use mocked data instead of campaign insights
+  // Load real data from API
   useEffect(() => {
     console.log('🔍 Effect data mudou:', {
       hasData: !!data,
@@ -142,18 +142,11 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     try {
       setLoadingGeographics(true);
 
-      // Mock dados geográficos para desenvolvimento
+      // Dados geográficos reais virão da API no futuro
       const geoData = {
-        cities: [
-          { name: 'São Paulo', value: 45, percentage: 35.2 },
-          { name: 'Rio de Janeiro', value: 28, percentage: 21.9 }
-        ],
-        regions: [
-          { name: 'Sudeste', value: 63, percentage: 49.2 }
-        ],
-        countries: [
-          { name: 'Brasil', value: 128, percentage: 100 }
-        ]
+        cities: [],
+        regions: [],
+        countries: []
       };
       console.log('📍 Dados geográficos carregados:', geoData);
 
@@ -253,26 +246,10 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       try {
         let tablesData = {};
 
-        if (selectedSource && selectedSource !== 'todos') {
-          // Mock dados detalhados por fonte
-          const mockLeadsDetalhes = [
-            { id: 1, name: 'Lead 1', source: selectedSource, date: '2025-01-10' },
-            { id: 2, name: 'Lead 2', source: selectedSource, date: '2025-01-09' }
-          ];
-          tablesData = {
-            leadsDetalhes: mockLeadsDetalhes
-          };
-        } else {
-          // Mock dados detalhados gerais
-          const mockLeadsDetalhes = [
-            { id: 1, name: 'Lead 1', source: 'Facebook', date: '2025-01-10' },
-            { id: 2, name: 'Lead 2', source: 'Instagram', date: '2025-01-09' },
-            { id: 3, name: 'Lead 3', source: 'Google', date: '2025-01-08' }
-          ];
-          tablesData = {
-            leadsDetalhes: mockLeadsDetalhes
-          };
-        }
+        // Dados detalhados virão da API no futuro
+        tablesData = {
+          leadsDetalhes: []
+        };
 
         const dataMap = {
           'leads': tablesData.leadsDetalhes || []
@@ -631,7 +608,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     return totalMetrics;
   }, [data?.facebookStructure?.campaigns, facebookFilters]);
 
-  // Usar dados filtrados se disponíveis, senão usar dados totais ou mock
+  // Usar dados filtrados se disponíveis, senão usar dados totais
   const facebookMetrics = (() => {
     const metrics = getFilteredMetrics || data?.facebookRawMetrics;
 
@@ -657,24 +634,24 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       };
     }
 
-    // Fallback para dados mockados
+    // Sem dados disponíveis
     return {
-      reach: 15000,
-      impressions: 45000,
-      clicks: 750,
-      spend: 1200.50,
-      costPerLead: 45.30,
-      cpc: 1.60,
-      cpm: 26.70,
-      inlineLinkClicks: 650,
-      leads: 57,
+      reach: 0,
+      impressions: 0,
+      clicks: 0,
+      spend: 0,
+      costPerLead: 0,
+      cpc: 0,
+      cpm: 0,
+      inlineLinkClicks: 0,
+      leads: 0,
       profileVisits: 0,
-      whatsappConversations: 6,
-      ctr: 1.03,
+      whatsappConversations: 0,
+      ctr: 0,
       engagement: {
-        pageEngagement: 320,
-        likes: 180,
-        comments: 45
+        pageEngagement: 0,
+        likes: 0,
+        comments: 0
       }
     };
   })();

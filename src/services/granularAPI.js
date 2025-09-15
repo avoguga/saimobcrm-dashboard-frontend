@@ -1,9 +1,9 @@
 /**
  * 🚀 API GRANULAR SIMPLIFICADA E HONESTA
- * 
+ *
  * VENDAS: Usa endpoints V2 reais do backend
- * MARKETING: Dados mockados para desenvolvimento
- * 
+ * MARKETING: Usa endpoints reais do backend
+ *
  * APENAS métodos REALMENTE usados pelo Dashboard.jsx
  */
 
@@ -48,22 +48,12 @@ export class GranularAPI {
   /**
    * 🚀 FACEBOOK CAMPAIGNS LIST
    * Lista todas as campanhas disponíveis para filtros
+   * Usa dados do unified-data em vez de endpoint separado
    */
-  static async getFacebookCampaigns() {
-    const cacheKey = 'facebook-campaigns-list';
-    const cached = this.getCached(cacheKey);
-    if (cached) return cached;
-
+  static async getFacebookCampaigns(start_date, end_date) {
     try {
-      // Mock data para desenvolvimento - substituir por endpoint real
-      const campaigns = [
-        { id: "120230104014510558", name: "[NANO] [CADASTRO] PRODUTOS MACEIÓ - 18/06/2025", status: "ACTIVE" },
-        { id: "120230104014510559", name: "[NANO] [CONVERSÃO] VENDAS RECIFE - 20/06/2025", status: "ACTIVE" },
-        { id: "120230104014510560", name: "[NANO] [AWARENESS] BRANDING SALVADOR - 22/06/2025", status: "PAUSED" }
-      ];
-
-      this.setCache(cacheKey, campaigns);
-      return campaigns;
+      const unifiedData = await this.getFacebookUnifiedData(start_date, end_date);
+      return unifiedData?.campaigns || [];
     } catch (error) {
       console.error('❌ Erro ao carregar campanhas do Facebook:', error);
       return [];
@@ -73,22 +63,13 @@ export class GranularAPI {
   /**
    * 🚀 FACEBOOK ADSETS LIST
    * Lista todos os conjuntos de anúncios de uma campanha
+   * Usa dados do unified-data em vez de endpoint separado
    */
-  static async getFacebookAdsets(campaign_id) {
-    const cacheKey = `facebook-adsets-${campaign_id}`;
-    const cached = this.getCached(cacheKey);
-    if (cached) return cached;
-
+  static async getFacebookAdsets(campaign_id, start_date, end_date) {
     try {
-      // Mock data para desenvolvimento - substituir por endpoint real
-      const adsets = [
-        { id: "120230104014510558001", name: "Interesse - Imóveis - 25-45 anos", campaign_id, status: "ACTIVE" },
-        { id: "120230104014510558002", name: "Lookalike - Clientes - Broad", campaign_id, status: "ACTIVE" },
-        { id: "120230104014510558003", name: "Retargeting - Site Visitors", campaign_id, status: "PAUSED" }
-      ];
-
-      this.setCache(cacheKey, adsets);
-      return adsets;
+      const unifiedData = await this.getFacebookUnifiedData(start_date, end_date);
+      const campaign = unifiedData?.campaigns?.find(c => c.id === campaign_id);
+      return campaign?.adsets || [];
     } catch (error) {
       console.error('❌ Erro ao carregar conjuntos de anúncios do Facebook:', error);
       return [];
@@ -98,22 +79,15 @@ export class GranularAPI {
   /**
    * 🚀 FACEBOOK ADS LIST
    * Lista todos os anúncios de um conjunto de anúncios
+   * Usa dados do unified-data em vez de endpoint separado
    */
-  static async getFacebookAds(adset_id) {
-    const cacheKey = `facebook-ads-${adset_id}`;
-    const cached = this.getCached(cacheKey);
-    if (cached) return cached;
-
+  static async getFacebookAds(adset_id, start_date, end_date) {
     try {
-      // Mock data para desenvolvimento - substituir por endpoint real
-      const ads = [
-        { id: "120230104014510558001001", name: "Imóvel dos Sonhos - Vídeo", adset_id, status: "ACTIVE" },
-        { id: "120230104014510558001002", name: "Apartamento Novo - Carrossel", adset_id, status: "ACTIVE" },
-        { id: "120230104014510558001003", name: "Casa Própria - Single Image", adset_id, status: "PAUSED" }
-      ];
-
-      this.setCache(cacheKey, ads);
-      return ads;
+      const unifiedData = await this.getFacebookUnifiedData(start_date, end_date);
+      const adset = unifiedData?.campaigns
+        ?.flatMap(c => c.adsets || [])
+        ?.find(a => a.id === adset_id);
+      return adset?.ads || [];
     } catch (error) {
       console.error('❌ Erro ao carregar anúncios do Facebook:', error);
       return [];
@@ -297,15 +271,9 @@ export class GranularAPI {
 
       console.timeEnd('Marketing Dashboard Load');
 
-      // Dados mockados para desenvolvimento (gênero)
-      const genderData_formatted = [
-        { name: 'Masculino', value: 35, percentage: 50.7 },
-        { name: 'Feminino', value: 34, percentage: 49.3 }
-      ];
-
       return {
         ...marketingData,
-        genderData: genderData_formatted,
+        genderData: [], // Dados demográficos virão da API no futuro
         _metadata: {
           realFacebookData: !!facebookData?.success,
           granular: true,
@@ -327,7 +295,13 @@ export class GranularAPI {
         whatsappSpend: 0,
         facebookMetrics: {},
         facebookStructure: { campaigns: [], adsets: [], ads: [] },
-        facebookRawMetrics: {}
+        facebookRawMetrics: {},
+        _metadata: {
+          realFacebookData: false,
+          granular: true,
+          unifiedData: true,
+          error: true
+        }
       };
     }
   }
