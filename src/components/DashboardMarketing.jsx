@@ -227,9 +227,10 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   }, [salesData?._rawTablesData]);
 
   // Modal functions
-  const openModal = useCallback((type, title) => {
+  const openModal = useCallback(async (type, title) => {
     const typeMap = {
-      'leads': `Leads de ${selectedSource || 'Todas as Fontes'}`
+      'leads': `Leads de ${selectedSource || 'Todas as Fontes'}`,
+      'reunioes': 'Reuniões Realizadas'
     };
 
     modalStateRef.current = {
@@ -242,38 +243,85 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     };
     setModalForceUpdate(prev => prev + 1);
 
-    setTimeout(async () => {
-      try {
-        let tablesData = {};
+    try {
+      const extraParams = {};
 
-        // Dados detalhados virão da API no futuro
-        tablesData = {
-          leadsDetalhes: []
-        };
+      // Usar a mesma lógica dos gráficos: priorizar start_date/end_date sobre days
+      if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+        extraParams.start_date = customPeriod.startDate;
+        extraParams.end_date = customPeriod.endDate;
+      } else if (period === 'current_month') {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const firstDayStr = firstDay.toISOString().split('T')[0];
+        const todayStr = now.toISOString().split('T')[0];
 
-        const dataMap = {
-          'leads': tablesData.leadsDetalhes || []
-        };
+        extraParams.start_date = firstDayStr;
+        extraParams.end_date = todayStr;
+      } else if (period === 'previous_month') {
+        const now = new Date();
+        const firstDayPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        modalStateRef.current = {
-          ...modalStateRef.current,
-          isLoading: false,
-          data: dataMap[type] || [],
-          error: null
+        extraParams.start_date = firstDayPreviousMonth.toISOString().split('T')[0];
+        extraParams.end_date = lastDayPreviousMonth.toISOString().split('T')[0];
+      } else if (period === 'year') {
+        const now = new Date();
+        const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+
+        extraParams.start_date = firstDayOfYear.toISOString().split('T')[0];
+        extraParams.end_date = now.toISOString().split('T')[0];
+      } else {
+        // Para períodos predefinidos (7d), usar days
+        const periodToDays = {
+          '7d': 7
         };
-        setModalForceUpdate(prev => prev + 1);
-      } catch (error) {
-        console.error(`❌ Erro ao carregar dados do modal ${type}:`, error);
-        modalStateRef.current = {
-          ...modalStateRef.current,
-          isLoading: false,
-          data: [],
-          error: `Erro ao carregar dados: ${error.message}`
-        };
-        setModalForceUpdate(prev => prev + 1);
+        extraParams.days = periodToDays[period] || 30;
       }
-    }, 100);
-  }, [period, customPeriod, selectedSource]);
+
+      // Usar dados já carregados do salesData quando disponíveis
+      let tablesData;
+
+      const currentData = salesData?._rawTablesData;
+
+      if (currentData) {
+        // Usar os dados já carregados - eles já estão com o período correto
+        tablesData = currentData;
+      } else {
+        // Só fazer requisição se não temos dados carregados
+        const KommoAPI = (await import('../services/api')).default;
+        tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
+      }
+
+      const dataMap = {
+        'leads': [
+          ...(tablesData.leadsDetalhes || []),
+          ...(tablesData.organicosDetalhes || [])
+        ],
+        'reunioes': [
+          ...(tablesData.reunioesDetalhes || []),
+          ...(tablesData.reunioesOrganicasDetalhes || [])
+        ]
+      };
+
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        data: dataMap[type] || [],
+        error: null
+      };
+      setModalForceUpdate(prev => prev + 1);
+    } catch (error) {
+      console.error(`❌ Erro ao carregar dados do modal ${type}:`, error);
+      modalStateRef.current = {
+        ...modalStateRef.current,
+        isLoading: false,
+        data: [],
+        error: `Erro ao carregar dados: ${error.message}`
+      };
+      setModalForceUpdate(prev => prev + 1);
+    }
+  }, [period, customPeriod, selectedSource, salesData]);
 
   const closeModal = useCallback(() => {
     modalStateRef.current = {
