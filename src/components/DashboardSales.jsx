@@ -539,23 +539,32 @@ const DashboardSales = ({
 
   // Função para abrir modal específico por corretor
   const openModalByCorretor = async (type, corretorName, value, params, seriesName) => {
+    console.log('🎯 openModalByCorretor chamado:', { type, corretorName, seriesName });
     // Ajustar título baseado na série clicada
     const getTitle = () => {
       if (type === 'leads') {
-        if (seriesName === 'Leads Orgânicos') {
+        if (seriesName === 'Orgânico') {
           return `Leads Orgânicos de ${corretorName}`;
-        } else if (seriesName === 'Leads') {
-          return `Leads Pagos de ${corretorName}`;
+        } else if (seriesName === 'Normal') {
+          return `Leads Normais de ${corretorName}`;
         } else {
           return `Todos os Leads de ${corretorName}`;
         }
       } else if (type === 'reunioes') {
-        if (seriesName === 'Reuniões Orgânicas') {
+        if (seriesName === 'Orgânico') {
           return `Reuniões Orgânicas de ${corretorName}`;
-        } else if (seriesName === 'Reuniões') {
-          return `Reuniões Pagas de ${corretorName}`;
+        } else if (seriesName === 'Normal') {
+          return `Reuniões Normais de ${corretorName}`;
         } else {
           return `Todas as Reuniões de ${corretorName}`;
+        }
+      } else if (type === 'vendas') {
+        if (seriesName === 'Orgânico') {
+          return `Vendas Orgânicas de ${corretorName}`;
+        } else if (seriesName === 'Normal') {
+          return `Vendas Normais de ${corretorName}`;
+        } else {
+          return `Todas as Vendas de ${corretorName}`;
         }
       }
       return `Dados de ${corretorName}`;
@@ -657,18 +666,21 @@ const DashboardSales = ({
       // Filtrar dados baseado na série clicada
       const getFilteredData = () => {
         if (type === 'leads') {
-          if (seriesName === 'Leads Orgânicos') {
+          if (seriesName === 'Orgânico') {
             return tablesData.organicosDetalhes || [];
-          } else if (seriesName === 'Leads') {
+          } else if (seriesName === 'Normal') {
             return tablesData.leadsDetalhes || [];
           } else {
-            // Fallback - mostrar leads pagos
-            return tablesData.leadsDetalhes || [];
+            // Fallback - mostrar todos os leads
+            return [
+              ...(tablesData.leadsDetalhes || []),
+              ...(tablesData.organicosDetalhes || [])
+            ];
           }
         } else if (type === 'reunioes') {
-          if (seriesName === 'Reuniões Orgânicas') {
+          if (seriesName === 'Orgânico') {
             return tablesData.reunioesOrganicasDetalhes || [];
-          } else if (seriesName === 'Reuniões') {
+          } else if (seriesName === 'Normal') {
             return tablesData.reunioesDetalhes || [];
           } else {
             // Reuniões Totais - mostrar todas
@@ -677,11 +689,29 @@ const DashboardSales = ({
               ...(tablesData.reunioesOrganicasDetalhes || [])
             ];
           }
+        } else if (type === 'vendas') {
+          if (seriesName === 'Orgânico') {
+            // Filtrar vendas orgânicas pela fonte
+            return (tablesData.vendasDetalhes || []).filter(sale => {
+              const fonte = sale.Fonte || sale.fonte || '';
+              return fonte === 'Orgânico';
+            });
+          } else if (seriesName === 'Normal') {
+            // Filtrar vendas normais (não orgânicas)
+            return (tablesData.vendasDetalhes || []).filter(sale => {
+              const fonte = sale.Fonte || sale.fonte || '';
+              return fonte !== 'Orgânico';
+            });
+          } else {
+            // Vendas Totais - mostrar todas
+            return tablesData.vendasDetalhes || [];
+          }
         }
-        return tablesData.vendasDetalhes || [];
+        return [];
       };
 
       let modalData = getFilteredData();
+      console.log(`📋 Modal ${type} filtrado por série '${seriesName}':`, modalData.length, 'itens');
       
       // Se é tipo propostas, usar propostasDetalhes do backend
       if (type === 'propostas') {
@@ -735,9 +765,9 @@ const DashboardSales = ({
             }
           }
         }
-      } else if (type === 'vendas') {
-        modalData = tablesData.vendasDetalhes || [];
       }
+      // Para vendas, os dados já foram filtrados corretamente em getFilteredData()
+      // Não sobrescrever modalData para vendas
       
       // Não filtrar propostas, pois propostasDetalhes já vem com os dados corretos do backend
       
@@ -1046,53 +1076,45 @@ const DashboardSales = ({
     // Usar os mesmos dados que o modal usa para garantir consistência
     const tablesData = salesData._rawTablesData;
     
-    // Buscar todos os leads da mesma forma que o modal
-    let allLeads = [
-      ...(tablesData.leadsDetalhes || []),
-      ...(tablesData.organicosDetalhes || [])
-    ];
-    
-    // Buscar todas as reuniões separadamente
-    let allMeetings = [
-      ...(tablesData.reunioesDetalhes || []),
-      ...(tablesData.reunioesOrganicasDetalhes || [])
-    ];
-    
-    // Buscar todas as vendas separadamente para calcular vendas corretas
-    let allSales = [
-      ...(tablesData.vendasDetalhes || [])
-    ];
+    // Separar leads normais e orgânicos
+    let normalLeads = tablesData.leadsDetalhes || [];
+    let organicLeads = tablesData.organicosDetalhes || [];
+
+    // Separar reuniões normais e orgânicas
+    let normalMeetings = tablesData.reunioesDetalhes || [];
+    let organicMeetings = tablesData.reunioesOrganicasDetalhes || [];
+
+    // Separar vendas normais e orgânicas baseado no campo Fonte
+    let allSales = tablesData.vendasDetalhes || [];
+    let normalSales = allSales.filter(sale => {
+      const fonte = sale.Fonte || sale.fonte || '';
+      return fonte !== 'Orgânico';
+    });
+    let organicSales = allSales.filter(sale => {
+      const fonte = sale.Fonte || sale.fonte || '';
+      return fonte === 'Orgânico';
+    });
     
     // Aplicar filtros de corretor se houver
     if (filters.corretor && filters.corretor.trim() !== '') {
       const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
       if (selectedCorretores.length > 0) {
-        allLeads = allLeads.filter(lead => {
-          const leadCorretor = lead.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            leadCorretor === corretor || 
-            (corretor === 'VAZIO' && (leadCorretor === 'Vazio' || leadCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && leadCorretor === 'SA IMOB')
+        const filterByCorretor = (item) => {
+          const itemCorretor = item.Corretor || '';
+          return selectedCorretores.some(corretor =>
+            itemCorretor === corretor ||
+            (corretor === 'VAZIO' && (itemCorretor === 'Vazio' || itemCorretor === 'SA IMOB')) ||
+            (corretor === 'Vazio' && itemCorretor === 'SA IMOB')
           );
-        });
-        
-        allMeetings = allMeetings.filter(meeting => {
-          const meetingCorretor = meeting.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            meetingCorretor === corretor || 
-            (corretor === 'VAZIO' && (meetingCorretor === 'Vazio' || meetingCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && meetingCorretor === 'SA IMOB')
-          );
-        });
-        
-        allSales = allSales.filter(sale => {
-          const saleCorretor = sale.Corretor || '';
-          return selectedCorretores.some(corretor => 
-            saleCorretor === corretor || 
-            (corretor === 'VAZIO' && (saleCorretor === 'Vazio' || saleCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && saleCorretor === 'SA IMOB')
-          );
-        });
+        };
+
+        normalLeads = normalLeads.filter(filterByCorretor);
+        organicLeads = organicLeads.filter(filterByCorretor);
+        normalMeetings = normalMeetings.filter(filterByCorretor);
+        organicMeetings = organicMeetings.filter(filterByCorretor);
+        normalSales = normalSales.filter(filterByCorretor);
+        organicSales = organicSales.filter(filterByCorretor);
+        allSales = allSales.filter(filterByCorretor);
       }
     }
     
@@ -1100,94 +1122,134 @@ const DashboardSales = ({
     if (filters.source && filters.source.trim() !== '') {
       const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
       if (selectedSources.length > 0) {
-        allLeads = allLeads.filter(lead => {
-          const leadFonte = lead.fonte || lead.Fonte || lead.source || lead.utm_source || '';
-          return selectedSources.some(source => flexibleSearch(leadFonte, source));
-        });
-        
-        allMeetings = allMeetings.filter(meeting => {
-          const meetingFonte = meeting.fonte || meeting.Fonte || meeting.source || meeting.utm_source || '';
-          return selectedSources.some(source => flexibleSearch(meetingFonte, source));
-        });
-        
-        allSales = allSales.filter(sale => {
-          const saleFonte = sale.fonte || sale.Fonte || sale.source || sale.utm_source || '';
-          return selectedSources.some(source => flexibleSearch(saleFonte, source));
-        });
+        const filterBySource = (item) => {
+          const itemFonte = item.fonte || item.Fonte || item.source || item.utm_source || '';
+          return selectedSources.some(source => flexibleSearch(itemFonte, source));
+        };
+
+        normalLeads = normalLeads.filter(filterBySource);
+        organicLeads = organicLeads.filter(filterBySource);
+        normalMeetings = normalMeetings.filter(filterBySource);
+        organicMeetings = organicMeetings.filter(filterBySource);
+        normalSales = normalSales.filter(filterBySource);
+        organicSales = organicSales.filter(filterBySource);
+        allSales = allSales.filter(filterBySource);
       }
     }
     
     // Aplicar filtros de busca avançada se houver
     if (searchValue && searchField && searchField !== 'Corretor') {
-      allLeads = allLeads.filter(lead => {
-        const fieldValue = lead[searchField] || '';
+      const filterByField = (item) => {
+        const fieldValue = item[searchField] || '';
         return flexibleSearch(fieldValue, searchValue);
-      });
-      
-      allMeetings = allMeetings.filter(meeting => {
-        const fieldValue = meeting[searchField] || '';
-        return flexibleSearch(fieldValue, searchValue);
-      });
-      
-      allSales = allSales.filter(sale => {
-        const fieldValue = sale[searchField] || '';
-        return flexibleSearch(fieldValue, searchValue);
-      });
-    }
-    
-    // Se filtro de busca avançada é por Corretor, aplicar filtro específico
-    if (searchValue && searchField === 'Corretor') {
-      allLeads = allLeads.filter(lead => {
-        const corretorName = lead.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
-      
-      allMeetings = allMeetings.filter(meeting => {
-        const corretorName = meeting.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
-      
-      allSales = allSales.filter(sale => {
-        const corretorName = sale.Corretor || '';
-        return flexibleSearch(corretorName, searchValue);
-      });
+      };
+
+      normalLeads = normalLeads.filter(filterByField);
+      organicLeads = organicLeads.filter(filterByField);
+      normalMeetings = normalMeetings.filter(filterByField);
+      organicMeetings = organicMeetings.filter(filterByField);
+      normalSales = normalSales.filter(filterByField);
+      organicSales = organicSales.filter(filterByField);
+      allSales = allSales.filter(filterByField);
     }
 
-    // Nova lógica: Agrupar por corretor e calcular métricas (mesma base de dados do modal)
+    // Se filtro de busca avançada é por Corretor, aplicar filtro específico
+    if (searchValue && searchField === 'Corretor') {
+      const filterByCorretorName = (item) => {
+        const corretorName = item.Corretor || '';
+        return flexibleSearch(corretorName, searchValue);
+      };
+
+      normalLeads = normalLeads.filter(filterByCorretorName);
+      organicLeads = organicLeads.filter(filterByCorretorName);
+      normalMeetings = normalMeetings.filter(filterByCorretorName);
+      organicMeetings = organicMeetings.filter(filterByCorretorName);
+      normalSales = normalSales.filter(filterByCorretorName);
+      organicSales = organicSales.filter(filterByCorretorName);
+      allSales = allSales.filter(filterByCorretorName);
+    }
+
+    // Nova lógica: Agrupar por corretor e calcular métricas separando normais e orgânicos
     const corretorStats = {};
-    
-    // Processar leads
-    allLeads.forEach(lead => {
+
+    // Processar leads normais
+    normalLeads.forEach(lead => {
       const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
-      
+
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
           name: corretorName,
-          value: 0, // total leads
-          meetingsHeld: 0,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
           proposalsHeld: 0,
-          sales: 0
+          normalSales: 0,
+          organicSales: 0
         };
       }
-      
-      corretorStats[corretorName].value++;
+
+      corretorStats[corretorName].normalLeads++;
     });
-    
-    // Processar reuniões separadamente
-    allMeetings.forEach(meeting => {
-      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Vazio' : (meeting.Corretor || 'Desconhecido');
-      
+
+    // Processar leads orgânicos
+    organicLeads.forEach(lead => {
+      const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
+
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
           name: corretorName,
-          value: 0,
-          meetingsHeld: 0,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
           proposalsHeld: 0,
-          sales: 0
+          normalSales: 0,
+          organicSales: 0
         };
       }
-      
-      corretorStats[corretorName].meetingsHeld++;
+
+      corretorStats[corretorName].organicLeads++;
+    });
+
+    // Processar reuniões normais
+    normalMeetings.forEach(meeting => {
+      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Vazio' : (meeting.Corretor || 'Desconhecido');
+
+      if (!corretorStats[corretorName]) {
+        corretorStats[corretorName] = {
+          name: corretorName,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
+          proposalsHeld: 0,
+          normalSales: 0,
+          organicSales: 0
+        };
+      }
+
+      corretorStats[corretorName].normalMeetings++;
+    });
+
+    // Processar reuniões orgânicas
+    organicMeetings.forEach(meeting => {
+      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Vazio' : (meeting.Corretor || 'Desconhecido');
+
+      if (!corretorStats[corretorName]) {
+        corretorStats[corretorName] = {
+          name: corretorName,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
+          proposalsHeld: 0,
+          normalSales: 0,
+          organicSales: 0
+        };
+      }
+
+      corretorStats[corretorName].organicMeetings++;
     });
     
     // Processar propostas usando propostasDetalhes do backend (já filtradas por Data da Proposta!)
@@ -1263,54 +1325,88 @@ const DashboardSales = ({
     // Contar propostas por corretor
     propostas.forEach(proposta => {
       const corretorName = proposta.Corretor === 'SA IMOB' ? 'Vazio' : (proposta.Corretor || 'Desconhecido');
-      
+
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
           name: corretorName,
-          value: 0,
-          meetingsHeld: 0,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
           proposalsHeld: 0,
-          sales: 0
+          normalSales: 0,
+          organicSales: 0
         };
       }
-      
+
       corretorStats[corretorName].proposalsHeld++;
     });
-    
-    // Processar vendas usando dados específicos de vendas
-    allSales.forEach(sale => {
+
+    // Processar vendas normais
+    normalSales.forEach(sale => {
       const corretorName = sale.Corretor === 'SA IMOB' ? 'Vazio' : (sale.Corretor || 'Desconhecido');
-      
+
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
           name: corretorName,
-          value: 0,
-          meetingsHeld: 0,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
           proposalsHeld: 0,
-          sales: 0
+          normalSales: 0,
+          organicSales: 0
         };
       }
-      
-      // Cada venda filtrada é uma venda válida
-      corretorStats[corretorName].sales++;
-    });
-    
-    // Converter para array
-    const finalData = Object.values(corretorStats);
 
-    // Usar nova lógica baseada nos mesmos dados do modal
+      corretorStats[corretorName].normalSales++;
+    });
+
+    // Processar vendas orgânicas
+    organicSales.forEach(sale => {
+      const corretorName = sale.Corretor === 'SA IMOB' ? 'Vazio' : (sale.Corretor || 'Desconhecido');
+
+      if (!corretorStats[corretorName]) {
+        corretorStats[corretorName] = {
+          name: corretorName,
+          normalLeads: 0,
+          organicLeads: 0,
+          normalMeetings: 0,
+          organicMeetings: 0,
+          proposalsHeld: 0,
+          normalSales: 0,
+          organicSales: 0
+        };
+      }
+
+      corretorStats[corretorName].organicSales++;
+    });
+    
+    // Converter para array e adicionar total para ordenação
+    const finalData = Object.values(corretorStats).map(stats => ({
+      ...stats,
+      totalLeads: stats.normalLeads + stats.organicLeads,
+      totalMeetings: stats.normalMeetings + stats.organicMeetings,
+      totalSales: stats.normalSales + stats.organicSales,
+      // Manter compatibilidade com o formato antigo para gráficos
+      value: stats.normalLeads + stats.organicLeads,
+      meetingsHeld: stats.normalMeetings + stats.organicMeetings,
+      sales: stats.normalSales + stats.organicSales
+    }));
+
+    // Ordenar por total de cada categoria
     const sortedLeads = [...finalData].sort((a, b) => {
-      const diff = Number(b.value || 0) - Number(a.value || 0);
+      const diff = b.totalLeads - a.totalLeads;
       return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
     });
-    
+
     const sortedMeetings = [...finalData].sort((a, b) => {
-      const diff = Number(b.meetingsHeld || 0) - Number(a.meetingsHeld || 0);
+      const diff = b.totalMeetings - a.totalMeetings;
       return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
     });
-    
+
     const sortedSales = [...finalData].sort((a, b) => {
-      const diff = Number(b.sales || 0) - Number(a.sales || 0);
+      const diff = b.totalSales - a.totalSales;
       return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
     });
 
@@ -1369,7 +1465,7 @@ const DashboardSales = ({
             }
           },
           legend: {
-            data: ['Leads', 'Leads Orgânicos'],
+            data: ['Normal', 'Orgânico'],
             top: 10,
             left: 'center',
             textStyle: { fontSize: 12, fontWeight: '500' },
@@ -1398,7 +1494,7 @@ const DashboardSales = ({
           },
           series: [
             {
-              name: 'Leads',
+              name: 'Normal',
               type: 'bar',
               barGap: 0,
               label: labelOption,
@@ -1407,7 +1503,7 @@ const DashboardSales = ({
               itemStyle: { color: '#96856F' }
             },
             {
-              name: 'Leads Orgânicos',
+              name: 'Orgânico',
               type: 'bar',
               label: labelOption,
               emphasis: { focus: 'series' },
@@ -1456,12 +1552,24 @@ const DashboardSales = ({
         },
         series: [
           {
-            name: 'Leads',
-            data: data.map(item => item.pagos || 0)
+            name: 'Normal',
+            data: data.map(item => {
+              // Decidir que tipo de dados mostrar com base no title do gráfico
+              if (title === 'Leads') return item.normalLeads || 0;
+              if (title === 'Reuniões') return item.normalMeetings || 0;
+              if (title === 'Vendas') return item.normalSales || 0;
+              return item.normal || 0;
+            })
           },
           {
-            name: 'Leads Orgânicos',
-            data: data.map(item => item.organicos || 0)
+            name: 'Orgânico',
+            data: data.map(item => {
+              // Decidir que tipo de dados mostrar com base no title do gráfico
+              if (title === 'Leads') return item.organicLeads || 0;
+              if (title === 'Reuniões') return item.organicMeetings || 0;
+              if (title === 'Vendas') return item.organicSales || 0;
+              return item.organic || 0;
+            })
           }
         ]
       };
@@ -2301,7 +2409,7 @@ const DashboardSales = ({
                     }}
                     title="Clique para ver detalhes dos leads"
                   >
-                    Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0)}
+                    Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.totalLeads || user.value || 0), 0)}
                   </span>
                   <button
                     onClick={handleExportLeads}
@@ -2333,12 +2441,11 @@ const DashboardSales = ({
                   </button>
                 </div>
               </div>
-              <CompactChart 
-                type="bar"
+              <GroupedBarChart
                 data={sortedChartsData.sortedLeadsData}
-                config={chartConfigs.leadsConfig}
                 style={chartStyle}
-                onBarClick={(corretorName) => openModalByCorretor('leads', corretorName)}
+                title="Leads"
+                onBarClick={(corretorName, value, params, seriesName) => openModalByCorretor('leads', corretorName, value, params, seriesName)}
               />
             </div>
             
@@ -2370,7 +2477,7 @@ const DashboardSales = ({
                     }}
                     title="Clique para ver todas as reuniões"
                   >
-                    Total: {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
+                    Total: {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.totalMeetings || user.meetingsHeld || 0), 0)}
                   </span>
                   <button
                     onClick={handleExportMeetings}
@@ -2402,13 +2509,12 @@ const DashboardSales = ({
                   </button>
                 </div>
               </div>
-              <CompactChart 
-                type="bar" 
-                data={sortedChartsData.sortedMeetingsData} 
-                config={chartConfigs.meetingsConfig}
+              <GroupedBarChart
+                data={sortedChartsData.sortedMeetingsData}
                 style={chartStyle}
-                onBarClick={(corretorName) => openModalByCorretor('reunioes', corretorName)}
-                  />
+                title="Reuniões"
+                onBarClick={(corretorName, value, params, seriesName) => openModalByCorretor('reunioes', corretorName, value, params, seriesName)}
+                />
             </div>
             
             <div className="card card-full" key={`sales-${searchField}-${searchValue}`}>
@@ -2439,7 +2545,7 @@ const DashboardSales = ({
                     }}
                     title="Clique para ver todas as vendas"
                   >
-                    Total: {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0)}
+                    Total: {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalSales || user.sales || 0), 0)}
                   </span>
                   <button
                     onClick={handleExportSales}
@@ -2471,13 +2577,12 @@ const DashboardSales = ({
                   </button>
                 </div>
               </div>
-              <CompactChart 
-                type="bar" 
-                data={sortedChartsData.sortedSalesData} 
-                config={chartConfigs.salesConfig}
+              <GroupedBarChart
+                data={sortedChartsData.sortedSalesData}
                 style={chartStyle}
-                onBarClick={(corretorName) => openModalByCorretor('vendas', corretorName)}
-                  />
+                title="Vendas"
+                onBarClick={(corretorName, value, params, seriesName) => openModalByCorretor('vendas', corretorName, value, params, seriesName)}
+                />
             </div>
           </>
         ) : salesData?.analyticsTeam && salesData.analyticsTeam.user_performance && salesData.analyticsTeam.user_performance.length > 0 ? (
