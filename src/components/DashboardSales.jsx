@@ -950,10 +950,9 @@ const DashboardSales = ({
         if (selectedCorretores.length > 0) {
           modalData = modalData.filter(item => {
             const itemCorretor = item.Corretor || '';
-            return selectedCorretores.some(corretor => 
-              itemCorretor === corretor || 
-              (corretor === 'VAZIO' && (itemCorretor === 'Vazio' || itemCorretor === 'SA IMOB')) ||
-              (corretor === 'Vazio' && itemCorretor === 'SA IMOB')
+            return selectedCorretores.some(corretor =>
+              itemCorretor === corretor ||
+              (corretor === 'Não atribuído' && itemCorretor === 'SA IMOB')
             );
           });
         }
@@ -1103,8 +1102,7 @@ const DashboardSales = ({
           const itemCorretor = item.Corretor || '';
           return selectedCorretores.some(corretor =>
             itemCorretor === corretor ||
-            (corretor === 'VAZIO' && (itemCorretor === 'Vazio' || itemCorretor === 'SA IMOB')) ||
-            (corretor === 'Vazio' && itemCorretor === 'SA IMOB')
+            (corretor === 'Não atribuído' && itemCorretor === 'SA IMOB')
           );
         };
 
@@ -1174,7 +1172,7 @@ const DashboardSales = ({
 
     // Processar leads normais
     normalLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
+      const corretorName = lead.Corretor === 'SA IMOB' ? 'Não atribuído' : (lead.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -1194,7 +1192,7 @@ const DashboardSales = ({
 
     // Processar leads orgânicos
     organicLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Vazio' : (lead.Corretor || 'Desconhecido');
+      const corretorName = lead.Corretor === 'SA IMOB' ? 'Não atribuído' : (lead.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -1214,7 +1212,7 @@ const DashboardSales = ({
 
     // Processar reuniões normais
     normalMeetings.forEach(meeting => {
-      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Vazio' : (meeting.Corretor || 'Desconhecido');
+      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Não atribuído' : (meeting.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -1234,7 +1232,7 @@ const DashboardSales = ({
 
     // Processar reuniões orgânicas
     organicMeetings.forEach(meeting => {
-      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Vazio' : (meeting.Corretor || 'Desconhecido');
+      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Não atribuído' : (meeting.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -1270,10 +1268,9 @@ const DashboardSales = ({
         if (selectedCorretores.length > 0) {
           propostas = propostas.filter(proposta => {
             const propostaCorretor = proposta.Corretor || '';
-            return selectedCorretores.some(corretor => 
-              propostaCorretor === corretor || 
-              (corretor === 'VAZIO' && (propostaCorretor === 'Vazio' || propostaCorretor === 'SA IMOB')) ||
-              (corretor === 'Vazio' && propostaCorretor === 'SA IMOB')
+            return selectedCorretores.some(corretor =>
+              propostaCorretor === corretor ||
+              (corretor === 'Não atribuído' && propostaCorretor === 'SA IMOB')
             );
           });
         }
@@ -1324,7 +1321,7 @@ const DashboardSales = ({
     
     // Contar propostas por corretor
     propostas.forEach(proposta => {
-      const corretorName = proposta.Corretor === 'SA IMOB' ? 'Vazio' : (proposta.Corretor || 'Desconhecido');
+      const corretorName = proposta.Corretor === 'SA IMOB' ? 'Não atribuído' : (proposta.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -1344,7 +1341,7 @@ const DashboardSales = ({
 
     // Processar vendas normais
     normalSales.forEach(sale => {
-      const corretorName = sale.Corretor === 'SA IMOB' ? 'Vazio' : (sale.Corretor || 'Desconhecido');
+      const corretorName = sale.Corretor === 'SA IMOB' ? 'Não atribuído' : (sale.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -1364,7 +1361,7 @@ const DashboardSales = ({
 
     // Processar vendas orgânicas
     organicSales.forEach(sale => {
-      const corretorName = sale.Corretor === 'SA IMOB' ? 'Vazio' : (sale.Corretor || 'Desconhecido');
+      const corretorName = sale.Corretor === 'SA IMOB' ? 'Não atribuído' : (sale.Corretor || 'Não atribuído');
 
       if (!corretorStats[corretorName]) {
         corretorStats[corretorName] = {
@@ -2142,8 +2139,7 @@ const DashboardSales = ({
                           const vendaCorretor = venda.Corretor || '';
                           return selectedCorretores.some(corretor => 
                             vendaCorretor === corretor || 
-                            (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                            (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
+                              (corretor === 'Não atribuído' && vendaCorretor === 'SA IMOB')
                           );
                         });
                       }
@@ -2206,8 +2202,7 @@ const DashboardSales = ({
                         const vendaCorretor = venda.Corretor || '';
                         return selectedCorretores.some(corretor => 
                           vendaCorretor === corretor || 
-                          (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                          (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
+                          (corretor === 'Não atribuído' && vendaCorretor === 'SA IMOB')
                         );
                       });
                     }
@@ -2276,8 +2271,7 @@ const DashboardSales = ({
                           const vendaCorretor = venda.Corretor || '';
                           return selectedCorretores.some(corretor => 
                             vendaCorretor === corretor || 
-                            (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                            (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
+                              (corretor === 'Não atribuído' && vendaCorretor === 'SA IMOB')
                           );
                         });
                       }
@@ -2332,8 +2326,7 @@ const DashboardSales = ({
                         const vendaCorretor = venda.Corretor || '';
                         return selectedCorretores.some(corretor => 
                           vendaCorretor === corretor || 
-                          (corretor === 'VAZIO' && (vendaCorretor === 'Vazio' || vendaCorretor === 'SA IMOB')) ||
-                          (corretor === 'Vazio' && vendaCorretor === 'SA IMOB')
+                          (corretor === 'Não atribuído' && vendaCorretor === 'SA IMOB')
                         );
                       });
                     }

@@ -15,7 +15,7 @@ const processDetailedTablesData = (tablesData) => {
   // 1. Agrupar leads por corretor
   const leadsByUserMap = {};
   leadsDetalhes.forEach(lead => {
-    const corretor = lead.Corretor === 'SA IMOB' ? 'VAZIO' : lead.Corretor;
+    const corretor = lead.Corretor === 'SA IMOB' ? 'Não atribuído' : lead.Corretor;
     if (!leadsByUserMap[corretor]) {
       leadsByUserMap[corretor] = {
         name: corretor,
@@ -47,7 +47,7 @@ const processDetailedTablesData = (tablesData) => {
   
   // 2. Adicionar reuniões aos corretores
   [...reunioesDetalhes, ...reunioesOrganicasDetalhes].forEach(reuniao => {
-    const corretor = reuniao.Corretor === 'SA IMOB' ? 'VAZIO' : reuniao.Corretor;
+    const corretor = reuniao.Corretor === 'SA IMOB' ? 'Não atribuído' : reuniao.Corretor;
     if (!leadsByUserMap[corretor]) {
       leadsByUserMap[corretor] = {
         name: corretor,
@@ -64,7 +64,7 @@ const processDetailedTablesData = (tablesData) => {
   
   // 3. Adicionar vendas aos corretores
   vendasDetalhes.forEach(venda => {
-    const corretor = venda.Corretor === 'SA IMOB' ? 'VAZIO' : venda.Corretor;
+    const corretor = venda.Corretor === 'SA IMOB' ? 'Não atribuído' : venda.Corretor;
     if (!leadsByUserMap[corretor]) {
       leadsByUserMap[corretor] = {
         name: corretor,
@@ -300,7 +300,7 @@ function Dashboard() {
     
     return salesData.leadsByUser
       .map(user => ({ name: user.name }))
-      .filter(corretor => corretor.name && corretor.name !== 'Vazio' && corretor.name !== 'Desconhecido')
+      .filter(corretor => corretor.name && corretor.name !== 'Não atribuído')
       .sort((a, b) => a.name.localeCompare(b.name));
   };
   
@@ -954,10 +954,9 @@ function Dashboard() {
       if (selectedCorretores.length === 0) return true;
       
       const itemCorretor = item.Corretor;
-      return selectedCorretores.some(selectedCorretor => 
-        itemCorretor === selectedCorretor || 
-        (selectedCorretor === 'VAZIO' && (itemCorretor === 'Vazio' || itemCorretor === 'SA IMOB')) ||
-        (selectedCorretor === 'SA IMOB' && itemCorretor === 'VAZIO')
+      return selectedCorretores.some(selectedCorretor =>
+        itemCorretor === selectedCorretor ||
+        (selectedCorretor === 'SA IMOB' && itemCorretor === 'Não atribuído')
       );
     };
 

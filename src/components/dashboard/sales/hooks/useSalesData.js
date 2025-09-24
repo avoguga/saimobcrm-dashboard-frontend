@@ -29,9 +29,9 @@ export const useSalesData = (data) => {
     ];
     
     const uniqueCorretores = [...new Set(allLeads.map(item => {
-      // Renomear 'SA IMOB' para 'Vazio' (como no filtro de busca avançada)
+      // Renomear 'SA IMOB' para 'Não atribuído' (como no filtro de busca avançada)
       const corretor = item.Corretor;
-      return corretor === 'SA IMOB' ? 'Vazio' : corretor;
+      return corretor === 'SA IMOB' ? 'Não atribuído' : corretor;
     }).filter(name => name && name.trim() !== ''))].sort();
     
     return uniqueCorretores.map(name => ({
