@@ -325,32 +325,42 @@ function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Carregar lista de corretores
+  // Carregar lista de corretores e limpar cache no primeiro carregamento
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        
+        // Limpar cache do Kommo toda vez que entrar na página (primeiro carregamento)
+        console.log('🧹 Limpando cache do Kommo ao entrar na página...');
+
+        // Limpar cache local
+        KommoAPI.clearCache();
+
+        // Limpar cache da API granular
+        GranularAPI.clearCache();
+
+        // Limpar cache do backend (Kommo)
+        try {
+          await KommoAPI.flushKommoCache();
+          console.log('✅ Cache do Kommo limpo com sucesso no carregamento inicial');
+        } catch (error) {
+          console.error('⚠️ Erro ao limpar cache do Kommo no carregamento inicial:', error);
+          // Continuar mesmo se falhar a limpeza do cache do backend
+        }
+
         // Carregar apenas fontes (corretores serão extraídos dos dados de vendas)
         const sourceOptionsResponse = await KommoAPI.getSourceOptions();
-        
-        
+
+
         if (sourceOptionsResponse && Array.isArray(sourceOptionsResponse)) {
           setSourceOptions(sourceOptionsResponse);
-        } else {
-        }
+        } 
       } catch (error) {
-        
+
         // Em caso de erro, garantir que pelo menos o fallback seja definido
-        setSourceOptions([
-          { value: '', label: 'Todas as Fontes' },
-          { value: 'Google', label: 'Google' },
-          { value: 'Tráfego Meta', label: 'Tráfego Meta' },
-          { value: 'Site', label: 'Site' },
-          { value: 'Parceria com Construtoras', label: 'Parceria com Construtoras' }
-        ]);
+        console.log(error);
       }
     };
-    
+
     fetchInitialData();
   }, []);
 
