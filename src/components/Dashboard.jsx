@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+// Estado para controlar se o cache do Kommo foi limpo
 import { KommoAPI } from '../services/api';
 import { GranularAPI } from '../services/granularAPI'; // API REAL granular
 import DashboardMarketing from './DashboardMarketing';
@@ -277,6 +278,7 @@ function Dashboard() {
   }, [updateFilter]);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isKommoCacheFlushed, setIsKommoCacheFlushed] = useState(false);
   const [isLoadingMarketing, setIsLoadingMarketing] = useState(false);
   const [isLoadingSales, setIsLoadingSales] = useState(false);
   const [isInitialSalesLoad, setIsInitialSalesLoad] = useState(true);
@@ -325,42 +327,85 @@ function Dashboard() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Carregar lista de corretores e limpar cache no primeiro carregamento
+  // Carregar lista de corretores, limpar cache e buscar dados detalhados no primeiro carregamento
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Limpar cache do Kommo toda vez que entrar na página (primeiro carregamento)
-        console.log('🧹 Limpando cache do Kommo ao entrar na página...');
-
+        setIsLoading(true);
+        setIsKommoCacheFlushed(false);
         // Limpar cache local
         KommoAPI.clearCache();
-
         // Limpar cache da API granular
         GranularAPI.clearCache();
-
         // Limpar cache do backend (Kommo)
         try {
           await KommoAPI.flushKommoCache();
+          setIsKommoCacheFlushed(true);
           console.log('✅ Cache do Kommo limpo com sucesso no carregamento inicial');
         } catch (error) {
+          setIsKommoCacheFlushed(false);
           console.error('⚠️ Erro ao limpar cache do Kommo no carregamento inicial:', error);
-          // Continuar mesmo se falhar a limpeza do cache do backend
         }
-
         // Carregar apenas fontes (corretores serão extraídos dos dados de vendas)
         const sourceOptionsResponse = await KommoAPI.getSourceOptions();
-
-
         if (sourceOptionsResponse && Array.isArray(sourceOptionsResponse)) {
           setSourceOptions(sourceOptionsResponse);
-        } 
+        }
+        // Carregar dados detalhados do dashboard (garante flush antes)
+        const days = calculateDays();
+        const params = { days };
+        let customDates = null;
+        if (period === 'current_month') {
+          const defaultPeriod = getDefaultPeriod();
+          params.start_date = defaultPeriod.startDate;
+          params.end_date = defaultPeriod.endDate;
+          customDates = {
+            start_date: defaultPeriod.startDate,
+            end_date: defaultPeriod.endDate
+          };
+        } else if (period === 'previous_month') {
+          const today = new Date();
+          const firstDayPreviousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          const lastDayPreviousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+          customDates = {
+            start_date: firstDayPreviousMonth.toISOString().split('T')[0],
+            end_date: lastDayPreviousMonth.toISOString().split('T')[0]
+          };
+        } else if (period === 'year') {
+          const today = new Date();
+          const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+          customDates = {
+            start_date: firstDayOfYear.toISOString().split('T')[0],
+            end_date: today.toISOString().split('T')[0]
+          };
+        } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          params.start_date = customPeriod.startDate;
+          params.end_date = customPeriod.endDate;
+          customDates = {
+            start_date: customPeriod.startDate,
+            end_date: customPeriod.endDate
+          };
+        }
+        const extraParams = {};
+        if (customDates) {
+          extraParams.start_date = customDates.start_date;
+          extraParams.end_date = customDates.end_date;
+        } else {
+          extraParams.days = days;
+        }
+        const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
+        const salesResult = processDetailedTablesData(tablesData);
+        salesResult._lastParams = extraParams;
+        setSalesData(salesResult);
+        setIsLoading(false);
+        setIsInitialSalesLoad(false);
       } catch (error) {
-
-        // Em caso de erro, garantir que pelo menos o fallback seja definido
+        setIsLoading(false);
+        setIsInitialSalesLoad(false);
+        setError(error.message);
         console.log(error);
       }
     };
-
     fetchInitialData();
   }, []);
 
@@ -581,29 +626,23 @@ function Dashboard() {
     }
   }, [activeTab, marketingData, salesData]);
 
-  // Carregar dados de vendas (quando period está válido E aba sales ativa) com debounce
+  // Carregar dados de vendas (quando período ou aba mudam, e cache já foi limpo)
   useEffect(() => {
-    if (!isPeriodValid() || activeTab !== 'sales') {
-      return; // Não faz nada se o período não estiver válido OU se não estiver na aba sales
+    if (!isPeriodValid() || activeTab !== 'sales' || !isKommoCacheFlushed) {
+      return;
     }
-
     // Debounce de 300ms para evitar múltiplas chamadas
     const timeoutId = setTimeout(() => {
       const fetchSalesData = async () => {
-        // Só mostrar loading na primeira carga
-        // Mudanças de filtro mostram indicador sutil (como auto-refresh)
         if (isInitialSalesLoad) {
           setIsLoadingSales(true);
         } else {
           setIsUpdatingSales(true);
         }
         setError(null);
-        
         try {
           const days = calculateDays();
           const params = { days };
-          
-          // Se for período customizado ou mês atual, enviar datas específicas
           let customDates = null;
           if (period === 'current_month') {
             const defaultPeriod = getDefaultPeriod();
@@ -636,9 +675,6 @@ function Dashboard() {
               end_date: customPeriod.endDate
             };
           }
-          
-          
-          // ✅ NOVA IMPLEMENTAÇÃO: Usar apenas endpoint detailed-tables
           const extraParams = {};
           if (customDates) {
             extraParams.start_date = customDates.start_date;
@@ -648,10 +684,7 @@ function Dashboard() {
           }
           const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
           const salesResult = processDetailedTablesData(tablesData);
-          // ✅ OTIMIZAÇÃO: Salvar parâmetros para reutilização nos modals
           salesResult._lastParams = extraParams;
-          
-          // Buscar dados do período anterior para comparação (2ª requisição)
           try {
             const previousPeriodData = await loadPreviousPeriodData(period, days, customPeriod, filters.corretor, filters.source);
             if (previousPeriodData) {
@@ -660,23 +693,20 @@ function Dashboard() {
           } catch (error) {
             console.warn('Erro ao buscar dados do período anterior:', error);
           }
-          
           setSalesData(salesResult);
         } catch (error) {
           setError(`Falha ao carregar dados de vendas: ${error.message}`);
         } finally {
           setIsLoadingSales(false);
           setIsUpdatingSales(false);
-          setIsLoading(false); // Loading geral só para primeira carga
-          setIsInitialSalesLoad(false); // Marcar que primeira carga foi concluída
+          setIsLoading(false);
+          setIsInitialSalesLoad(false);
         }
       };
-      
       fetchSalesData();
     }, 300);
-
     return () => clearTimeout(timeoutId);
-  }, [period, activeTab]); // Removido filtros para não trigger automático - agora só com botão Apply
+  }, [period, activeTab, isKommoCacheFlushed]);
   
   // Reset da flag de primeira carga quando o período muda (só na aba sales)
   useEffect(() => {
@@ -697,7 +727,6 @@ function Dashboard() {
     if (forceRefresh) {
       // Limpar cache local
       KommoAPI.clearCache();
-      
       // Limpar cache do backend (Kommo)
       try {
         await KommoAPI.flushKommoCache();
@@ -712,48 +741,83 @@ function Dashboard() {
     } else {
       setIsLoadingSales(true);
     }
-    
-    // Sempre mostrar loading de filtros no refresh manual
-    
+
     try {
-      const days = calculateDays();
-      const params = { days };
-      
-      // Se for período customizado, enviar datas específicas
-      if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
-        params.start_date = customPeriod.startDate;
-        params.end_date = customPeriod.endDate;
+      let extraParams = {};
+      let customDates = null;
+      // Mês atual
+      if (period === 'current_month') {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const start_date = firstDay.toISOString().split('T')[0];
+        const end_date = today.toISOString().split('T')[0];
+        extraParams.start_date = start_date;
+        extraParams.end_date = end_date;
+        customDates = { start_date, end_date };
+      // Mês anterior
+      } else if (period === 'previous_month') {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
+        const start_date = firstDay.toISOString().split('T')[0];
+        const end_date = lastDay.toISOString().split('T')[0];
+        extraParams.start_date = start_date;
+        extraParams.end_date = end_date;
+        customDates = { start_date, end_date };
+      // Período customizado
+      } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+        extraParams.start_date = customPeriod.startDate;
+        extraParams.end_date = customPeriod.endDate;
+        customDates = { start_date: customPeriod.startDate, end_date: customPeriod.endDate };
+      // Outros períodos (ex: 7d, year)
+      } else {
+        const days = calculateDays();
+        extraParams.days = days;
       }
-      
-      
-      // Preparar datas customizadas se período for custom
-      const customDates = (period === 'custom' && customPeriod.startDate && customPeriod.endDate) ? {
-        start_date: customPeriod.startDate,
-        end_date: customPeriod.endDate
-      } : null;
-      
+
       if (activeTab === 'marketing') {
-        // Limpar cache da API granular também
         GranularAPI.clearCache();
-        
+        const days = calculateDays();
         const marketingResponse = await GranularAPI.loadMarketingDashboard(days, filters.source, customDates);
         setMarketingData(marketingResponse);
       } else {
-        // Limpar cache da API granular também
         GranularAPI.clearCache();
-        
-        // ✅ NOVA IMPLEMENTAÇÃO: Carregar dados com endpoint único
-        const extraParams = {};
-        if (customDates) {
-          extraParams.start_date = customDates.start_date;
-          extraParams.end_date = customDates.end_date;
-        } else {
-          extraParams.days = days;
-        }
+        // Requisição para o período atual
         const tablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, extraParams);
         const salesResponse = processDetailedTablesData(tablesData);
-        // ✅ OTIMIZAÇÃO: Salvar parâmetros para reutilização nos modals
         salesResponse._lastParams = extraParams;
+
+        // Requisição para o período anterior (para comparação)
+        let previousPeriodParams = {};
+        if (period === 'current_month') {
+          const today = new Date();
+          const firstDayPrev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          const lastDayPrev = new Date(today.getFullYear(), today.getMonth(), 0);
+          previousPeriodParams.start_date = firstDayPrev.toISOString().split('T')[0];
+          previousPeriodParams.end_date = lastDayPrev.toISOString().split('T')[0];
+        } else if (period === 'previous_month') {
+          const today = new Date();
+          const firstDayPrev = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+          const lastDayPrev = new Date(today.getFullYear(), today.getMonth() - 1, 0);
+          previousPeriodParams.start_date = firstDayPrev.toISOString().split('T')[0];
+          previousPeriodParams.end_date = lastDayPrev.toISOString().split('T')[0];
+        } else if (period === 'custom' && customPeriod.startDate && customPeriod.endDate) {
+          // Período anterior ao customizado
+          const start = new Date(customPeriod.startDate);
+          const end = new Date(customPeriod.endDate);
+          const diff = end.getTime() - start.getTime();
+          const prevEnd = new Date(start.getTime() - 1);
+          const prevStart = new Date(prevEnd.getTime() - diff);
+          previousPeriodParams.start_date = prevStart.toISOString().split('T')[0];
+          previousPeriodParams.end_date = prevEnd.toISOString().split('T')[0];
+        } else {
+          // Para outros períodos, pode-se usar days igual
+          previousPeriodParams.days = calculateDays();
+        }
+        // Manter filtros
+        const previousTablesData = await KommoAPI.getDetailedTables(filters.corretor, filters.source, previousPeriodParams);
+        salesResponse.previousPeriodData = processDetailedTablesData(previousTablesData);
+
         setSalesData(salesResponse);
       }
     } catch (error) {
