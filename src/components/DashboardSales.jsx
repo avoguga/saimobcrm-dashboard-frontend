@@ -212,7 +212,50 @@ const DashboardSales = ({
   const { rawSalesData, salesData, comparisonData, setRawSalesData, setSalesData, setComparisonData, corretorOptions, sourceSelectOptions } = salesDataHook;
   const { searchField, searchValue, setSearchField, setSearchValue } = searchHook;
 
+  // Estado para receita prevista
+  const [receitaPrevista, setReceitaPrevista] = useState(0);
+  const [loadingReceitaPrevista, setLoadingReceitaPrevista] = useState(true);
 
+  // Calcular receita prevista a partir dos dados do salesData
+  // Usa propostasDetalhes e filtra por etapas: "Contrato Enviado", "Contrato Assinado", "Venda ganha"
+  useEffect(() => {
+    const calcularReceitaPrevista = () => {
+      try {
+        setLoadingReceitaPrevista(true);
+
+        const rawData = salesData?._rawTablesData || data?._rawTablesData;
+
+        // Verificar se há campo receita_prevista no summary (backend atualizado)
+        if (rawData?.summary?.receita_prevista !== undefined) {
+          setReceitaPrevista(rawData.summary.receita_prevista);
+          setLoadingReceitaPrevista(false);
+          return;
+        }
+
+        // Fallback: calcular no frontend usando propostasDetalhes
+        const propostas = rawData?.propostasDetalhes || [];
+        const etapasAlvo = ['Contrato Enviado', 'Contrato Assinado', 'Venda ganha'];
+
+        let total = 0;
+        propostas.forEach(proposta => {
+          if (etapasAlvo.includes(proposta.Etapa)) {
+            const valorStr = proposta['Valor da Proposta'] || 'R$ 0,00';
+            const valorNum = parseBrazilianCurrency(valorStr);
+            total += valorNum;
+          }
+        });
+
+        setReceitaPrevista(total);
+      } catch (error) {
+        console.error('Erro ao calcular receita prevista:', error);
+        setReceitaPrevista(0);
+      } finally {
+        setLoadingReceitaPrevista(false);
+      }
+    };
+
+    calcularReceitaPrevista();
+  }, [salesData, data]);
 
   // Converter valores dos filtros para formato do React-Select
   const selectedCorretorValues = useMemo(() => {
@@ -2363,6 +2406,21 @@ const DashboardSales = ({
                 })()} />
               </div>
               <div className="mini-metric-title">RECEITA TOTAL</div>
+            </div>
+            <div className="mini-metric-card">
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="mini-metric-value" style={{ color: '#059669' }}>
+                  {loadingReceitaPrevista ? (
+                    <span style={{ fontSize: '14px' }}>Carregando...</span>
+                  ) : (
+                    `R$ ${formatCurrency(receitaPrevista)}`
+                  )}
+                </div>
+              </div>
+              <div className="mini-metric-title">RECEITA PREVISTA</div>
+              <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#6b7280' }}>
+                <span>Contrato Enviado + Assinado + Closed-Won</span>
+              </div>
             </div>
           </div>
         </div>
