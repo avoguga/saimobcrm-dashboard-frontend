@@ -214,12 +214,13 @@ const DashboardSales = ({
 
   // Estado para receita prevista
   const [receitaPrevista, setReceitaPrevista] = useState(0);
+  const [receitaPrevistaPeriodoAnterior, setReceitaPrevistaPeriodoAnterior] = useState(0);
   const [loadingReceitaPrevista, setLoadingReceitaPrevista] = useState(true);
 
   // Calcular receita prevista a partir dos dados do salesData
   // Usa propostasDetalhes e filtra por etapas: "Contrato Enviado", "Contrato Assinado", "Venda ganha"
   useEffect(() => {
-    const calcularReceitaPrevista = () => {
+    const calcularReceitaPrevista = async () => {
       try {
         setLoadingReceitaPrevista(true);
 
@@ -228,34 +229,106 @@ const DashboardSales = ({
         // Verificar se há campo receita_prevista no summary (backend atualizado)
         if (rawData?.summary?.receita_prevista !== undefined) {
           setReceitaPrevista(rawData.summary.receita_prevista);
-          setLoadingReceitaPrevista(false);
-          return;
+        } else {
+          // Fallback: calcular no frontend usando propostasDetalhes
+          const propostas = rawData?.propostasDetalhes || [];
+          const etapasAlvo = ['Contrato Enviado', 'Contrato Assinado', 'Venda ganha'];
+
+          let total = 0;
+          propostas.forEach(proposta => {
+            if (etapasAlvo.includes(proposta.Etapa)) {
+              const valorStr = proposta['Valor da Proposta'] || 'R$ 0,00';
+              const valorNum = parseBrazilianCurrency(valorStr);
+              total += valorNum;
+            }
+          });
+
+          setReceitaPrevista(total);
         }
 
-        // Fallback: calcular no frontend usando propostasDetalhes
-        const propostas = rawData?.propostasDetalhes || [];
-        const etapasAlvo = ['Contrato Enviado', 'Contrato Assinado', 'Venda ganha'];
+        // Calcular receita prevista do período anterior para comparação
+        // Usar o mesmo cálculo que comparisonData usa para outros KPIs
+        try {
+          // Calcular datas do período anterior baseado no período atual
+          const now = new Date();
+          let previousStartDate, previousEndDate;
 
-        let total = 0;
-        propostas.forEach(proposta => {
-          if (etapasAlvo.includes(proposta.Etapa)) {
-            const valorStr = proposta['Valor da Proposta'] || 'R$ 0,00';
-            const valorNum = parseBrazilianCurrency(valorStr);
-            total += valorNum;
+          if (period === 'current_month') {
+            // Mês anterior
+            previousStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            previousEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
+          } else if (period === 'previous_month') {
+            // Dois meses atrás
+            previousStartDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            previousEndDate = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+          } else if (period === 'year') {
+            // Ano anterior
+            previousStartDate = new Date(now.getFullYear() - 1, 0, 1);
+            previousEndDate = new Date(now.getFullYear() - 1, 11, 31);
+          } else if (period === '7d') {
+            // 7 dias anteriores aos últimos 7 dias
+            previousEndDate = new Date(now);
+            previousEndDate.setDate(previousEndDate.getDate() - 7);
+            previousStartDate = new Date(previousEndDate);
+            previousStartDate.setDate(previousStartDate.getDate() - 7);
+          } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
+            // Para período customizado, usar o mesmo range mas deslocado para trás
+            const start = new Date(customPeriod.startDate + 'T12:00:00');
+            const end = new Date(customPeriod.endDate + 'T12:00:00');
+            const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+
+            previousEndDate = new Date(start);
+            previousEndDate.setDate(previousEndDate.getDate() - 1);
+            previousStartDate = new Date(previousEndDate);
+            previousStartDate.setDate(previousStartDate.getDate() - diffDays);
+          } else {
+            setReceitaPrevistaPeriodoAnterior(0);
+            return;
           }
-        });
 
-        setReceitaPrevista(total);
+          // Buscar dados do período anterior
+          const extraParams = {
+            start_date: previousStartDate.toISOString().split('T')[0],
+            end_date: previousEndDate.toISOString().split('T')[0],
+            ...(filters.corretor && { corretor: filters.corretor }),
+            ...(filters.source && { fonte: filters.source })
+          };
+
+          const previousData = await KommoAPI.getDetailedTables('', '', extraParams);
+
+          // Calcular receita prevista do período anterior
+          if (previousData?.summary?.receita_prevista !== undefined) {
+            setReceitaPrevistaPeriodoAnterior(previousData.summary.receita_prevista);
+          } else {
+            const propostasPrevious = previousData?.propostasDetalhes || [];
+            const etapasAlvo = ['Contrato Enviado', 'Contrato Assinado', 'Venda ganha'];
+
+            let totalPrevious = 0;
+            propostasPrevious.forEach(proposta => {
+              if (etapasAlvo.includes(proposta.Etapa)) {
+                const valorStr = proposta['Valor da Proposta'] || 'R$ 0,00';
+                const valorNum = parseBrazilianCurrency(valorStr);
+                totalPrevious += valorNum;
+              }
+            });
+
+            setReceitaPrevistaPeriodoAnterior(totalPrevious);
+          }
+        } catch (error) {
+          console.warn('Erro ao buscar receita prevista do período anterior:', error);
+          setReceitaPrevistaPeriodoAnterior(0);
+        }
       } catch (error) {
         console.error('Erro ao calcular receita prevista:', error);
         setReceitaPrevista(0);
+        setReceitaPrevistaPeriodoAnterior(0);
       } finally {
         setLoadingReceitaPrevista(false);
       }
     };
 
     calcularReceitaPrevista();
-  }, [salesData, data]);
+  }, [salesData, data, period, customPeriod, filters.corretor, filters.source]);
 
   // Converter valores dos filtros para formato do React-Select
   const selectedCorretorValues = useMemo(() => {
@@ -2416,11 +2489,13 @@ const DashboardSales = ({
                     `R$ ${formatCurrency(receitaPrevista)}`
                   )}
                 </div>
+                <TrendIndicator value={(() => {
+                  const current = receitaPrevista;
+                  const previous = receitaPrevistaPeriodoAnterior;
+                  return previous > 0 ? ((current - previous) / previous) * 100 : 0;
+                })()} />
               </div>
               <div className="mini-metric-title">RECEITA PREVISTA</div>
-              <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#6b7280' }}>
-                <span>Contrato Enviado + Assinado + Closed-Won</span>
-              </div>
             </div>
           </div>
         </div>
