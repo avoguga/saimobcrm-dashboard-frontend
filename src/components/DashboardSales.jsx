@@ -990,7 +990,6 @@ const DashboardSales = ({
         tablesData = currentData;
       } else {
         // Buscar dados frescos da API
-        console.log('🔄 Buscando dados frescos da API para:', type);
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
@@ -1030,11 +1029,6 @@ const DashboardSales = ({
         return allProposals;
       };
       
-      // DEBUG: Log para verificar dados recebidos
-      console.log('📊 openModal - tablesData keys:', Object.keys(tablesData || {}));
-      console.log('📊 openModal - receitaPrevistaDetalhes:', tablesData?.receitaPrevistaDetalhes?.length || 0, 'items');
-      console.log('📊 openModal - vendasDetalhes:', tablesData?.vendasDetalhes?.length || 0, 'items');
-
       const dataMap = {
         'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
         'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
@@ -1558,30 +1552,47 @@ const DashboardSales = ({
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const isMobile = windowSize.width < 768;
+    const isTablet = windowSize.width >= 768 && windowSize.width < 1024;
+
+    // Função para truncar nomes longos
+    const truncateName = (name, maxLength) => {
+      if (!name) return '';
+      // No mobile, pegar apenas o primeiro nome
+      if (isMobile) {
+        const firstName = name.split(' ')[0];
+        return firstName.length > maxLength ? firstName.substring(0, maxLength) + '..' : firstName;
+      }
+      return name.length > maxLength ? name.substring(0, maxLength) + '...' : name;
+    };
 
     // Configuração de labels simplificada - apenas números
     const labelOption = {
       show: true,
       position: 'top',
       formatter: '{c}',
-      fontSize: isMobile ? 9 : 12,
+      fontSize: isMobile ? 8 : 12,
       fontWeight: 'bold',
-      color: '#2d3748'
+      color: '#2d3748',
+      distance: isMobile ? 2 : 5
     };
+
+    // Calcular se precisa de scroll (dataZoom) - mais de 6 barras no mobile
+    const needsScroll = isMobile && data && data.length > 5;
 
     useEffect(() => {
       if (!chartRef.current) return;
 
       if (!chartInstance.current) {
         chartInstance.current = echarts.init(chartRef.current);
-        
-        // Configuração simplificada do gráfico
+
+        // Configuração otimizada para mobile
         const emptyOption = {
           tooltip: {
             trigger: 'axis',
             axisPointer: {
               type: 'shadow'
             },
+            confine: true, // Mantém tooltip dentro do container
             formatter: function(params) {
               let result = `<strong>${params[0].name}</strong><br/>`;
               params.forEach(item => {
@@ -1593,55 +1604,111 @@ const DashboardSales = ({
           },
           legend: {
             data: ['Normal', 'Orgânico'],
-            top: 10,
+            top: isMobile ? 5 : 10,
             left: 'center',
-            textStyle: { fontSize: 12, fontWeight: '500' },
-            itemGap: 20
+            textStyle: { fontSize: isMobile ? 11 : 12, fontWeight: '500' },
+            itemGap: isMobile ? 15 : 20,
+            itemWidth: isMobile ? 14 : 25,
+            itemHeight: isMobile ? 10 : 14
           },
           grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '3%',
-            top: '15%',
+            left: isMobile ? '8%' : '3%',
+            right: isMobile ? '5%' : '4%',
+            bottom: isMobile ? (needsScroll ? '18%' : '25%') : '3%',
+            top: isMobile ? '18%' : '15%',
             containLabel: true
           },
+          // DataZoom para scroll horizontal no mobile quando há muitos dados
+          ...(needsScroll ? {
+            dataZoom: [
+              {
+                type: 'slider',
+                show: true,
+                xAxisIndex: [0],
+                start: 0,
+                end: Math.min(100, (5 / data.length) * 100), // Mostra ~5 barras inicialmente
+                bottom: '5%',
+                height: isMobile ? 20 : 25,
+                borderColor: 'transparent',
+                backgroundColor: '#f5f5f5',
+                fillerColor: 'rgba(78, 88, 89, 0.2)',
+                handleStyle: {
+                  color: '#4E5859',
+                  borderColor: '#4E5859'
+                },
+                textStyle: {
+                  fontSize: 10
+                },
+                brushSelect: false
+              },
+              {
+                type: 'inside',
+                xAxisIndex: [0],
+                start: 0,
+                end: Math.min(100, (5 / data.length) * 100),
+                zoomOnMouseWheel: false,
+                moveOnMouseMove: true,
+                moveOnMouseWheel: true
+              }
+            ]
+          } : {}),
           xAxis: {
             type: 'category',
             axisTick: { show: false },
             data: [],
-            axisLabel: { 
-              fontSize: 11,
-              rotate: isMobile ? 30 : 0,
-              interval: 0
+            axisLabel: {
+              fontSize: isMobile ? 9 : isTablet ? 10 : 11,
+              rotate: isMobile ? 45 : isTablet ? 30 : 0,
+              interval: 0,
+              width: isMobile ? 50 : 80,
+              overflow: 'truncate',
+              color: '#666',
+              formatter: function(value) {
+                return truncateName(value, isMobile ? 8 : 12);
+              }
+            },
+            axisLine: {
+              lineStyle: { color: '#e0e0e0' }
             }
           },
           yAxis: {
             type: 'value',
-            axisLabel: { fontSize: 12 }
+            axisLabel: { fontSize: isMobile ? 10 : 12 },
+            splitLine: {
+              lineStyle: { color: '#f0f0f0' }
+            }
           },
           series: [
             {
               name: 'Normal',
               type: 'bar',
               barGap: 0,
+              barWidth: isMobile ? '35%' : '40%',
               label: labelOption,
               emphasis: { focus: 'series' },
               data: [],
-              itemStyle: { color: '#96856F' }
+              itemStyle: {
+                color: '#96856F',
+                borderRadius: [2, 2, 0, 0]
+              }
             },
             {
               name: 'Orgânico',
               type: 'bar',
+              barWidth: isMobile ? '35%' : '40%',
               label: labelOption,
               emphasis: { focus: 'series' },
               data: [],
-              itemStyle: { color: '#4ce0b3' }
+              itemStyle: {
+                color: '#4ce0b3',
+                borderRadius: [2, 2, 0, 0]
+              }
             }
           ]
         };
-        
+
         chartInstance.current.setOption(emptyOption);
-        
+
         // Adicionar evento de clique se fornecido
         if (onBarClick) {
           chartInstance.current.on('click', function (params) {
@@ -1649,7 +1716,7 @@ const DashboardSales = ({
           });
         }
       }
-    }, [onBarClick]);
+    }, [onBarClick, needsScroll]);
 
     // Controlar loading
     useEffect(() => {
@@ -1673,10 +1740,43 @@ const DashboardSales = ({
     useEffect(() => {
       if (!chartInstance.current || !data || data.length === 0 || loading) return;
 
+      // Recalcular se precisa de scroll com os dados atuais
+      const currentNeedsScroll = isMobile && data.length > 5;
+
       const updateOption = {
         xAxis: {
-          data: data.map(item => item.name || item.period)
+          data: data.map(item => item.name || item.period),
+          axisLabel: {
+            formatter: function(value) {
+              return truncateName(value, isMobile ? 8 : 12);
+            }
+          }
         },
+        grid: {
+          bottom: isMobile ? (currentNeedsScroll ? '18%' : '25%') : '3%'
+        },
+        // Atualizar dataZoom se necessário
+        ...(currentNeedsScroll ? {
+          dataZoom: [
+            {
+              type: 'slider',
+              show: true,
+              xAxisIndex: [0],
+              start: 0,
+              end: Math.min(100, (5 / data.length) * 100),
+              bottom: '5%',
+              height: isMobile ? 20 : 25
+            },
+            {
+              type: 'inside',
+              xAxisIndex: [0],
+              start: 0,
+              end: Math.min(100, (5 / data.length) * 100)
+            }
+          ]
+        } : {
+          dataZoom: [] // Remove dataZoom se não precisar
+        }),
         series: [
           {
             name: 'Normal',
@@ -1702,7 +1802,7 @@ const DashboardSales = ({
       };
 
       chartInstance.current.setOption(updateOption, false);
-    }, [data, loading]);
+    }, [data, loading, isMobile]);
 
     // Cleanup
     useEffect(() => {
@@ -1723,54 +1823,95 @@ const DashboardSales = ({
     const chartInstance = useRef(null);
     const [isLoading, setIsLoading] = useState(loading);
 
+    // Função para truncar nomes longos
+    const truncateName = (name, maxLength) => {
+      if (!name) return '';
+      if (isMobile) {
+        const firstName = name.split(' ')[0];
+        return firstName.length > maxLength ? firstName.substring(0, maxLength) + '..' : firstName;
+      }
+      return name.length > maxLength ? name.substring(0, maxLength) + '...' : name;
+    };
+
+    // Verificar se precisa de scroll
+    const needsScroll = isMobile && data && data.length > 5;
+
     // Inicializar chart com configuração vazia (eixos vazios)
     useEffect(() => {
       if (!chartRef.current) return;
 
       if (!chartInstance.current) {
         chartInstance.current = echarts.init(chartRef.current);
-        
+
         // Mostrar chart vazio inicialmente com estrutura definida
         let emptyOption = {};
-        
+
         if (type === 'bar') {
           emptyOption = {
-            grid: { 
-              top: isMobile ? 30 : 20, 
-              right: isMobile ? 10 : 20, 
-              bottom: isMobile ? 80 : 40, 
-              left: isMobile ? 50 : 60 
+            grid: {
+              top: isMobile ? 35 : 20,
+              right: isMobile ? 10 : 20,
+              bottom: isMobile ? (needsScroll ? 60 : 90) : 40,
+              left: isMobile ? 40 : 60
             },
+            // DataZoom para scroll horizontal no mobile
+            ...(needsScroll ? {
+              dataZoom: [
+                {
+                  type: 'slider',
+                  show: true,
+                  xAxisIndex: [0],
+                  start: 0,
+                  end: data ? Math.min(100, (5 / data.length) * 100) : 50,
+                  bottom: 10,
+                  height: 18,
+                  borderColor: 'transparent',
+                  backgroundColor: '#f0f0f0',
+                  fillerColor: 'rgba(78, 88, 89, 0.2)',
+                  handleStyle: { color: '#4E5859' },
+                  textStyle: { fontSize: 9 },
+                  brushSelect: false
+                },
+                {
+                  type: 'inside',
+                  xAxisIndex: [0],
+                  start: 0,
+                  end: data ? Math.min(100, (5 / data.length) * 100) : 50,
+                  zoomOnMouseWheel: false,
+                  moveOnMouseMove: true
+                }
+              ]
+            } : {}),
             xAxis: {
               type: 'category',
-              data: [], // Eixo vazio inicialmente
-              axisLabel: { 
-                fontSize: isMobile ? 11 : 12,
+              data: [],
+              axisLabel: {
+                fontSize: isMobile ? 9 : 12,
                 rotate: isMobile ? 45 : 0,
-                interval: 0, // Força mostrar todos os labels
-                overflow: 'none',
-                width: isMobile ? 80 : 100,
-                rich: {
-                  a: {
-                    fontSize: isMobile ? 10 : 12,
-                    fontWeight: 'normal'
-                  }
+                interval: 0,
+                color: '#666',
+                formatter: function(value) {
+                  return truncateName(value, isMobile ? 7 : 12);
                 }
               },
               axisLine: {
-                show: true
-              }
+                show: true,
+                lineStyle: { color: '#e0e0e0' }
+              },
+              axisTick: { show: false }
             },
             yAxis: {
               type: 'value',
-              axisLabel: { fontSize: isMobile ? 10 : 12 }
+              axisLabel: { fontSize: isMobile ? 9 : 12 },
+              splitLine: { lineStyle: { color: '#f5f5f5' } }
             },
             series: [{
               name: config.name || 'Data',
-              data: [], // Dados vazios inicialmente
+              data: [],
               type: 'bar',
-              itemStyle: { 
+              itemStyle: {
                 color: config.color,
+                borderRadius: [3, 3, 0, 0],
                 emphasis: {
                   color: config.color,
                   opacity: 0.8
@@ -1785,16 +1926,14 @@ const DashboardSales = ({
                   shadowColor: 'rgba(0, 0, 0, 0.5)'
                 }
               },
-              barWidth: isMobile ? '50%' : '70%',
+              barWidth: isMobile ? '45%' : '70%',
               label: {
                 show: true,
                 position: 'top',
-                fontSize: isMobile ? 10 : 14,
+                fontSize: isMobile ? 8 : 14,
                 fontWeight: 'bold',
                 color: '#2d3748',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                padding: [2, 6],
-                borderRadius: 4,
+                distance: isMobile ? 2 : 5,
                 formatter: function(params) {
                   return params.value;
                 }
@@ -1802,9 +1941,10 @@ const DashboardSales = ({
             }],
             tooltip: {
               trigger: 'axis',
+              confine: true,
               formatter: function(params) {
                 const item = params[0];
-                return `${item.name}: ${item.value}`;
+                return `<strong>${item.name}</strong><br/>${item.value}`;
               }
             }
           };
@@ -1860,6 +2000,9 @@ const DashboardSales = ({
     useEffect(() => {
       if (!chartInstance.current || !data || data.length === 0 || isLoading) return;
 
+      // Recalcular se precisa de scroll
+      const currentNeedsScroll = isMobile && data.length > 5;
+
       // ECharts will automatically animate transitions between data updates
       let updateOption = {};
 
@@ -1871,16 +2014,44 @@ const DashboardSales = ({
           const diff = valueB - valueA; // Decrescente
           return diff !== 0 ? diff : (a[config.xKey] || '').localeCompare(b[config.xKey] || '');
         });
-        
+
         updateOption = {
+          grid: {
+            bottom: isMobile ? (currentNeedsScroll ? 60 : 90) : 40
+          },
+          // Atualizar dataZoom
+          ...(currentNeedsScroll ? {
+            dataZoom: [
+              {
+                type: 'slider',
+                show: true,
+                start: 0,
+                end: Math.min(100, (5 / data.length) * 100),
+                bottom: 10
+              },
+              {
+                type: 'inside',
+                start: 0,
+                end: Math.min(100, (5 / data.length) * 100)
+              }
+            ]
+          } : {
+            dataZoom: []
+          }),
           xAxis: {
-            data: sortedData.map(item => item[config.xKey])
+            data: sortedData.map(item => item[config.xKey]),
+            axisLabel: {
+              formatter: function(value) {
+                return truncateName(value, isMobile ? 7 : 12);
+              }
+            }
           },
           series: [{
-            name: config.name || 'Data', // Use name for navigation
+            name: config.name || 'Data',
             data: sortedData.map(item => item[config.yKey]),
-            itemStyle: { 
+            itemStyle: {
               color: config.color,
+              borderRadius: [3, 3, 0, 0],
               emphasis: {
                 color: config.color,
                 opacity: 0.8
@@ -1898,12 +2069,10 @@ const DashboardSales = ({
             label: {
               show: true,
               position: 'top',
-              fontSize: isMobile ? 12 : 14,
+              fontSize: isMobile ? 8 : 14,
               fontWeight: 'bold',
               color: '#2d3748',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              padding: [2, 6],
-              borderRadius: 4,
+              distance: isMobile ? 2 : 5,
               formatter: function(params) {
                 return params.value;
               }

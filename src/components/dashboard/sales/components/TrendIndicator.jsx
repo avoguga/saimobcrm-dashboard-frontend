@@ -9,10 +9,10 @@ const TrendIndicator = ({ value, showZero = false }) => {
   if ((value === null || value === undefined || (value === 0 && !showZero))) {
     return null;
   }
-  
+
   // Determinar se o valor é positivo, negativo ou zero
   const isPositive = value > 0;
-  
+
   // Estilo para o indicador de tendência com setas diagonais
   const style = {
     display: 'inline-flex',
@@ -23,13 +23,13 @@ const TrendIndicator = ({ value, showZero = false }) => {
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: '600',
-    backgroundColor: isPositive 
+    backgroundColor: isPositive
       ? 'rgba(76, 224, 179, 0.25)'  // Verde com mais opacidade
       : 'rgba(255, 58, 94, 0.25)',  // Vermelho com mais opacidade
     color: '#374151', // Cinza escuro
     marginLeft: '8px'
   };
-  
+
   return (
     <div style={style} className="trend-indicator-square">
       {isPositive ? '↗' : '↘'} {isPositive ? '+' : ''}{Math.abs(value).toFixed(1)}%

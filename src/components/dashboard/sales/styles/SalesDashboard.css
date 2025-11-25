@@ -747,3 +747,103 @@
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* ========================================
+   DETAIL MODAL - ESTILOS COMPLEMENTARES
+   ======================================== */
+
+/* Animação de pulse para loading */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+/* Animação de fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estilos para o modal em telas grandes */
+@media (min-width: 1440px) {
+  .detail-modal-content {
+    max-width: 1400px !important;
+  }
+
+  .detail-modal-table th,
+  .detail-modal-table td {
+    padding: 16px 14px !important;
+  }
+}
+
+/* Melhorias para tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .detail-modal-content {
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+  }
+}
+
+/* Scroll customizado para o modal */
+.detail-modal-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.detail-modal-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.detail-modal-content::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.detail-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Tabela do modal - scroll customizado */
+.detail-modal-table::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.detail-modal-table::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.detail-modal-table::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* Foco acessível nos inputs */
+.detail-modal-filters input:focus,
+.detail-modal-filters select:focus {
+  outline: none;
+  border-color: #4E5859 !important;
+  box-shadow: 0 0 0 3px rgba(78, 88, 89, 0.15) !important;
+}
+
+/* Animação suave para hover nas linhas */
+.detail-modal-table tbody tr {
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.detail-modal-table tbody tr:hover {
+  box-shadow: inset 0 0 0 1px rgba(78, 88, 89, 0.1);
+}
