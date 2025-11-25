@@ -5,7 +5,7 @@ import { formatValue, calculateTrend } from '../../../../utils/formatters';
  * Componente de métrica com comparação entre períodos
  * Exibe valor atual, valor anterior e indicador de tendência
  */
-const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'number' }) => {
+const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'number', onClick }) => {
   const { percentage, trend, difference } = calculateTrend(currentValue, previousValue);
 
   // Estilo baseado na tendência
@@ -38,25 +38,29 @@ const ComparisonMetricCard = ({ title, currentValue, previousValue, format = 'nu
   const trendStyle = getTrendStyle();
 
   return (
-    <div className="comparison-metric-new">
+    <div
+      className={`comparison-metric-new ${onClick ? 'clickable' : ''}`}
+      onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+    >
       <div className="metric-header-new">
         <h3 className="metric-title-new">{title}</h3>
       </div>
-      
+
       <div className="metric-main-value">
         {formatValue(currentValue, format)}
       </div>
-      
+
       <div className="metric-previous">
         <span className="previous-label-new">PERÍODO ANTERIOR:</span>
         <div className="previous-value-new">{formatValue(previousValue, format)}</div>
       </div>
-      
-      <div 
+
+      <div
         className="trend-indicator-new"
-        style={{ 
+        style={{
           backgroundColor: trendStyle.backgroundColor,
-          color: trendStyle.color 
+          color: trendStyle.color
         }}
       >
         <span className="trend-icon-new">{trendStyle.icon}</span>

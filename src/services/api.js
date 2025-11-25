@@ -212,23 +212,23 @@ export const KommoAPI = {
 
   /**
    * Obtém tabelas detalhadas do dashboard
-   * USADO EM: DashboardSales.jsx (linha não especificada)
+   * USADO EM: DashboardSales.jsx (linha não especificado)
    */
   async getDetailedTables(corretor = null, fonte = null, extraParams = {}) {
     const params = { ...extraParams };
-    
+
     // Aplicar filtro de corretor se especificado
     // Suporta múltiplas seleções separadas por vírgula
     if (corretor && corretor.trim() !== '') {
       params.corretor = corretor;
     }
-    
-    // Aplicar filtro de fonte se especificado  
+
+    // Aplicar filtro de fonte se especificado
     // Suporta múltiplas seleções separadas por vírgula
     if (fonte && fonte.trim() !== '') {
       params.fonte = fonte;
     }
-    
+
     return this.get(`/dashboard/detailed-tables`, params);
   }
 };

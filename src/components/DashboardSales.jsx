@@ -918,8 +918,10 @@ const DashboardSales = ({
     const titles = {
       'leads': 'Todos os Leads',
       'reunioes': 'Reuniões Realizadas',
-      'propostas': 'Propostas Enviadas', 
-      'vendas': 'Vendas Realizadas'
+      'propostas': 'Propostas Enviadas',
+      'vendas': 'Vendas Realizadas',
+      'receitaPrevista': 'Receita Prevista - Detalhes',
+      'receitaTotal': 'Receita Total - Detalhes'
     };
 
     modalStateRef.current = {
@@ -975,15 +977,20 @@ const DashboardSales = ({
       // ✅ OTIMIZAÇÃO: SEMPRE reutilizar dados já carregados no dashboard
       // Os dados já foram carregados com os filtros de período corretos
       let tablesData;
-      
+
       // Verificar se temos dados já carregados do dashboard
       const currentData = salesData?._rawTablesData || data?._rawTablesData;
-      
-      if (currentData) {
+
+      // Para receitaPrevista/receitaTotal, verificar se os dados existem no cache
+      const needsFreshData = (type === 'receitaPrevista' && !currentData?.receitaPrevistaDetalhes) ||
+                             (type === 'receitaTotal' && !currentData?.vendasDetalhes);
+
+      if (currentData && !needsFreshData) {
         // SEMPRE usar os dados já carregados - eles já estão com o período correto
         tablesData = currentData;
       } else {
-        // Só fazer requisição se não temos dados carregados
+        // Buscar dados frescos da API
+        console.log('🔄 Buscando dados frescos da API para:', type);
         tablesData = await KommoAPI.getDetailedTables('', '', extraParams);
       }
       
@@ -1023,6 +1030,11 @@ const DashboardSales = ({
         return allProposals;
       };
       
+      // DEBUG: Log para verificar dados recebidos
+      console.log('📊 openModal - tablesData keys:', Object.keys(tablesData || {}));
+      console.log('📊 openModal - receitaPrevistaDetalhes:', tablesData?.receitaPrevistaDetalhes?.length || 0, 'items');
+      console.log('📊 openModal - vendasDetalhes:', tablesData?.vendasDetalhes?.length || 0, 'items');
+
       const dataMap = {
         'leads': [...(tablesData.leadsDetalhes || []), ...(tablesData.organicosDetalhes || [])],
         'reunioes': [...(tablesData.reunioesDetalhes || []), ...(tablesData.reunioesOrganicasDetalhes || [])],
@@ -1039,8 +1051,8 @@ const DashboardSales = ({
           else if (tablesData.leadsDetalhes) {
             console.log('⚠️ openModalByCorretor usando fallback: leadsDetalhes');
             return tablesData.leadsDetalhes
-              .filter(lead => 
-                lead['É Proposta'] === true || 
+              .filter(lead =>
+                lead['É Proposta'] === true ||
                 lead['Etapa']?.toLowerCase().includes('proposta')
               )
               .map(lead => ({
@@ -1054,7 +1066,9 @@ const DashboardSales = ({
             return getAllProposals();
           }
         })(),
-        'vendas': tablesData.vendasDetalhes || []
+        'vendas': tablesData.vendasDetalhes || [],
+        'receitaPrevista': tablesData.receitaPrevistaDetalhes || [],
+        'receitaTotal': tablesData.vendasDetalhes || []
       };
       
       // Aplicar pré-filtro se houver filtro ativo no dashboard
@@ -2364,7 +2378,15 @@ const DashboardSales = ({
               </div>
               <div className="mini-metric-title">TICKET MÉDIO</div>
             </div>
-            <div className="mini-metric-card">
+            <div
+              className="mini-metric-card"
+              onClick={() => openModal('receitaTotal')}
+              onKeyDown={(e) => e.key === 'Enter' && openModal('receitaTotal')}
+              tabIndex={0}
+              role="button"
+              aria-label="Clique para ver detalhes da receita total"
+              style={{ cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
                   R$ {formatCurrency((() => {
@@ -2373,25 +2395,25 @@ const DashboardSales = ({
                     const hasSourceFilter = filters.source && filters.source.trim() !== '';
                     const hasSearchFilter = searchValue && searchValue.trim() !== '';
                     const hasAnyFilter = hasCorretorFilter || hasSourceFilter || hasSearchFilter;
-                    
+
                     const rawData = salesData?._rawTablesData || data?._rawTablesData;
-                    
+
                     if (hasAnyFilter) {
                       // Com filtro: calcular receita total das vendas filtradas
                       let vendasFiltradas = rawData?.vendasDetalhes || [];
-                      
+
                       // Aplicar filtro de corretor se houver
                       if (hasCorretorFilter) {
                         const selectedCorretores = filters.corretor.split(',').map(c => c.trim()).filter(c => c);
                         vendasFiltradas = vendasFiltradas.filter(venda => {
                           const vendaCorretor = venda.Corretor || '';
-                          return selectedCorretores.some(corretor => 
-                            vendaCorretor === corretor || 
+                          return selectedCorretores.some(corretor =>
+                            vendaCorretor === corretor ||
                               (corretor === 'Não atribuído' && vendaCorretor === 'SA IMOB')
                           );
                         });
                       }
-                      
+
                       // Aplicar filtro de fonte se houver
                       if (hasSourceFilter) {
                         const selectedSources = filters.source.split(',').map(s => s.trim()).filter(s => s);
@@ -2480,7 +2502,15 @@ const DashboardSales = ({
               </div>
               <div className="mini-metric-title">RECEITA TOTAL</div>
             </div>
-            <div className="mini-metric-card">
+            <div
+              className="mini-metric-card"
+              onClick={() => openModal('receitaPrevista')}
+              onKeyDown={(e) => e.key === 'Enter' && openModal('receitaPrevista')}
+              tabIndex={0}
+              role="button"
+              aria-label="Clique para ver detalhes da receita prevista"
+              style={{ cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#059669' }}>
                   {loadingReceitaPrevista ? (

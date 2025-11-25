@@ -105,7 +105,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
   
   const getFilterOptions = () => {
     const commonFields = ['Nome do Lead', 'Corretor', 'Fonte', 'Anúncio', 'Público', 'Produto'];
-    
+
     switch (type) {
       case 'leads':
         return ['Data de Criação', ...commonFields, 'Funil', 'Etapa'];
@@ -114,7 +114,10 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
       case 'propostas':
         return ['Data da Proposta', ...commonFields, 'Proposta'];
       case 'vendas':
+      case 'receitaTotal':
         return ['Data da Venda', ...commonFields, 'Valor da Venda'];
+      case 'receitaPrevista':
+        return ['Nome do Lead', 'Etapa', 'Corretor', 'Fonte', 'Funil', 'Data da Proposta', 'Data Fechamento', 'Valor'];
       default:
         return commonFields;
     }
@@ -500,7 +503,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Proposta', 'Proposta')}
                       </>
                     )}
-                    {type === 'vendas' && (
+                    {(type === 'vendas' || type === 'receitaTotal') && (
                       <>
                         {renderSortableHeader('Data da Venda', 'Data da Venda')}
                         {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
@@ -510,6 +513,18 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Anúncio', 'Anúncio')}
                         {renderSortableHeader('Público', 'Público-Alvo')}
                         {renderSortableHeader('Valor da Venda', 'Valor da Venda')}
+                      </>
+                    )}
+                    {type === 'receitaPrevista' && (
+                      <>
+                        {renderSortableHeader('Nome do Lead', 'Nome do Lead')}
+                        {renderSortableHeader('Etapa', 'Etapa')}
+                        {renderSortableHeader('Corretor', 'Corretor')}
+                        {renderSortableHeader('Fonte', 'Fonte')}
+                        {renderSortableHeader('Funil', 'Funil')}
+                        {renderSortableHeader('Data da Proposta', 'Data da Proposta')}
+                        {renderSortableHeader('Data Fechamento', 'Data Fechamento')}
+                        {renderSortableHeader('Valor', 'Valor')}
                       </>
                     )}
                   </tr>
@@ -589,7 +604,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           </td>
                         </>
                       )}
-                      {type === 'vendas' && (
+                      {(type === 'vendas' || type === 'receitaTotal') && (
                         <>
                           <td style={{ padding: '12px' }}>{formatDate(item['Data da Venda'])}</td>
                           <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
@@ -600,6 +615,20 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={{ padding: '12px' }}>{item['Público'] || 'N/A'}</td>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
                             {item['Valor da Venda']}
+                          </td>
+                        </>
+                      )}
+                      {type === 'receitaPrevista' && (
+                        <>
+                          <td style={{ padding: '12px' }}>{item['Nome do Lead']}</td>
+                          <td style={{ padding: '12px' }}>{item['Etapa']}</td>
+                          <td style={{ padding: '12px' }}>{item['Corretor']}</td>
+                          <td style={{ padding: '12px' }}>{item['Fonte']}</td>
+                          <td style={{ padding: '12px' }}>{item['Funil']}</td>
+                          <td style={{ padding: '12px' }}>{formatDate(item['Data da Proposta'])}</td>
+                          <td style={{ padding: '12px' }}>{formatDate(item['Data Fechamento'])}</td>
+                          <td style={{ padding: '12px', fontWeight: 'bold', color: COLORS.success }}>
+                            {item['Valor']}
                           </td>
                         </>
                       )}
