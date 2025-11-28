@@ -2580,6 +2580,117 @@ body {
   }
 }
 
+/* Total Badge Styles - Responsivo */
+.total-badge {
+  font-size: 18px;
+  font-weight: 700;
+  color: #007bff;
+  background-color: #f0f4f8;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 2px solid #e2e8f0;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.total-badge:hover {
+  background-color: #e3f2fd;
+  border-color: #007bff;
+}
+
+/* Excel Export Button */
+.excel-export-btn {
+  padding: 6px 12px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.excel-export-btn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+/* Card title com Total - layout responsivo */
+.card-title-with-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-title-with-total .card-title-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title-with-total .total-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Mobile - Total Badge */
+@media (max-width: 768px) {
+  .total-badge {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+
+  .excel-export-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .card-title-with-total {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .card-title-with-total .total-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .total-badge {
+    font-size: 16px;
+    padding: 8px 16px;
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .excel-export-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .card-title-with-total .total-actions {
+    flex-direction: row;
+    width: 100%;
+  }
+}
+
 /* Campaign Insights Styles */
 .loading-indicator {
   font-size: var(--font-size-xs);

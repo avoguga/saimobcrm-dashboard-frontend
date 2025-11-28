@@ -2707,59 +2707,19 @@ const DashboardSales = ({
         {sortedChartsData.sortedLeadsData.length > 0 ? (
           <>
             <div className="card card-full" key={`leads-${searchField}-${searchValue}`}>
-              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Leads criados no período (CRM)</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span 
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#007bff',
-                      backgroundColor: '#f0f4f8',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      border: '2px solid #e2e8f0',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      transition: 'all 0.2s ease'
-                    }}
+              <div className="card-title card-title-with-total">
+                <span className="card-title-text">Leads criados no período (CRM)</span>
+                <div className="total-actions">
+                  <span
+                    className="total-badge"
                     onClick={() => openModal('leads')}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e3f2fd';
-                      e.target.style.borderColor = '#007bff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#f0f4f8';
-                      e.target.style.borderColor = '#e2e8f0';
-                    }}
                     title="Clique para ver detalhes dos leads"
                   >
                     Total: {sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.totalLeads || user.value || 0), 0)}
                   </span>
                   <button
+                    className="excel-export-btn"
                     onClick={handleExportLeads}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#28a745',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#218838';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#28a745';
-                      e.target.style.transform = 'translateY(0)';
-                    }}
                     title="Exportar dados de leads para Excel"
                   >
                     📊 Excel
@@ -2775,59 +2735,19 @@ const DashboardSales = ({
             </div>
             
             <div className="card card-full" key={`meetings-${searchField}-${searchValue}`}>
-              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Rank Corretores - Reunião</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span 
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#007bff',
-                      backgroundColor: '#f0f4f8',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      border: '2px solid #e2e8f0',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      transition: 'all 0.2s ease'
-                    }}
+              <div className="card-title card-title-with-total">
+                <span className="card-title-text">Rank Corretores - Reunião</span>
+                <div className="total-actions">
+                  <span
+                    className="total-badge"
                     onClick={() => openModal('reunioes')}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e3f2fd';
-                      e.target.style.borderColor = '#007bff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#f0f4f8';
-                      e.target.style.borderColor = '#e2e8f0';
-                    }}
                     title="Clique para ver todas as reuniões"
                   >
                     Total: {sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.totalMeetings || user.meetingsHeld || 0), 0)}
                   </span>
                   <button
+                    className="excel-export-btn"
                     onClick={handleExportMeetings}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#28a745',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#218838';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#28a745';
-                      e.target.style.transform = 'translateY(0)';
-                    }}
                     title="Exportar dados de reuniões para Excel"
                   >
                     📊 Excel
@@ -2843,59 +2763,19 @@ const DashboardSales = ({
             </div>
             
             <div className="card card-full" key={`sales-${searchField}-${searchValue}`}>
-              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Rank Corretores - Venda</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span 
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#007bff',
-                      backgroundColor: '#f0f4f8',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      border: '2px solid #e2e8f0',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      transition: 'all 0.2s ease'
-                    }}
+              <div className="card-title card-title-with-total">
+                <span className="card-title-text">Rank Corretores - Venda</span>
+                <div className="total-actions">
+                  <span
+                    className="total-badge"
                     onClick={() => openModal('vendas')}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e3f2fd';
-                      e.target.style.borderColor = '#007bff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#f0f4f8';
-                      e.target.style.borderColor = '#e2e8f0';
-                    }}
                     title="Clique para ver todas as vendas"
                   >
                     Total: {sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.totalSales || user.sales || 0), 0)}
                   </span>
                   <button
+                    className="excel-export-btn"
                     onClick={handleExportSales}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#28a745',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#218838';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#28a745';
-                      e.target.style.transform = 'translateY(0)';
-                    }}
                     title="Exportar dados de vendas para Excel"
                   >
                     📊 Excel

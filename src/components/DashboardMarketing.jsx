@@ -1241,31 +1241,12 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
         {sortedSalesChartsData.sortedLeadsData.length > 0 || sortedSalesChartsData.sortedMeetingsData.length > 0 ? (
           <>
             <div className="card card-full">
-              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Leads criados no período (CRM)</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="card-title card-title-with-total">
+                <span className="card-title-text">Leads criados no período (CRM)</span>
+                <div className="total-actions">
                   <span
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#007bff',
-                      backgroundColor: '#f0f4f8',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      border: '2px solid #e2e8f0',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="total-badge"
                     onClick={() => openModal('leads')}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e3f2fd';
-                      e.target.style.borderColor = '#007bff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#f0f4f8';
-                      e.target.style.borderColor = '#e2e8f0';
-                    }}
                     title="Clique para ver detalhes dos leads"
                   >
                     Total: {sortedSalesChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0)}
@@ -1283,31 +1264,12 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
             </div>
 
             <div className="card card-full">
-              <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Rank Corretores - Reunião</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="card-title card-title-with-total">
+                <span className="card-title-text">Rank Corretores - Reunião</span>
+                <div className="total-actions">
                   <span
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#007bff',
-                      backgroundColor: '#f0f4f8',
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      border: '2px solid #e2e8f0',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="total-badge"
                     onClick={() => openModal('reunioes')}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#e3f2fd';
-                      e.target.style.borderColor = '#007bff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#f0f4f8';
-                      e.target.style.borderColor = '#e2e8f0';
-                    }}
                     title="Clique para ver todas as reuniões"
                   >
                     Total: {sortedSalesChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0)}
