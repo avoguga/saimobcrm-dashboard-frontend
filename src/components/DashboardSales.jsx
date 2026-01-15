@@ -661,24 +661,24 @@ const DashboardSales = ({
       if (type === 'leads') {
         if (seriesName === 'Orgânico') {
           return `Leads Orgânicos de ${corretorName}`;
-        } else if (seriesName === 'Normal') {
-          return `Leads Normais de ${corretorName}`;
+        } else if (seriesName === 'Lead') {
+          return `Leads de ${corretorName}`;
         } else {
           return `Todos os Leads de ${corretorName}`;
         }
       } else if (type === 'reunioes') {
         if (seriesName === 'Orgânico') {
           return `Reuniões Orgânicas de ${corretorName}`;
-        } else if (seriesName === 'Normal') {
-          return `Reuniões Normais de ${corretorName}`;
+        } else if (seriesName === 'Lead') {
+          return `Reuniões de ${corretorName}`;
         } else {
           return `Todas as Reuniões de ${corretorName}`;
         }
       } else if (type === 'vendas') {
         if (seriesName === 'Orgânico') {
           return `Vendas Orgânicas de ${corretorName}`;
-        } else if (seriesName === 'Normal') {
-          return `Vendas Normais de ${corretorName}`;
+        } else if (seriesName === 'Lead') {
+          return `Vendas de ${corretorName}`;
         } else {
           return `Todas as Vendas de ${corretorName}`;
         }
@@ -784,7 +784,7 @@ const DashboardSales = ({
         if (type === 'leads') {
           if (seriesName === 'Orgânico') {
             return tablesData.organicosDetalhes || [];
-          } else if (seriesName === 'Normal') {
+          } else if (seriesName === 'Lead') {
             return tablesData.leadsDetalhes || [];
           } else {
             // Fallback - mostrar todos os leads
@@ -796,7 +796,7 @@ const DashboardSales = ({
         } else if (type === 'reunioes') {
           if (seriesName === 'Orgânico') {
             return tablesData.reunioesOrganicasDetalhes || [];
-          } else if (seriesName === 'Normal') {
+          } else if (seriesName === 'Lead') {
             return tablesData.reunioesDetalhes || [];
           } else {
             // Reuniões Totais - mostrar todas
@@ -812,7 +812,7 @@ const DashboardSales = ({
               const fonte = sale.Fonte || sale.fonte || '';
               return fonte === 'Orgânico';
             });
-          } else if (seriesName === 'Normal') {
+          } else if (seriesName === 'Lead') {
             // Filtrar vendas normais (não orgânicas)
             return (tablesData.vendasDetalhes || []).filter(sale => {
               const fonte = sale.Fonte || sale.fonte || '';
@@ -1603,7 +1603,7 @@ const DashboardSales = ({
             }
           },
           legend: {
-            data: ['Normal', 'Orgânico'],
+            data: ['Lead', 'Orgânico'],
             top: isMobile ? 5 : 10,
             left: 'center',
             textStyle: { fontSize: isMobile ? 11 : 12, fontWeight: '500' },
@@ -1680,7 +1680,7 @@ const DashboardSales = ({
           },
           series: [
             {
-              name: 'Normal',
+              name: 'Lead',
               type: 'bar',
               barGap: 0,
               barWidth: isMobile ? '35%' : '40%',
@@ -1743,7 +1743,51 @@ const DashboardSales = ({
       // Recalcular se precisa de scroll com os dados atuais
       const currentNeedsScroll = isMobile && data.length > 5;
 
+      // Criar mapa de dados para acesso rápido no tooltip
+      const dataMap = {};
+      data.forEach(item => {
+        dataMap[item.name || item.period] = item;
+      });
+
       const updateOption = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          confine: true,
+          formatter: function(params) {
+            const corretorName = params[0].name;
+            const corretorData = dataMap[corretorName] || {};
+
+            let result = `<strong>${corretorName}</strong><br/>`;
+            let total = 0;
+
+            params.forEach(item => {
+              const color = `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:${item.color};"></span>`;
+              result += `${color}${item.seriesName}: <strong>${item.value}</strong><br/>`;
+              total += item.value || 0;
+            });
+
+            // Adicionar Total
+            result += `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:#666;"></span>Total: <strong>${total}</strong><br/>`;
+
+            // Calcular e mostrar Taxa de Conversão para Reuniões e Vendas
+            if (title === 'Reuniões') {
+              const totalLeads = (corretorData.normalLeads || 0) + (corretorData.organicLeads || 0);
+              if (totalLeads > 0) {
+                const taxaConversao = ((total / totalLeads) * 100).toFixed(1);
+                result += `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:#10B981;"></span>Taxa de Conversão: <strong>${taxaConversao}%</strong>`;
+              }
+            } else if (title === 'Vendas') {
+              const totalLeads = (corretorData.normalLeads || 0) + (corretorData.organicLeads || 0);
+              if (totalLeads > 0) {
+                const taxaConversao = ((total / totalLeads) * 100).toFixed(1);
+                result += `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:#10B981;"></span>Taxa de Conversão: <strong>${taxaConversao}%</strong>`;
+              }
+            }
+
+            return result;
+          }
+        },
         xAxis: {
           data: data.map(item => item.name || item.period),
           axisLabel: {
@@ -1779,7 +1823,7 @@ const DashboardSales = ({
         }),
         series: [
           {
-            name: 'Normal',
+            name: 'Lead',
             data: data.map(item => {
               // Decidir que tipo de dados mostrar com base no title do gráfico
               if (title === 'Leads') return item.normalLeads || 0;
@@ -1802,7 +1846,7 @@ const DashboardSales = ({
       };
 
       chartInstance.current.setOption(updateOption, false);
-    }, [data, loading, isMobile]);
+    }, [data, loading, isMobile, title]);
 
     // Cleanup
     useEffect(() => {
