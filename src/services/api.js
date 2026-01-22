@@ -15,7 +15,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohe
  *
  * =============================================================================
  */
-const API_VERSION = 'v2'; // <<< MUDE AQUI: 'v1', 'v2' ou 'auto'
+const API_VERSION = 'v1'; // <<< MUDE AQUI: 'v1', 'v2' ou 'auto'
 
 const getApiVersion = () => API_VERSION;
 
