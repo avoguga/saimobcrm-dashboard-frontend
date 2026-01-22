@@ -3,6 +3,23 @@
 const API_URL = import.meta.env.VITE_API_URL || 'https://backendsaimob.gustavohenrique.dev';
 
 /**
+ * =============================================================================
+ * CONFIGURAÇÃO DE VERSÃO DA API (V1 ou V2)
+ * =============================================================================
+ *
+ * Altere a constante abaixo para mudar a versão:
+ *
+ *   'v1'   = Força V1 (Kommo API direta - lento, mas sempre funciona)
+ *   'v2'   = Força V2 (MongoDB - rápido, requer sync)
+ *   'auto' = Tenta V2, se não tiver dados usa V1 automaticamente
+ *
+ * =============================================================================
+ */
+const API_VERSION = 'v1'; // <<< MUDE AQUI: 'v1', 'v2' ou 'auto'
+
+const getApiVersion = () => API_VERSION;
+
+/**
  * Serviço para comunicação com a API do Kommo Dashboard
  * SIMPLIFICADO - apenas métodos REALMENTE usados
  */
@@ -213,9 +230,11 @@ export const KommoAPI = {
   /**
    * Dashboard de vendas OTIMIZADO (V2 - MongoDB)
    * Tenta V2 primeiro, fallback para V1 se falhar
+   * Respeita configuração de versão do backend (MongoDB)
    */
   async getSalesCompleteV2(corretor = null, fonte = null, extraParams = {}) {
     const params = { ...extraParams };
+    const apiVersion = getApiVersion();
 
     if (corretor && corretor.trim() !== '') {
       params.corretor = corretor;
@@ -224,11 +243,22 @@ export const KommoAPI = {
       params.fonte = fonte;
     }
 
+    // Se forçar V1, usar diretamente
+    if (apiVersion === 'v1') {
+      console.log('[API] sales-complete usando V1 (configurado)');
+      return this.get(`/dashboard/sales-complete`, params);
+    }
+
+    // Se forçar V2, usar diretamente (sem fallback)
+    if (apiVersion === 'v2') {
+      console.log('[API] sales-complete usando V2 (configurado)');
+      return this.get(`/v2/dashboard/sales-complete`, params);
+    }
+
+    // Modo AUTO: tenta V2, fallback para V1
     try {
-      // Tentar endpoint V2 (MongoDB - muito mais rapido)
       const result = await this.get(`/v2/dashboard/sales-complete`, params);
 
-      // Verificar se V2 retornou dados reais (nao apenas estrutura vazia)
       const hasData = result &&
         result.totalLeads !== undefined &&
         result.totalLeads > 0;
@@ -238,12 +268,10 @@ export const KommoAPI = {
         return result;
       }
 
-      // MongoDB vazio - usar V1
-      console.warn('[V2] MongoDB vazio, usando V1');
+      console.warn('[AUTO] sales-complete MongoDB vazio, usando V1');
       throw new Error('V2 sem dados');
     } catch (error) {
-      console.warn('[V2] sales-complete falhou, usando V1:', error.message);
-      // Fallback para endpoint original
+      console.warn('[AUTO] sales-complete V2 falhou, usando V1:', error.message);
       return this.get(`/dashboard/sales-complete`, params);
     }
   },
@@ -252,9 +280,15 @@ export const KommoAPI = {
    * Obtém tabelas detalhadas do dashboard
    * OTIMIZADO: Tenta V2 (MongoDB) primeiro, fallback para V1
    * USADO EM: DashboardSales.jsx, Dashboard.jsx
+   *
+   * Controle de versão via backend (MongoDB):
+   *   POST /webhooks/config/api-version?version=v1   (força V1)
+   *   POST /webhooks/config/api-version?version=v2   (força V2)
+   *   POST /webhooks/config/api-version?version=auto (automático)
    */
   async getDetailedTables(corretor = null, fonte = null, extraParams = {}) {
     const params = { ...extraParams };
+    const apiVersion = getApiVersion();
 
     // Aplicar filtro de corretor se especificado
     if (corretor && corretor.trim() !== '') {
@@ -266,6 +300,19 @@ export const KommoAPI = {
       params.fonte = fonte;
     }
 
+    // Se forçar V1, usar diretamente
+    if (apiVersion === 'v1') {
+      console.log('[API] Usando V1 (configurado no backend)');
+      return this.get(`/dashboard/detailed-tables`, params);
+    }
+
+    // Se forçar V2, usar diretamente (sem fallback)
+    if (apiVersion === 'v2') {
+      console.log('[API] Usando V2 (configurado no backend)');
+      return this.get(`/v2/dashboard/detailed-tables`, params);
+    }
+
+    // Modo AUTO: tenta V2, fallback para V1
     try {
       // Tentar V2 primeiro (MongoDB - muito mais rapido)
       const result = await this.get(`/v2/dashboard/detailed-tables`, params);
@@ -284,10 +331,10 @@ export const KommoAPI = {
       }
 
       // MongoDB vazio ou sem dados - usar V1
-      console.warn('[V2] MongoDB vazio ou sem dados, usando V1');
+      console.warn('[AUTO] MongoDB vazio ou sem dados, usando V1');
       throw new Error('V2 sem dados');
     } catch (error) {
-      console.warn('[V2] detailed-tables falhou, usando V1:', error.message);
+      console.warn('[AUTO] V2 falhou, usando V1:', error.message);
       // Fallback para endpoint original
       return this.get(`/dashboard/detailed-tables`, params);
     }
