@@ -227,13 +227,22 @@ export const KommoAPI = {
     try {
       // Tentar endpoint V2 (MongoDB - muito mais rapido)
       const result = await this.get(`/v2/dashboard/sales-complete`, params);
-      if (result && result.totalLeads !== undefined) {
-        console.log('V2 sales-complete OK:', result._metadata?.elapsed_ms, 'ms');
+
+      // Verificar se V2 retornou dados reais (nao apenas estrutura vazia)
+      const hasData = result &&
+        result.totalLeads !== undefined &&
+        result.totalLeads > 0;
+
+      if (hasData) {
+        console.log('[V2] sales-complete OK:', result._metadata?.elapsed_ms, 'ms');
         return result;
       }
-      throw new Error('V2 retornou dados invalidos');
+
+      // MongoDB vazio - usar V1
+      console.warn('[V2] MongoDB vazio, usando V1');
+      throw new Error('V2 sem dados');
     } catch (error) {
-      console.warn('V2 sales-complete falhou, usando V1:', error.message);
+      console.warn('[V2] sales-complete falhou, usando V1:', error.message);
       // Fallback para endpoint original
       return this.get(`/dashboard/sales-complete`, params);
     }
@@ -260,11 +269,23 @@ export const KommoAPI = {
     try {
       // Tentar V2 primeiro (MongoDB - muito mais rapido)
       const result = await this.get(`/v2/dashboard/detailed-tables`, params);
-      if (result && result.summary !== undefined) {
+
+      // Verificar se V2 retornou dados reais (nao apenas estrutura vazia)
+      // Se MongoDB esta vazio, fazer fallback para V1
+      const hasData = result &&
+        result.summary !== undefined &&
+        (result.summary.total_leads > 0 ||
+         result.summary.total_vendas > 0 ||
+         result.summary.total_reunioes > 0);
+
+      if (hasData) {
         console.log('[V2] detailed-tables OK:', result._metadata?.elapsed_ms, 'ms');
         return result;
       }
-      throw new Error('V2 retornou dados invalidos');
+
+      // MongoDB vazio ou sem dados - usar V1
+      console.warn('[V2] MongoDB vazio ou sem dados, usando V1');
+      throw new Error('V2 sem dados');
     } catch (error) {
       console.warn('[V2] detailed-tables falhou, usando V1:', error.message);
       // Fallback para endpoint original
@@ -275,30 +296,11 @@ export const KommoAPI = {
   /**
    * Tabelas detalhadas OTIMIZADAS (V2 - MongoDB)
    * Tenta V2 primeiro, fallback para V1 se falhar
+   * NOTA: Use getDetailedTables() que ja tem logica V2 com fallback
    */
   async getDetailedTablesV2(corretor = null, fonte = null, extraParams = {}) {
-    const params = { ...extraParams };
-
-    if (corretor && corretor.trim() !== '') {
-      params.corretor = corretor;
-    }
-    if (fonte && fonte.trim() !== '') {
-      params.fonte = fonte;
-    }
-
-    try {
-      // Tentar endpoint V2 (MongoDB - muito mais rapido)
-      const result = await this.get(`/v2/dashboard/detailed-tables`, params);
-      if (result && result.summary !== undefined) {
-        console.log('V2 detailed-tables OK:', result._metadata?.elapsed_ms, 'ms');
-        return result;
-      }
-      throw new Error('V2 retornou dados invalidos');
-    } catch (error) {
-      console.warn('V2 detailed-tables falhou, usando V1:', error.message);
-      // Fallback para endpoint original
-      return this.get(`/dashboard/detailed-tables`, params);
-    }
+    // Reutilizar logica do getDetailedTables que ja tem fallback inteligente
+    return this.getDetailedTables(corretor, fonte, extraParams);
   },
 
   /**
