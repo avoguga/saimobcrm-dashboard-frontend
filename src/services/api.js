@@ -211,25 +211,121 @@ export const KommoAPI = {
   },
 
   /**
+   * Dashboard de vendas OTIMIZADO (V2 - MongoDB)
+   * Tenta V2 primeiro, fallback para V1 se falhar
+   */
+  async getSalesCompleteV2(corretor = null, fonte = null, extraParams = {}) {
+    const params = { ...extraParams };
+
+    if (corretor && corretor.trim() !== '') {
+      params.corretor = corretor;
+    }
+    if (fonte && fonte.trim() !== '') {
+      params.fonte = fonte;
+    }
+
+    try {
+      // Tentar endpoint V2 (MongoDB - muito mais rapido)
+      const result = await this.get(`/v2/dashboard/sales-complete`, params);
+      if (result && result.totalLeads !== undefined) {
+        console.log('V2 sales-complete OK:', result._metadata?.elapsed_ms, 'ms');
+        return result;
+      }
+      throw new Error('V2 retornou dados invalidos');
+    } catch (error) {
+      console.warn('V2 sales-complete falhou, usando V1:', error.message);
+      // Fallback para endpoint original
+      return this.get(`/dashboard/sales-complete`, params);
+    }
+  },
+
+  /**
    * Obtém tabelas detalhadas do dashboard
-   * USADO EM: DashboardSales.jsx (linha não especificado)
+   * OTIMIZADO: Tenta V2 (MongoDB) primeiro, fallback para V1
+   * USADO EM: DashboardSales.jsx, Dashboard.jsx
    */
   async getDetailedTables(corretor = null, fonte = null, extraParams = {}) {
     const params = { ...extraParams };
 
     // Aplicar filtro de corretor se especificado
-    // Suporta múltiplas seleções separadas por vírgula
     if (corretor && corretor.trim() !== '') {
       params.corretor = corretor;
     }
 
     // Aplicar filtro de fonte se especificado
-    // Suporta múltiplas seleções separadas por vírgula
     if (fonte && fonte.trim() !== '') {
       params.fonte = fonte;
     }
 
-    return this.get(`/dashboard/detailed-tables`, params);
+    try {
+      // Tentar V2 primeiro (MongoDB - muito mais rapido)
+      const result = await this.get(`/v2/dashboard/detailed-tables`, params);
+      if (result && result.summary !== undefined) {
+        console.log('[V2] detailed-tables OK:', result._metadata?.elapsed_ms, 'ms');
+        return result;
+      }
+      throw new Error('V2 retornou dados invalidos');
+    } catch (error) {
+      console.warn('[V2] detailed-tables falhou, usando V1:', error.message);
+      // Fallback para endpoint original
+      return this.get(`/dashboard/detailed-tables`, params);
+    }
+  },
+
+  /**
+   * Tabelas detalhadas OTIMIZADAS (V2 - MongoDB)
+   * Tenta V2 primeiro, fallback para V1 se falhar
+   */
+  async getDetailedTablesV2(corretor = null, fonte = null, extraParams = {}) {
+    const params = { ...extraParams };
+
+    if (corretor && corretor.trim() !== '') {
+      params.corretor = corretor;
+    }
+    if (fonte && fonte.trim() !== '') {
+      params.fonte = fonte;
+    }
+
+    try {
+      // Tentar endpoint V2 (MongoDB - muito mais rapido)
+      const result = await this.get(`/v2/dashboard/detailed-tables`, params);
+      if (result && result.summary !== undefined) {
+        console.log('V2 detailed-tables OK:', result._metadata?.elapsed_ms, 'ms');
+        return result;
+      }
+      throw new Error('V2 retornou dados invalidos');
+    } catch (error) {
+      console.warn('V2 detailed-tables falhou, usando V1:', error.message);
+      // Fallback para endpoint original
+      return this.get(`/dashboard/detailed-tables`, params);
+    }
+  },
+
+  /**
+   * Verifica status do MongoDB e sincronizacao
+   */
+  async getV2Status() {
+    return this.get(`/v2/dashboard/health`);
+  },
+
+  /**
+   * Dispara sincronizacao manual do Kommo -> MongoDB
+   */
+  async triggerKommoSync(type = 'incremental') {
+    const endpoint = type === 'full' ? '/webhooks/sync/full' : '/webhooks/sync/incremental';
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao disparar sync:', error);
+      throw error;
+    }
   }
 };
 
