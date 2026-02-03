@@ -1292,14 +1292,28 @@ const DashboardSales = ({
     }
 
     // Nova lógica: Agrupar por corretor e calcular métricas separando normais e orgânicos
+    // Usar CorretorID como chave para evitar duplicação quando corretor é renomeado
     const corretorStats = {};
+
+    // Função auxiliar para obter chave do corretor (usa ID se disponível, senão nome)
+    const getCorretorKey = (item) => {
+      if (item.CorretorID) return `id_${item.CorretorID}`;
+      const name = item.Corretor === 'SA IMOB' ? 'Não atribuído' : (item.Corretor || 'Não atribuído');
+      return `name_${name}`;
+    };
+
+    // Função auxiliar para obter nome do corretor para exibição
+    const getCorretorDisplayName = (item) => {
+      return item.Corretor === 'SA IMOB' ? 'Não atribuído' : (item.Corretor || 'Não atribuído');
+    };
 
     // Processar leads normais
     normalLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Não atribuído' : (lead.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(lead);
+      const corretorName = getCorretorDisplayName(lead);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1309,17 +1323,23 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        // Atualizar nome para o mais recente (se houver nome diferente)
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].normalLeads++;
+      corretorStats[corretorKey].normalLeads++;
     });
 
     // Processar leads orgânicos
     organicLeads.forEach(lead => {
-      const corretorName = lead.Corretor === 'SA IMOB' ? 'Não atribuído' : (lead.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(lead);
+      const corretorName = getCorretorDisplayName(lead);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1329,17 +1349,22 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].organicLeads++;
+      corretorStats[corretorKey].organicLeads++;
     });
 
     // Processar reuniões normais
     normalMeetings.forEach(meeting => {
-      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Não atribuído' : (meeting.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(meeting);
+      const corretorName = getCorretorDisplayName(meeting);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1349,17 +1374,22 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].normalMeetings++;
+      corretorStats[corretorKey].normalMeetings++;
     });
 
     // Processar reuniões orgânicas
     organicMeetings.forEach(meeting => {
-      const corretorName = meeting.Corretor === 'SA IMOB' ? 'Não atribuído' : (meeting.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(meeting);
+      const corretorName = getCorretorDisplayName(meeting);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1369,9 +1399,13 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].organicMeetings++;
+      corretorStats[corretorKey].organicMeetings++;
     });
     
     // Processar propostas usando propostasDetalhes do backend (já filtradas por Data da Proposta!)
@@ -1445,10 +1479,11 @@ const DashboardSales = ({
     
     // Contar propostas por corretor
     propostas.forEach(proposta => {
-      const corretorName = proposta.Corretor === 'SA IMOB' ? 'Não atribuído' : (proposta.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(proposta);
+      const corretorName = getCorretorDisplayName(proposta);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1458,17 +1493,22 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].proposalsHeld++;
+      corretorStats[corretorKey].proposalsHeld++;
     });
 
     // Processar vendas normais
     normalSales.forEach(sale => {
-      const corretorName = sale.Corretor === 'SA IMOB' ? 'Não atribuído' : (sale.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(sale);
+      const corretorName = getCorretorDisplayName(sale);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1478,17 +1518,22 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].normalSales++;
+      corretorStats[corretorKey].normalSales++;
     });
 
     // Processar vendas orgânicas
     organicSales.forEach(sale => {
-      const corretorName = sale.Corretor === 'SA IMOB' ? 'Não atribuído' : (sale.Corretor || 'Não atribuído');
+      const corretorKey = getCorretorKey(sale);
+      const corretorName = getCorretorDisplayName(sale);
 
-      if (!corretorStats[corretorName]) {
-        corretorStats[corretorName] = {
+      if (!corretorStats[corretorKey]) {
+        corretorStats[corretorKey] = {
           name: corretorName,
           normalLeads: 0,
           organicLeads: 0,
@@ -1498,9 +1543,13 @@ const DashboardSales = ({
           normalSales: 0,
           organicSales: 0
         };
+      } else {
+        if (corretorName !== 'Não atribuído') {
+          corretorStats[corretorKey].name = corretorName;
+        }
       }
 
-      corretorStats[corretorName].organicSales++;
+      corretorStats[corretorKey].organicSales++;
     });
     
     // Converter para array e adicionar total para ordenação
