@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import * as echarts from 'echarts';
 import Select from 'react-select';
 import { KommoAPI } from '../services/api';
-import { GranularAPI } from '../services/granularAPI';
 import LoadingSpinner from './LoadingSpinner';
 import SimpleModal from './SimpleModal';
 import DetailModal from './common/DetailModal';
@@ -218,56 +217,7 @@ const DashboardSales = ({
   const [receitaPrevistaPeriodoAnterior, setReceitaPrevistaPeriodoAnterior] = useState(0);
   const [loadingReceitaPrevista, setLoadingReceitaPrevista] = useState(true);
 
-  // Estado para investimento em ads (Facebook/Meta) - usado para ROAS, ROI, CAC
-  const [adSpend, setAdSpend] = useState(0);
-  const [loadingAdSpend, setLoadingAdSpend] = useState(true);
 
-  // Buscar investimento em ads do Facebook/Meta
-  useEffect(() => {
-    const fetchAdSpend = async () => {
-      try {
-        setLoadingAdSpend(true);
-        const now = new Date();
-        let startDate, endDate;
-
-        if (period === 'current_month') {
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = now;
-        } else if (period === 'previous_month') {
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        } else if (period === 'year') {
-          startDate = new Date(now.getFullYear(), 0, 1);
-          endDate = now;
-        } else if (period === '7d') {
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          endDate = now;
-        } else if (period === 'custom' && customPeriod?.startDate && customPeriod?.endDate) {
-          const [sd, sm, sy] = customPeriod.startDate.split('/');
-          const [ed, em, ey] = customPeriod.endDate.split('/');
-          startDate = new Date(sy, sm - 1, sd);
-          endDate = new Date(ey, em - 1, ed);
-        } else {
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = now;
-        }
-
-        const startStr = startDate.toISOString().split('T')[0];
-        const endStr = endDate.toISOString().split('T')[0];
-
-        const fbData = await GranularAPI.getFacebookUnifiedData(startStr, endStr);
-        const spend = fbData?.totals?.spend || 0;
-        setAdSpend(spend);
-      } catch (error) {
-        console.error('Erro ao buscar investimento em ads:', error);
-        setAdSpend(0);
-      } finally {
-        setLoadingAdSpend(false);
-      }
-    };
-
-    fetchAdSpend();
-  }, [period, customPeriod]);
 
   // Calcular receita prevista a partir dos dados do salesData
   // Usa propostasDetalhes e filtra por etapas: "Contrato Enviado", "Contrato Assinado", "Venda ganha"
@@ -1567,21 +1517,27 @@ const DashboardSales = ({
       sales: stats.normalSales + stats.organicSales
     }));
 
-    // Ordenar por total de cada categoria
-    const sortedLeads = [...finalData].sort((a, b) => {
-      const diff = b.totalLeads - a.totalLeads;
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
+    // Ordenar por total de cada categoria e filtrar valores 0
+    const sortedLeads = [...finalData]
+      .filter(item => (item.totalLeads || item.value || 0) > 0)
+      .sort((a, b) => {
+        const diff = b.totalLeads - a.totalLeads;
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
 
-    const sortedMeetings = [...finalData].sort((a, b) => {
-      const diff = b.totalMeetings - a.totalMeetings;
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
+    const sortedMeetings = [...finalData]
+      .filter(item => (item.totalMeetings || item.meetingsHeld || 0) > 0)
+      .sort((a, b) => {
+        const diff = b.totalMeetings - a.totalMeetings;
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
 
-    const sortedSales = [...finalData].sort((a, b) => {
-      const diff = b.totalSales - a.totalSales;
-      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-    });
+    const sortedSales = [...finalData]
+      .filter(item => (item.totalSales || item.sales || 0) > 0)
+      .sort((a, b) => {
+        const diff = b.totalSales - a.totalSales;
+        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+      });
 
     return {
       sortedLeadsData: sortedLeads,
@@ -2232,30 +2188,6 @@ const DashboardSales = ({
     );
   }
 
-  // Pre-computar valores das metricas para condicional de visibilidade
-  const metricValues = (() => {
-    const rawData = salesData?._rawTablesData || data?._rawTablesData;
-    const totalMeetings = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
-    const totalProposals = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
-    const totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-    const totalRevenue = rawData?.summary?.valor_total_vendas || 0;
-    const ticketMedio = totalSales > 0 ? totalRevenue / totalSales : 0;
-
-    // MQL: Leads de fontes pagas (Tráfego Meta)
-    const leadsDetalhes = rawData?.leadsDetalhes || [];
-    const mqlCount = leadsDetalhes.filter(lead => {
-      const fonte = lead.Fonte || lead.fonte || '';
-      return fonte.toLowerCase().includes('tráfego') || fonte.toLowerCase().includes('trafego') || fonte.toLowerCase().includes('meta');
-    }).length;
-
-    // ROAS, ROI, CAC (dependem do adSpend)
-    const roas = adSpend > 0 ? totalRevenue / adSpend : 0;
-    const roi = adSpend > 0 ? ((totalRevenue - adSpend) / adSpend) * 100 : 0;
-    const cac = totalSales > 0 && adSpend > 0 ? adSpend / totalSales : 0;
-
-    return { totalMeetings, totalProposals, totalSales, ticketMedio, totalRevenue, receitaPrevista, mqlCount, roas, roi, cac, adSpend };
-  })();
-
   return (
     <div className={`dashboard-content ${isUpdating ? 'updating' : ''}`}>
 
@@ -2437,7 +2369,6 @@ const DashboardSales = ({
           <div className="card-title">Métricas de Vendas e Produtividade</div>
           <div className="metrics-group">
                <div className="metrics-group">
-            {metricValues.totalMeetings > 0 && (
             <div
               className="mini-metric-card"
               onClick={() => openModal('reunioes')}
@@ -2470,8 +2401,6 @@ const DashboardSales = ({
                 <span>TAXA CONV.</span>
               </div>
             </div>
-            )}
-            {metricValues.totalProposals > 0 && (
             <div
               className="mini-metric-card"
               onClick={() => openModal('propostas')}
@@ -2504,9 +2433,7 @@ const DashboardSales = ({
                 <span>TAXA CONV.</span>
               </div>
             </div>
-            )}
           </div>
-            {metricValues.totalSales > 0 && (
             <div
               className="mini-metric-card"
               onClick={() => openModal('vendas')}
@@ -2539,8 +2466,6 @@ const DashboardSales = ({
                 <span>TAXA CONV.</span>
               </div>
             </div>
-            )}
-            {metricValues.ticketMedio > 0 && (
             <div className="mini-metric-card">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className="mini-metric-value" style={{ color: '#374151' }}>
@@ -2674,8 +2599,6 @@ const DashboardSales = ({
               </div>
               <div className="mini-metric-title">TICKET MÉDIO</div>
             </div>
-            )}
-            {metricValues.totalRevenue > 0 && (
             <div
               className="mini-metric-card"
               onClick={() => openModal('receitaTotal')}
@@ -2801,8 +2724,6 @@ const DashboardSales = ({
               <div className="mini-metric-title">RECEITA TOTAL</div>
               <div className="mini-metric-subtitle">Vendas Realizadas</div>
             </div>
-            )}
-            {metricValues.receitaPrevista > 0 && (
             <div
               className="mini-metric-card"
               onClick={() => openModal('receitaPrevista')}
@@ -2829,85 +2750,9 @@ const DashboardSales = ({
               <div className="mini-metric-title">RECEITA PREVISTA</div>
               <div className="mini-metric-subtitle">Propostas na Mesa</div>
             </div>
-            )}
           </div>
         </div>
       </div>
-
-      {/* Linha 2: Métricas de Performance (ROAS, ROI, CAC, MQL) */}
-      {(metricValues.adSpend > 0 || metricValues.mqlCount > 0) && (
-      <div className="dashboard-row row-compact">
-        <div className="card card-metrics-group">
-          <div className="card-title">Métricas de Performance</div>
-          <div className="metrics-group">
-            {metricValues.mqlCount > 0 && (
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: '#7C3AED' }}>
-                  {metricValues.mqlCount}
-                </div>
-              </div>
-              <div className="mini-metric-title">MQL</div>
-              <div className="mini-metric-subtitle">Leads de Tráfego Pago</div>
-            </div>
-            )}
-            {metricValues.roas > 0 && (
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: '#059669' }}>
-                  {metricValues.roas.toFixed(1)}x
-                </div>
-              </div>
-              <div className="mini-metric-title">ROAS</div>
-              <div className="mini-metric-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>Retorno sobre Anúncio</span>
-              </div>
-            </div>
-            )}
-            {metricValues.roi > 0 && (
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: '#059669' }}>
-                  {metricValues.roi >= 1000
-                    ? `${(metricValues.roi / 1000).toFixed(1)}k%`
-                    : `${metricValues.roi.toFixed(0)}%`
-                  }
-                </div>
-              </div>
-              <div className="mini-metric-title">ROI</div>
-              <div className="mini-metric-subtitle">Retorno sobre Investimento</div>
-            </div>
-            )}
-            {metricValues.cac > 0 && (
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: '#DC2626' }}>
-                  R$ {formatCurrency(metricValues.cac)}
-                </div>
-              </div>
-              <div className="mini-metric-title">CAC</div>
-              <div className="mini-metric-subtitle">Custo por Cliente</div>
-            </div>
-            )}
-            {metricValues.adSpend > 0 && (
-            <div className="mini-metric-card">
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className="mini-metric-value" style={{ color: '#374151' }}>
-                  {loadingAdSpend ? (
-                    <span style={{ fontSize: '14px' }}>Carregando...</span>
-                  ) : (
-                    `R$ ${formatCurrency(metricValues.adSpend)}`
-                  )}
-                </div>
-              </div>
-              <div className="mini-metric-title">INVESTIMENTO ADS</div>
-              <div className="mini-metric-subtitle">Tráfego Pago (Meta)</div>
-            </div>
-            )}
-          </div>
-        </div>
-      </div>
-      )}
 
       {/* Linha 5: Gráficos de Corretores - Layout Vertical */}
       <div className="dashboard-row" style={{ flexDirection: 'column' }}>
