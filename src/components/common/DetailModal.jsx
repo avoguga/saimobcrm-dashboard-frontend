@@ -1103,13 +1103,29 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                     justifyContent: 'center',
                     alignItems: 'center',
                     gap: '12px',
-                    color: COLORS.white
+                    color: COLORS.white,
+                    flexWrap: 'wrap'
                   }}>
                     <span style={{ fontSize: '24px' }}>{TYPE_ICONS[type] || '📊'}</span>
                     <div>
                       <div style={{ fontSize: '12px', opacity: 0.9 }}>Total de registros</div>
                       <div style={{ fontSize: '24px', fontWeight: '700' }}>{sortedData.length}</div>
                     </div>
+                    {(type === 'vendas' || type === 'receitaTotal') && (() => {
+                      const totalVGV = sortedData.reduce((sum, item) => {
+                        const val = item['Valor da Venda'] || '';
+                        const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
+                        return sum + num;
+                      }, 0);
+                      return totalVGV > 0 ? (
+                        <div style={{ borderLeft: '1px solid rgba(255,255,255,0.3)', paddingLeft: '12px' }}>
+                          <div style={{ fontSize: '12px', opacity: 0.9 }}>VGV Total</div>
+                          <div style={{ fontSize: '20px', fontWeight: '700' }}>
+                            R$ {totalVGV.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               ) : (
@@ -1368,23 +1384,49 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         Total de registros
                       </span>
                     </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: isMobile ? '8px 14px' : '10px 18px',
-                      backgroundColor: COLORS.primary,
-                      borderRadius: '8px',
-                      color: COLORS.white
-                    }}>
-                      <span style={{
-                        fontSize: isMobile ? '18px' : isLargeScreen ? '22px' : '20px',
-                        fontWeight: '700'
-                      }}>{sortedData.length}</span>
-                      <span style={{
-                        fontSize: isMobile ? '12px' : isLargeScreen ? '14px' : '13px',
-                        opacity: 0.9
-                      }}>{type}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                      {(type === 'vendas' || type === 'receitaTotal') && (() => {
+                        const totalVGV = sortedData.reduce((sum, item) => {
+                          const val = item['Valor da Venda'] || '';
+                          const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
+                          return sum + num;
+                        }, 0);
+                        return totalVGV > 0 ? (
+                          <div style={{
+                            padding: isMobile ? '8px 14px' : '10px 18px',
+                            backgroundColor: '#059669',
+                            borderRadius: '8px',
+                            color: COLORS.white,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <span style={{ fontSize: isMobile ? '11px' : '12px', opacity: 0.9 }}>VGV</span>
+                            <span style={{
+                              fontSize: isMobile ? '16px' : isLargeScreen ? '20px' : '18px',
+                              fontWeight: '700'
+                            }}>R$ {totalVGV.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        ) : null;
+                      })()}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: isMobile ? '8px 14px' : '10px 18px',
+                        backgroundColor: COLORS.primary,
+                        borderRadius: '8px',
+                        color: COLORS.white
+                      }}>
+                        <span style={{
+                          fontSize: isMobile ? '18px' : isLargeScreen ? '22px' : '20px',
+                          fontWeight: '700'
+                        }}>{sortedData.length}</span>
+                        <span style={{
+                          fontSize: isMobile ? '12px' : isLargeScreen ? '14px' : '13px',
+                          opacity: 0.9
+                        }}>{type}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
