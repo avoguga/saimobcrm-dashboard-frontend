@@ -1,21 +1,19 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import * as echarts from 'echarts';
 import Select from 'react-select';
-import LoadingSpinner from './LoadingSpinner';
 import SimpleModal from './SimpleModal';
 import DetailModal from './common/DetailModal';
 import { COLORS } from '../constants/colors';
-import ExcelExporter from '../utils/excelExport';
 import GranularAPI from '../services/granularAPI';
 import './Dashboard.css';
 
-function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, setSelectedSource, sourceOptions, data, salesData, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
+function DashboardMarketing({ period, windowSize, selectedSource, data, salesData, isLoading, isUpdating, customPeriod, setCustomPeriod, showCustomPeriod, setShowCustomPeriod, handlePeriodChange, applyCustomPeriod, onDataRefresh }) {
   const [marketingData, setMarketingData] = useState(data);
-  const [filteredData, setFilteredData] = useState(data);
+  const [, setFilteredData] = useState(data);
 
   // Estados para dados do Facebook
-  const [facebookData, setFacebookData] = useState(null);
-  const [facebookError, setFacebookError] = useState(null);
+  const [, setFacebookData] = useState(null);
+  const [facebookError] = useState(null);
 
   // Estados para filtros do Facebook
   const [facebookFilters, setFacebookFilters] = useState({
@@ -73,7 +71,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   
   // Estados para dados demográficos
-  const [demographicData, setDemographicData] = useState({
+  const [, setDemographicData] = useState({
     genderData: [],
     cityData: []
   });
@@ -91,10 +89,11 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     error: null
   });
   
-  const [modalForceUpdate, setModalForceUpdate] = useState(0);
+  const [, setModalForceUpdate] = useState(0);
+  const [followerModalOpen, setFollowerModalOpen] = useState(false);
 
   // Estados para dados geográficos
-  const [geographicData, setGeographicData] = useState({
+  const [, setGeographicData] = useState({
     cities: [],
     regions: [],
     countries: [],
@@ -107,7 +106,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
   // Constantes de responsividade
   const isMobile = windowSize.width < 768;
-  const isSmallMobile = windowSize.width < 480;
+
 
   // Load real data from API
   useEffect(() => {
@@ -189,6 +188,16 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       ...(tablesData.reunioesOrganicasDetalhes || [])
     ];
 
+    // Filtrar por fonte selecionada
+    if (selectedSource && selectedSource !== 'todos') {
+      allLeads = allLeads.filter(l =>
+        (l.Fonte || '').toLowerCase() === selectedSource.toLowerCase()
+      );
+      allMeetings = allMeetings.filter(m =>
+        (m.Fonte || '').toLowerCase() === selectedSource.toLowerCase()
+      );
+    }
+
     // Processar leads por corretor
     const leadsByCorretor = {};
     allLeads.forEach(lead => {
@@ -224,7 +233,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       sortedLeadsData,
       sortedMeetingsData
     };
-  }, [salesData?._rawTablesData]);
+  }, [salesData?._rawTablesData, selectedSource]);
 
   // Modal functions
   const openModal = useCallback(async (type, title) => {
@@ -705,6 +714,29 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   })();
 
 
+  // Métricas de Retorno (ROAS, ROI, CAC, MQL)
+  const returnMetrics = useMemo(() => {
+    const spend = facebookMetrics.spend || 0;
+    const totalRevenue = salesData?.totalRevenue || 0;
+    const totalSales = salesData?.totalSales || 0;
+
+    const roas = spend > 0 ? totalRevenue / spend : null;
+    const roi = spend > 0 ? ((totalRevenue - spend) / spend) * 100 : null;
+    const cac = totalSales > 0 ? spend / totalSales : null;
+
+    let mql = 0;
+    const leadsDetalhes = salesData?._rawTablesData?.leadsDetalhes || [];
+    mql = leadsDetalhes.filter(lead => {
+      const fonte = (lead.Fonte || '').toLowerCase();
+      const estagio = (lead.Etapa || lead.Status || '').toLowerCase();
+      const isPaid = fonte.includes('facebook') || fonte.includes('instagram') || fonte.includes('meta') || fonte.includes('google') || fonte.includes('ads') || fonte.includes('pag');
+      const isQualified = estagio.includes('qualificado') || estagio.includes('mql') || estagio.includes('qualified');
+      return isPaid && isQualified;
+    }).length;
+
+    return { roas, roi, cac, mql };
+  }, [facebookMetrics.spend, salesData?.totalRevenue, salesData?.totalSales, salesData?._rawTablesData?.leadsDetalhes]);
+
   // Configurações dos gráficos
   const chartConfigs = {
     leadsConfig: {
@@ -759,8 +791,8 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
   };
 
   // Card de métrica com tendência elegante
-  const MiniMetricCardWithTrend = ({ title, value, trendValue, color = COLORS.primary, subtitle }) => (
-    <div className="mini-metric-card">
+  const MiniMetricCardWithTrend = ({ title, value, trendValue, color = COLORS.primary, subtitle, onClick }) => (
+    <div className="mini-metric-card" onClick={onClick} style={onClick ? { cursor: 'pointer' } : undefined}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <div className="mini-metric-value" style={{ color }}>{value}</div>
         <TrendIndicator value={trendValue} />
@@ -770,14 +802,6 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
     </div>
   );
 
-  const formatNumber = (num) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num?.toString() || '0';
-  };
 
   // Memoized Compact Chart Component
   const CompactChart = memo(({ data, type, config, style, loading = false, onBarClick = null }) => {
@@ -996,7 +1020,7 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
       {/* Cabeçalho com período */}
       <div className="dashboard-header">
         <div className="dashboard-header-content">
-          <h2>Dashboard Marketing</h2>
+          <h2 style={{ fontWeight: 700, fontSize: '24px', color: COLORS.dark, borderLeft: `4px solid ${COLORS.secondary}`, paddingLeft: '12px' }}>Dashboard Marketing</h2>
           <div className="dashboard-subtitle">
             <span>
               Período: {(() => {
@@ -1050,73 +1074,71 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
 
       {/* Facebook Filters */}
       <div className="dashboard-row">
-        <div className="card">
-          <div className="facebook-filters-header">
-            <span>CAMPANHAS</span>
-            <span>CONJUNTOS</span>
-            <span>ANÚNCIOS</span>
-          </div>
-          <div className="facebook-filters-controls">
-            {/* Campaign MultiSelect */}
-            <div className="react-select-container">
-              <Select
-                isMulti={true}
-                isSearchable={true}
-                closeMenuOnSelect={false}
-                hideSelectedOptions={false}
-                value={selectedCampaignValues}
-                onChange={(selectedOptions) => {
-                  const values = selectedOptions.map(option => option.value);
-                  updateFilter('campaigns', values);
-                }}
-                options={campaignOptions}
-                placeholder="Selecionar campanhas..."
-                noOptionsMessage={() => "Nenhuma campanha encontrada"}
-                className="react-select"
-                classNamePrefix="react-select"
-              />
-            </div>
+        <div className="card" style={{ padding: '16px 24px' }}>
+          <div className="facebook-filters-integrated">
+            <div style={{ fontSize: '14px', fontWeight: 600, color: COLORS.dark, marginBottom: '4px' }}>Filtros</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+              <div className="filter-group">
+                <label>Campanhas</label>
+                <Select
+                  isMulti={true}
+                  isSearchable={true}
+                  closeMenuOnSelect={false}
+                  hideSelectedOptions={false}
+                  value={selectedCampaignValues}
+                  onChange={(selectedOptions) => {
+                    const values = selectedOptions.map(option => option.value);
+                    updateFilter('campaigns', values);
+                  }}
+                  options={campaignOptions}
+                  placeholder="Selecionar campanhas..."
+                  noOptionsMessage={() => "Nenhuma campanha encontrada"}
+                  className="react-select"
+                  classNamePrefix="react-select"
+                />
+              </div>
 
-            {/* Adset MultiSelect */}
-            <div className="react-select-container">
-              <Select
-                isMulti={true}
-                isSearchable={true}
-                closeMenuOnSelect={false}
-                hideSelectedOptions={false}
-                value={selectedAdsetValues}
-                onChange={(selectedOptions) => {
-                  const values = selectedOptions.map(option => option.value);
-                  updateFilter('adsets', values);
-                }}
-                options={adsetOptions}
-                placeholder="Selecionar conjuntos..."
-                noOptionsMessage={() => "Nenhum conjunto encontrado"}
-                className="react-select"
-                classNamePrefix="react-select"
-                isDisabled={!facebookFilters.campaigns || adsetOptions.length === 0}
-              />
-            </div>
+              <div className="filter-group">
+                <label>Conjuntos</label>
+                <Select
+                  isMulti={true}
+                  isSearchable={true}
+                  closeMenuOnSelect={false}
+                  hideSelectedOptions={false}
+                  value={selectedAdsetValues}
+                  onChange={(selectedOptions) => {
+                    const values = selectedOptions.map(option => option.value);
+                    updateFilter('adsets', values);
+                  }}
+                  options={adsetOptions}
+                  placeholder="Selecionar conjuntos..."
+                  noOptionsMessage={() => "Nenhum conjunto encontrado"}
+                  className="react-select"
+                  classNamePrefix="react-select"
+                  isDisabled={!facebookFilters.campaigns || adsetOptions.length === 0}
+                />
+              </div>
 
-            {/* Ad MultiSelect */}
-            <div className="react-select-container">
-              <Select
-                isMulti={true}
-                isSearchable={true}
-                closeMenuOnSelect={false}
-                hideSelectedOptions={false}
-                value={selectedAdValues}
-                onChange={(selectedOptions) => {
-                  const values = selectedOptions.map(option => option.value);
-                  updateFilter('ads', values);
-                }}
-                options={adOptions}
-                placeholder="Selecionar anúncios..."
-                noOptionsMessage={() => "Nenhum anúncio encontrado"}
-                className="react-select"
-                classNamePrefix="react-select"
-                isDisabled={!facebookFilters.adsets || adOptions.length === 0}
-              />
+              <div className="filter-group">
+                <label>Anúncios</label>
+                <Select
+                  isMulti={true}
+                  isSearchable={true}
+                  closeMenuOnSelect={false}
+                  hideSelectedOptions={false}
+                  value={selectedAdValues}
+                  onChange={(selectedOptions) => {
+                    const values = selectedOptions.map(option => option.value);
+                    updateFilter('ads', values);
+                  }}
+                  options={adOptions}
+                  placeholder="Selecionar anúncios..."
+                  noOptionsMessage={() => "Nenhum anúncio encontrado"}
+                  className="react-select"
+                  classNamePrefix="react-select"
+                  isDisabled={!facebookFilters.adsets || adOptions.length === 0}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1137,16 +1159,25 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               color={COLORS.primary}
             />
             <MiniMetricCardWithTrend
-              title="TOTAL DE VISITAS AO PERFIL"
-              value={facebookMetrics.profileVisits.toString()}
+              title="GANHO DE SEGUIDORES"
+              value="N/D"
               trendValue={null}
               color={COLORS.secondary}
+              subtitle="Em breve"
+              onClick={() => setFollowerModalOpen(true)}
             />
             <MiniMetricCardWithTrend
               title="CONVERSAS PELO WHATSAPP"
               value={facebookMetrics.whatsappConversations.toString()}
               trendValue={null}
               color={COLORS.success}
+            />
+            <MiniMetricCardWithTrend
+              title="CONVERSAS VIA DIRECT"
+              value="0"
+              trendValue={null}
+              color={COLORS.warning}
+              subtitle="Em breve"
             />
           </div>
         </div>
@@ -1204,6 +1235,42 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               value={`R$ ${facebookMetrics.spend.toFixed(2)}`}
               trendValue={null}
               color={COLORS.danger}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Métricas de Retorno */}
+      <div className="dashboard-row row-compact">
+        <div className="card card-metrics-group wide">
+          <div className="card-title">Métricas de Retorno</div>
+          <div className="metrics-group">
+            <MiniMetricCardWithTrend
+              title="ROAS"
+              value={returnMetrics.roas !== null ? `${returnMetrics.roas.toFixed(2)}x` : 'N/D'}
+              trendValue={null}
+              color={COLORS.success}
+              subtitle="Retorno sobre investimento em ads"
+            />
+            <MiniMetricCardWithTrend
+              title="ROI"
+              value={returnMetrics.roi !== null ? `${returnMetrics.roi.toFixed(1)}%` : 'N/D'}
+              trendValue={null}
+              color={returnMetrics.roi === null ? COLORS.tertiary : (returnMetrics.roi >= 0 ? COLORS.success : COLORS.danger)}
+            />
+            <MiniMetricCardWithTrend
+              title="CAC"
+              value={returnMetrics.cac !== null ? `R$ ${returnMetrics.cac.toFixed(2)}` : 'N/D'}
+              trendValue={null}
+              color={COLORS.warning}
+              subtitle="Custo de aquisição por cliente"
+            />
+            <MiniMetricCardWithTrend
+              title="MQL"
+              value={returnMetrics.mql.toString()}
+              trendValue={null}
+              color={COLORS.primary}
+              subtitle="Leads qualificados de mídia paga"
             />
           </div>
         </div>
@@ -1365,6 +1432,107 @@ function DashboardMarketing({ period, setPeriod, windowSize, selectedSource, set
               Aplicar Período
             </button>
           </div>
+        </div>
+      </SimpleModal>
+
+      {/* Follower structure modal */}
+      <SimpleModal
+        isOpen={followerModalOpen}
+        onClose={() => setFollowerModalOpen(false)}
+        title="Estrutura de Campanhas"
+      >
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e8ecef', background: '#f8f9fa' }}>
+                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Campanha</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Conjunto</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Anúncio</th>
+                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data?.facebookStructure?.campaigns?.length > 0 ? (
+                data.facebookStructure.campaigns.flatMap(campaign => {
+                  const rows = [];
+                  if (campaign.adsets?.length > 0) {
+                    campaign.adsets.forEach(adset => {
+                      if (adset.ads?.length > 0) {
+                        adset.ads.forEach(ad => {
+                          rows.push(
+                            <tr key={`${campaign.id}-${adset.id}-${ad.id}`} style={{ borderBottom: '1px solid #e8ecef' }}>
+                              <td style={{ padding: '8px 12px' }}>{campaign.name}</td>
+                              <td style={{ padding: '8px 12px' }}>{adset.name}</td>
+                              <td style={{ padding: '8px 12px' }}>{ad.name}</td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 500,
+                                  background: (ad.status || '').toUpperCase() === 'ACTIVE' ? 'rgba(76,224,179,0.15)' : 'rgba(255,170,91,0.15)',
+                                  color: (ad.status || '').toUpperCase() === 'ACTIVE' ? COLORS.success : COLORS.warning
+                                }}>
+                                  {ad.status || '-'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      } else {
+                        rows.push(
+                          <tr key={`${campaign.id}-${adset.id}`} style={{ borderBottom: '1px solid #e8ecef' }}>
+                            <td style={{ padding: '8px 12px' }}>{campaign.name}</td>
+                            <td style={{ padding: '8px 12px' }}>{adset.name}</td>
+                            <td style={{ padding: '8px 12px', color: '#9ca3af' }}>-</td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                background: (adset.status || '').toUpperCase() === 'ACTIVE' ? 'rgba(76,224,179,0.15)' : 'rgba(255,170,91,0.15)',
+                                color: (adset.status || '').toUpperCase() === 'ACTIVE' ? COLORS.success : COLORS.warning
+                              }}>
+                                {adset.status || '-'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      }
+                    });
+                  } else {
+                    rows.push(
+                      <tr key={campaign.id} style={{ borderBottom: '1px solid #e8ecef' }}>
+                        <td style={{ padding: '8px 12px' }}>{campaign.name}</td>
+                        <td style={{ padding: '8px 12px', color: '#9ca3af' }}>-</td>
+                        <td style={{ padding: '8px 12px', color: '#9ca3af' }}>-</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            background: (campaign.status || '').toUpperCase() === 'ACTIVE' ? 'rgba(76,224,179,0.15)' : 'rgba(255,170,91,0.15)',
+                            color: (campaign.status || '').toUpperCase() === 'ACTIVE' ? COLORS.success : COLORS.warning
+                          }}>
+                            {campaign.status || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return rows;
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} style={{ padding: '20px', textAlign: 'center', color: '#9ca3af' }}>
+                    Nenhuma campanha encontrada
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </SimpleModal>
 
