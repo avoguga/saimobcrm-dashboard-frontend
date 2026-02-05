@@ -360,8 +360,10 @@ export const KommoAPI = {
   /**
    * Dispara sincronizacao manual do Kommo -> MongoDB
    */
-  async triggerKommoSync(type = 'incremental') {
-    const endpoint = type === 'full' ? '/webhooks/sync/full' : '/webhooks/sync/incremental';
+  async triggerKommoSync(type = 'incremental', wait = true) {
+    const endpoint = type === 'full'
+      ? `/webhooks/sync/full?wait=${wait}`
+      : `/webhooks/sync/incremental?wait=${wait}&minutes=60`;
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',

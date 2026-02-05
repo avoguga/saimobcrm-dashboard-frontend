@@ -293,6 +293,7 @@ function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30); // segundos
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Função para extrair lista de corretores dos dados de vendas
   const extractCorretoresFromSalesData = (salesData) => {
@@ -725,14 +726,23 @@ function Dashboard() {
 
     // Limpar cache se for refresh forçado
     if (forceRefresh) {
-      // Limpar cache local
+      // 1. Sincronizar dados do Kommo -> MongoDB
+      setIsSyncing(true);
+      try {
+        await KommoAPI.triggerKommoSync('incremental', true);
+        console.log('Sync incremental concluido');
+      } catch (error) {
+        console.error('Erro no sync Kommo:', error);
+      }
+      setIsSyncing(false);
+
+      // 2. Limpar cache local
       KommoAPI.clearCache();
-      // Limpar cache do backend (Kommo)
+      // 3. Limpar cache do backend (Kommo)
       try {
         await KommoAPI.flushKommoCache();
       } catch (error) {
         console.error('Erro ao limpar cache do Kommo:', error);
-        // Continuar mesmo se falhar a limpeza do cache do backend
       }
     }
 
@@ -1163,14 +1173,14 @@ function Dashboard() {
             )}
           </div>
           
-          <button 
-            className="action-button" 
-            onClick={() => refreshData(true)} 
-            disabled={isLoadingMarketing || isLoadingSales}
-            title="Atualizar dados (limpar cache)"
+          <button
+            className="action-button"
+            onClick={() => refreshData(true)}
+            disabled={isLoadingMarketing || isLoadingSales || isSyncing}
+            title="Sincronizar dados do Kommo e atualizar dashboard"
           >
-            <span className="icon">{(isLoadingMarketing || isLoadingSales) ? '⏳' : '🔄'}</span> 
-            {(isLoadingMarketing || isLoadingSales) ? 'Atualizando...' : 'Refresh Cache'}
+            <span className="icon">{(isLoadingMarketing || isLoadingSales || isSyncing) ? '⏳' : '🔄'}</span>
+            {isSyncing ? 'Sincronizando...' : (isLoadingMarketing || isLoadingSales) ? 'Atualizando...' : 'Atualizar Dados'}
           </button>
           
           <div className="data-timestamp">
