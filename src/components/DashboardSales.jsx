@@ -2425,8 +2425,8 @@ const DashboardSales = ({
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalProposals = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
-                    const totalLeads = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0);
-                    const conversionRate = totalLeads > 0 ? (totalProposals / totalLeads) * 100 : 0;
+                    const totalMeetings = sortedChartsData.sortedMeetingsData.reduce((sum, user) => sum + (user.meetingsHeld || 0), 0);
+                    const conversionRate = totalMeetings > 0 ? (totalProposals / totalMeetings) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
                 </span>
@@ -2458,8 +2458,8 @@ const DashboardSales = ({
                 <span style={{ color: '#000000', fontWeight: '600' }}>
                   {(() => {
                     const totalSales = sortedChartsData.sortedSalesData.reduce((sum, user) => sum + (user.sales || 0), 0);
-                    const totalLeads = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.value || 0), 0);
-                    const conversionRate = totalLeads > 0 ? (totalSales / totalLeads) * 100 : 0;
+                    const totalProposals = sortedChartsData.sortedLeadsData.reduce((sum, user) => sum + (user.proposalsHeld || 0), 0);
+                    const conversionRate = totalProposals > 0 ? (totalSales / totalProposals) * 100 : 0;
                     return conversionRate.toFixed(1);
                   })()}%
                 </span>
@@ -2721,8 +2721,7 @@ const DashboardSales = ({
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
-              <div className="mini-metric-title">RECEITA TOTAL</div>
-              <div className="mini-metric-subtitle">Vendas Realizadas</div>
+              <div className="mini-metric-title">VENDAS REALIZADAS</div>
             </div>
             <div
               className="mini-metric-card"
@@ -2747,8 +2746,7 @@ const DashboardSales = ({
                   return previous > 0 ? ((current - previous) / previous) * 100 : 0;
                 })()} />
               </div>
-              <div className="mini-metric-title">RECEITA PREVISTA</div>
-              <div className="mini-metric-subtitle">Propostas na Mesa</div>
+              <div className="mini-metric-title">PROPOSTAS NA MESA</div>
             </div>
           </div>
         </div>
