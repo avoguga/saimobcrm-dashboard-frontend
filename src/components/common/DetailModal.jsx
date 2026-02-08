@@ -1417,6 +1417,30 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           </div>
                         ) : null;
                       })()}
+                      {type === 'receitaPrevista' && (() => {
+                        const totalPropostas = sortedData.reduce((sum, item) => {
+                          const val = item['Valor da Proposta'] || '';
+                          const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
+                          return sum + num;
+                        }, 0);
+                        return totalPropostas > 0 ? (
+                          <div style={{
+                            padding: isMobile ? '8px 14px' : '10px 18px',
+                            backgroundColor: '#059669',
+                            borderRadius: '8px',
+                            color: COLORS.white,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <span style={{ fontSize: isMobile ? '11px' : '12px', opacity: 0.9 }}>Total</span>
+                            <span style={{
+                              fontSize: isMobile ? '16px' : isLargeScreen ? '20px' : '18px',
+                              fontWeight: '700'
+                            }}>R$ {totalPropostas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        ) : null;
+                      })()}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
