@@ -985,8 +985,9 @@ const DashboardSales = ({
       const currentData = salesData?._rawTablesData || data?._rawTablesData;
 
       // Para receitaPrevista/receitaTotal, verificar se os dados existem no cache
-      const needsFreshData = (type === 'receitaPrevista' && !currentData?.propostasDetalhes) ||
-                             (type === 'receitaTotal' && !currentData?.vendasDetalhes);
+      // IMPORTANTE: verificar length > 0 porque array vazio é truthy
+      const needsFreshData = (type === 'receitaPrevista' && (!currentData?.propostasDetalhes || currentData.propostasDetalhes.length === 0)) ||
+                             (type === 'receitaTotal' && (!currentData?.vendasDetalhes || currentData.vendasDetalhes.length === 0));
 
       if (currentData && !needsFreshData) {
         // SEMPRE usar os dados já carregados - eles já estão com o período correto
@@ -1067,7 +1068,13 @@ const DashboardSales = ({
         'receitaPrevista': tablesData.propostasDetalhes || [],  // Propostas na mesa = propostasDetalhes
         'receitaTotal': tablesData.vendasDetalhes || []
       };
-      
+
+      // DEBUG: Log para identificar problema
+      console.log('[openModal] type:', type);
+      console.log('[openModal] tablesData keys:', Object.keys(tablesData || {}));
+      console.log('[openModal] propostasDetalhes length:', tablesData?.propostasDetalhes?.length);
+      console.log('[openModal] dataMap[type] length:', dataMap[type]?.length);
+
       // Aplicar pré-filtro se houver filtro ativo no dashboard
       let modalData = dataMap[type];
       
