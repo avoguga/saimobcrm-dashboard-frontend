@@ -1223,10 +1223,9 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                         {renderSortableHeader('Etapa', 'Etapa')}
                         {renderSortableHeader('Corretor', 'Corretor')}
                         {renderSortableHeader('Fonte', 'Fonte')}
-                        {renderSortableHeader('Funil', 'Funil')}
+                        {renderSortableHeader('Produto', 'Produto')}
                         {renderSortableHeader('Data da Proposta', 'Data da Proposta')}
-                        {renderSortableHeader('Data Fechamento', 'Data Fechamento')}
-                        {renderSortableHeader('Valor', 'Valor')}
+                        {renderSortableHeader('Valor da Proposta', 'Valor')}
                       </>
                     )}
                   </tr>
@@ -1350,11 +1349,10 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                           <td style={cellStyle}>{item['Etapa']}</td>
                           <td style={cellStyle}>{item['Corretor']}</td>
                           <td style={cellStyle}>{item['Fonte']}</td>
-                          <td style={cellStyle}>{item['Funil']}</td>
+                          <td style={cellStyle}>{item['Produto'] || 'N/A'}</td>
                           <td style={cellStyle}>{formatDate(item['Data da Proposta'])}</td>
-                          <td style={cellStyle}>{formatDate(item['Data Fechamento'])}</td>
                           <td style={cellStyleBold}>
-                            {item['Valor']}
+                            {item['Valor da Proposta']}
                           </td>
                         </>
                       )}
