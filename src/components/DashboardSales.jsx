@@ -233,12 +233,13 @@ const DashboardSales = ({
           setReceitaPrevista(rawData.summary.receita_prevista);
         } else {
           // Fallback: calcular no frontend usando propostasDetalhes
+          // "Propostas na Mesa" = todas propostas em negociação ativa
           const propostas = rawData?.propostasDetalhes || [];
-          const etapasAlvo = ['Contrato Enviado', 'Contrato Assinado', 'Venda ganha'];
+          const etapasAlvo = ['Proposta enviada', 'Contrato Enviado', 'Contrato Assinado', 'negociação', 'Venda ganha'];
 
           let total = 0;
           propostas.forEach(proposta => {
-            if (etapasAlvo.includes(proposta.Etapa)) {
+            if (etapasAlvo.some(etapa => proposta.Etapa?.toLowerCase() === etapa.toLowerCase())) {
               const valorStr = proposta['Valor da Proposta'] || 'R$ 0,00';
               const valorNum = parseBrazilianCurrency(valorStr);
               total += valorNum;
@@ -303,11 +304,11 @@ const DashboardSales = ({
             setReceitaPrevistaPeriodoAnterior(previousData.summary.receita_prevista);
           } else {
             const propostasPrevious = previousData?.propostasDetalhes || [];
-            const etapasAlvo = ['Contrato Enviado', 'Contrato Assinado', 'Venda ganha'];
+            const etapasAlvo = ['Proposta enviada', 'Contrato Enviado', 'Contrato Assinado', 'negociação', 'Venda ganha'];
 
             let totalPrevious = 0;
             propostasPrevious.forEach(proposta => {
-              if (etapasAlvo.includes(proposta.Etapa)) {
+              if (etapasAlvo.some(etapa => proposta.Etapa?.toLowerCase() === etapa.toLowerCase())) {
                 const valorStr = proposta['Valor da Proposta'] || 'R$ 0,00';
                 const valorNum = parseBrazilianCurrency(valorStr);
                 totalPrevious += valorNum;
