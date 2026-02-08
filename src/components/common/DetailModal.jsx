@@ -34,6 +34,16 @@ const flexibleSearch = (fieldValue, searchValue) => {
   return searchWords.every(word => normalizedField.includes(word));
 };
 
+// Mapeamento de tipos para nomes amigáveis
+const TYPE_FRIENDLY_NAMES = {
+  'leads': 'leads',
+  'reunioes': 'reuniões',
+  'propostas': 'propostas',
+  'vendas': 'vendas',
+  'receitaPrevista': 'propostas na mesa',
+  'receitaTotal': 'receita total'
+};
+
 // Função para formatar data corretamente
 const formatDate = (dateString) => {
   if (!dateString || dateString === 'N/A') return 'N/A';
@@ -1068,7 +1078,7 @@ const DetailModal = memo(({ isOpen, onClose, type, title, isLoading, data, error
                 marginTop: '12px',
                 color: COLORS.tertiary
               }}>
-                Não há {type} no período selecionado.
+                Não há {TYPE_FRIENDLY_NAMES[type] || type} no período selecionado.
               </div>
             </div>
           ) : (

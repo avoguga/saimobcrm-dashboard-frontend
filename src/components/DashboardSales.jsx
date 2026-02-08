@@ -985,7 +985,7 @@ const DashboardSales = ({
       const currentData = salesData?._rawTablesData || data?._rawTablesData;
 
       // Para receitaPrevista/receitaTotal, verificar se os dados existem no cache
-      const needsFreshData = (type === 'receitaPrevista' && !currentData?.receitaPrevistaDetalhes) ||
+      const needsFreshData = (type === 'receitaPrevista' && !currentData?.propostasDetalhes) ||
                              (type === 'receitaTotal' && !currentData?.vendasDetalhes);
 
       if (currentData && !needsFreshData) {
@@ -1064,7 +1064,7 @@ const DashboardSales = ({
           }
         })(),
         'vendas': tablesData.vendasDetalhes || [],
-        'receitaPrevista': tablesData.receitaPrevistaDetalhes || [],
+        'receitaPrevista': tablesData.propostasDetalhes || [],  // Propostas na mesa = propostasDetalhes
         'receitaTotal': tablesData.vendasDetalhes || []
       };
       
