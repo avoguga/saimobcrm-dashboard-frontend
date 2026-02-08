@@ -923,7 +923,7 @@ const DashboardSales = ({
       'reunioes': 'Reuniões Realizadas',
       'propostas': 'Propostas Enviadas',
       'vendas': 'Vendas Realizadas',
-      'receitaPrevista': 'Receita Prevista - Detalhes',
+      'receitaPrevista': 'Propostas na Mesa - Detalhes',
       'receitaTotal': 'Receita Total - Detalhes'
     };
 
