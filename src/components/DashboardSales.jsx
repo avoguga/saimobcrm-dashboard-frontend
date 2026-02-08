@@ -1729,8 +1729,9 @@ const DashboardSales = ({
     // Controlar loading
     useEffect(() => {
       if (!chartInstance.current) return;
-      
-      if (loading || !data || data.length === 0) {
+
+      // Só mostrar loading quando realmente está carregando
+      if (loading) {
         chartInstance.current.showLoading({
           text: 'Carregando...',
           color: '#4E5859',
@@ -1739,8 +1740,28 @@ const DashboardSales = ({
           zlevel: 0
         });
         return;
-      } else {
-        chartInstance.current.hideLoading();
+      }
+
+      // Se não está carregando, esconder loading
+      chartInstance.current.hideLoading();
+
+      // Se não tem dados, mostrar mensagem "Sem dados"
+      if (!data || data.length === 0) {
+        chartInstance.current.setOption({
+          title: {
+            text: 'Sem dados no período',
+            left: 'center',
+            top: 'center',
+            textStyle: {
+              color: '#999',
+              fontSize: 14,
+              fontWeight: 'normal'
+            }
+          },
+          xAxis: { show: false },
+          yAxis: { show: false },
+          series: []
+        });
       }
     }, [loading, data]);
 
